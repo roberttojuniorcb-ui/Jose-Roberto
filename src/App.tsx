@@ -30,7 +30,9 @@ import {
   FileSpreadsheet,
   Briefcase,
   UserCheck,
-  RefreshCw
+  RefreshCw,
+  Edit,
+  Trash2
 } from 'lucide-react';
 import { Cliente, OrdemServico, Quadrante, APIResponse, Motoboy } from './types';
 import { getInitialClientes, AUTO_PECA_SUGESTOES, INITIAL_MOTOBOYS } from './mockData';
@@ -180,6 +182,18 @@ export default function App() {
   const [newClientValorCobradoCliente, setNewClientValorCobradoCliente] = useState<number>(10.00);
   const [newClientEmail, setNewClientEmail] = useState<string>('');
   const [newClientSenha, setNewClientSenha] = useState<string>('');
+
+  // --- STATE FOR CLIENT EDITING (CRUD) ---
+  const [clienteParaEditar, setClienteParaEditar] = useState<Cliente | null>(null);
+  const [editClientNome, setEditClientNome] = useState<string>('');
+  const [editClientQuadrante, setEditClientQuadrante] = useState<Quadrante>('A');
+  const [editClientEndereco, setEditClientEndereco] = useState<string>('');
+  const [editClientTelefone, setEditClientTelefone] = useState<string>('');
+  const [editClientCidade, setEditClientCidade] = useState<string>('Passos - MG');
+  const [editClientValorPagoMotoboy, setEditClientValorPagoMotoboy] = useState<number>(4.00);
+  const [editClientValorCobradoCliente, setEditClientValorCobradoCliente] = useState<number>(10.00);
+  const [editClientEmail, setEditClientEmail] = useState<string>('');
+  const [editClientSenha, setEditClientSenha] = useState<string>('');
 
   // --- STATES FOR FIRST ACCESS SELF-REGISTRATION ---
   const [isFirstAccessModalOpen, setIsFirstAccessModalOpen] = useState<boolean>(false);
@@ -972,6 +986,51 @@ export default function App() {
     setNewClientTelefone('');
     setNewClientEmail('');
     setNewClientSenha('');
+  };
+
+  // Update / Edit client (CRUD update)
+  const handleUpdateCliente = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!clienteParaEditar) return;
+    if (!editClientNome.trim()) {
+      alert("Por favor, preencha o Nome / Razão Social do cliente.");
+      return;
+    }
+    if (!editClientEmail.trim()) {
+      alert("Por favor, preencha o E-mail de cadastro do cliente.");
+      return;
+    }
+
+    const updatedCli: Cliente = {
+      ...clienteParaEditar,
+      nome: editClientNome,
+      quadrante: editClientQuadrante,
+      endereco: editClientEndereco || 'Pendente - Preencher no 1º Acesso',
+      telefone: editClientTelefone || 'Pendente - Preencher no 1º Acesso',
+      cidade: editClientCidade,
+      valorPagoMotoboy: Number(editClientValorPagoMotoboy) || 4.00,
+      valorCobradoCliente: Number(editClientValorCobradoCliente) || 10.00,
+      email: editClientEmail,
+      senha: editClientSenha || clienteParaEditar.senha
+    };
+
+    setClientes(prev => prev.map(c => c.id === clienteParaEditar.id ? updatedCli : c));
+    setClienteParaEditar(null);
+
+    setSupabaseSuccessMsg(`✅ Cadastro de "${updatedCli.nome}" atualizado com sucesso!`);
+    setTimeout(() => setSupabaseSuccessMsg(''), 4000);
+  };
+
+  // Delete client (CRUD delete)
+  const handleDeletarCliente = (clientId: string) => {
+    const targetCli = clientes.find(c => c.id === clientId);
+    if (!targetCli) return;
+
+    if (window.confirm(`Tem certeza que deseja excluir o cliente "${targetCli.nome}"?`)) {
+      setClientes(prev => prev.filter(c => c.id !== clientId));
+      setSupabaseSuccessMsg(`❌ Cliente "${targetCli.nome}" excluído das bases com sucesso!`);
+      setTimeout(() => setSupabaseSuccessMsg(''), 4000);
+    }
   };
 
   // --- SESSION CONTROLLERS ---
@@ -2284,7 +2343,7 @@ export default function App() {
                       </div>
                     </div>
                     
-                    <div className="shrink-0 text-right font-mono flex sm:flex-col justify-between items-center sm:items-end border-t sm:border-t-0 border-slate-100 pt-1.5 sm:pt-0">
+                    <div className="shrink-0 text-right font-mono flex sm:flex-col justify-between items-center sm:items-end border-t sm:border-t-0 border-slate-100 pt-1.5 sm:pt-0 gap-2">
                       <span className={`text-[8.5px] px-2 py-0.5 rounded font-extrabold uppercase tracking-wide inline-block ${
                         cli.criadoPor === 'Entregador' 
                           ? 'bg-amber-100 text-amber-900 border border-amber-200' 
@@ -2292,6 +2351,37 @@ export default function App() {
                       }`}>
                         {cli.criadoPor === 'Entregador' ? 'Rua (Rider)' : 'Expedição'}
                       </span>
+                      
+                      {/* CRUD Actions Buttons for Edit and Delete */}
+                      <div className="flex gap-2.5 mt-1">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setClienteParaEditar(cli);
+                            setEditClientNome(cli.nome);
+                            setEditClientQuadrante(cli.quadrante);
+                            setEditClientEndereco(cli.endereco);
+                            setEditClientTelefone(cli.telefone);
+                            setEditClientCidade(cli.cidade);
+                            setEditClientEmail(cli.email || '');
+                            setEditClientSenha(cli.senha || '');
+                            setEditClientValorCobradoCliente(cli.valorCobradoCliente);
+                            setEditClientValorPagoMotoboy(cli.valorPagoMotoboy);
+                          }}
+                          className="bg-slate-100 hover:bg-slate-200 text-slate-705 p-1 rounded transition border border-slate-250 cursor-pointer"
+                          title="Editar cadastro do cliente"
+                        >
+                          <Edit className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeletarCliente(cli.id)}
+                          className="bg-red-50 hover:bg-red-100 text-red-650 p-1 rounded transition border border-red-200 cursor-pointer"
+                          title="Excluir cadastro do cliente"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 );
@@ -3118,7 +3208,6 @@ export default function App() {
                         <div className="text-xs text-slate-750 font-mono space-y-0.5 leading-normal mt-1.5">
                           <p>🏢 <strong>Ponto de Retirada (Coleta):</strong> {o.clienteNome}</p>
                           <p>🎯 <strong>Ponto de Destino:</strong> {o.enderecoEntrega || `${o.destinatarioNome || 'Oficina / Destinatário Final'} - Setor ${o.quadrante}`}</p>
-                          <p className="text-rose-600 font-bold">💰 Tarifa de Repasse: R$ {((o.valorPagoMotoboy || 4.00) + (o.retornoPeca ? (o.taxaReversa || 15) : 0)).toFixed(2)}</p>
                         </div>
                         
                         {o.retornoPeca && (
@@ -3204,10 +3293,6 @@ export default function App() {
                           <p>🏢 <strong>Origem:</strong> {o.clienteNome}</p>
                           <p>📍 <strong>Destino:</strong> {o.enderecoEntrega || `${o.destinatarioNome || 'Oficina'} - Setor ${o.quadrante}`}</p>
                         </div>
-                      </div>
-                      <div className="text-right border-l border-slate-200 pl-3.5 shrink-0">
-                        <span className="block text-[8px] text-slate-400 font-bold uppercase tracking-wider">SEU GANHO</span>
-                        <strong className="text-rose-600 font-black text-sm">R$ {((o.valorPagoMotoboy || 4.00) + (o.retornoPeca ? (o.taxaReversa || 15) : 0)).toFixed(2)}</strong>
                       </div>
                     </div>
                   ))
@@ -3692,22 +3777,18 @@ export default function App() {
                 <div><strong>Oficina Destinatária:</strong> {activeSignOrder.clienteNome}</div>
                 <div><strong>Peças Entregues:</strong> {activeSignOrder.itensDescricao}</div>
                 <div className="border-t border-slate-200 mt-2 pt-1.5 text-[11px]">
-                  {activeSessionRole !== 'Motoboy' && (
-                    <div className="flex justify-between">
-                      <span>💵 Cobrança Cliente B2B:</span>
-                      <span className="font-bold text-slate-800">R$ {((activeSignOrder.valorCobradoCliente || 10.00) + (activeSignOrder.retornoPeca ? (activeSignOrder.taxaReversa || 15) : 0)).toFixed(2)}</span>
-                    </div>
-                  )}
+                  <div className="flex justify-between">
+                    <span>💵 Cobrança Cliente B2B:</span>
+                    <span className="font-bold text-slate-800">R$ {((activeSignOrder.valorCobradoCliente || 10.00) + (activeSignOrder.retornoPeca ? (activeSignOrder.taxaReversa || 15) : 0)).toFixed(2)}</span>
+                  </div>
                   <div className="flex justify-between">
                     <span>🏍️ Repasse ao Motoboy:</span>
                     <span className="font-bold text-rose-600">R$ {((activeSignOrder.valorPagoMotoboy || 4.00) + (activeSignOrder.retornoPeca ? (activeSignOrder.taxaReversa || 15) : 0)).toFixed(2)}</span>
                   </div>
-                  {activeSessionRole !== 'Motoboy' && (
-                    <div className="flex justify-between font-bold text-emerald-600 border-t border-dashed border-slate-200 mt-1 pt-1">
-                      <span>⚡ Lucro Líquido TorqueLog:</span>
-                      <span>R$ {(activeSignOrder.valorCobradoCliente - activeSignOrder.valorPagoMotoboy).toFixed(2)}</span>
-                    </div>
-                  )}
+                  <div className="flex justify-between font-bold text-emerald-600 border-t border-dashed border-slate-200 mt-1 pt-1">
+                    <span>⚡ Lucro Líquido TorqueLog:</span>
+                    <span>R$ {(activeSignOrder.valorCobradoCliente - activeSignOrder.valorPagoMotoboy).toFixed(2)}</span>
+                  </div>
                 </div>
               </div>
 
@@ -3954,6 +4035,195 @@ export default function App() {
                 </div>
               </div>
 
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ==========================================
+          MODAL: EDIT CLIENT (CRUD UPDATE)
+          ========================================== */}
+      <AnimatePresence>
+        {clienteParaEditar && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm" id="modal-edit-client">
+            <motion.div 
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white rounded-xl shadow-2xl border border-slate-200 max-w-sm w-full p-5 max-h-[90vh] overflow-y-auto"
+            >
+              <div className="flex justify-between items-start mb-4 border-b border-slate-100 pb-2">
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900 uppercase font-mono tracking-tight">
+                    [Editar Cliente: {clienteParaEditar.id}]
+                  </h3>
+                  <span className="text-[10px] text-slate-400 font-mono">Sincronização Ativa Distribuidor & Entregador</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setClienteParaEditar(null)}
+                  className="text-slate-400 hover:text-slate-600 font-bold py-1 px-2 rounded hover:bg-slate-100 cursor-pointer text-xs"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <form onSubmit={handleUpdateCliente} className="space-y-3.5">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1 font-mono">
+                    Nome do Estabelecimento / Oficina
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={editClientNome}
+                    onChange={(e) => setEditClientNome(e.target.value)}
+                    placeholder="Ex: Oficina Mecânica do Renan"
+                    className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded-lg p-2.5 text-xs focus:ring-2 focus:ring-orange-500 focus:border-orange-500 font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1 font-mono">
+                    Atribuir à Região (Quadrante Geográfico)
+                  </label>
+                  <select
+                    value={editClientQuadrante}
+                    onChange={(e) => setEditClientQuadrante(e.target.value as Quadrante)}
+                    className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded-lg p-2.5 text-xs focus:ring-2 focus:ring-orange-500 font-mono"
+                  >
+                    {(['A', 'B', 'C', 'D', 'E', 'F'] as Quadrante[]).map((q) => (
+                      <option key={q} value={q}>Quadrante {q}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1 font-mono">
+                    Endereço Completo
+                  </label>
+                  <input
+                    type="text"
+                    value={editClientEndereco}
+                    onChange={(e) => setEditClientEndereco(e.target.value)}
+                    placeholder="Endereço principal da empresa"
+                    className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded-lg p-2.5 text-xs focus:ring-2 focus:ring-orange-500 focus:border-orange-500 font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1 font-mono">
+                    Contato Telefônico B2B
+                  </label>
+                  <input
+                    type="text"
+                    value={editClientTelefone}
+                    onChange={(e) => setEditClientTelefone(e.target.value)}
+                    placeholder="Número de telefone principal"
+                    className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded-lg p-2.5 text-xs focus:ring-2 focus:ring-orange-500 focus:border-orange-500 font-mono"
+                  />
+                </div>
+
+                <div className="border-t border-slate-100 pt-3 space-y-3">
+                  <span className="text-[10px] font-black text-emerald-600 uppercase font-mono tracking-wider block">
+                    📬 CREDENCIAIS E E-MAIL DO CLIENTE
+                  </span>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 uppercase mb-1 font-mono">
+                      E-mail de Cadastro *
+                    </label>
+                    <input
+                      type="email"
+                      required
+                      value={editClientEmail}
+                      onChange={(e) => setEditClientEmail(e.target.value)}
+                      placeholder="Ex: contato@mecanicab2b.com"
+                      className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded-lg p-2.5 text-xs focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 uppercase mb-1 font-mono">
+                      Senha de Acesso (Dica/Temporária)
+                    </label>
+                    <input
+                      type="text"
+                      value={editClientSenha}
+                      onChange={(e) => setEditClientSenha(e.target.value)}
+                      placeholder="Senha de login do cliente"
+                      className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded-lg p-2.5 text-xs focus:ring-2 focus:ring-orange-500 focus:border-orange-500 font-mono"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 gap-3 border-t border-slate-100 pt-3">
+                  <span className="text-[10px] font-black text-orange-600 uppercase font-mono tracking-wider block">
+                    🔧 CONFIGURAÇÃO DE FRETE E TARIFAS (Ex: PASSOS - MG)
+                  </span>
+                  
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1 font-mono">
+                      Cidade / Região do Contrato
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={editClientCidade}
+                      onChange={(e) => setEditClientCidade(e.target.value)}
+                      placeholder="Ex: Passos - MG"
+                      className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded-lg p-2.5 text-xs focus:ring-2 focus:ring-orange-500 font-mono"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-[9px] font-bold text-slate-600 uppercase mb-1 font-mono leading-tight">
+                        Fixo Cobrado (Cliente)
+                      </label>
+                      <input
+                        type="number"
+                        step="0.50"
+                        min="0"
+                        value={editClientValorCobradoCliente}
+                        onChange={(e) => setEditClientValorCobradoCliente(parseFloat(e.target.value) || 0)}
+                        className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded-lg p-2 px-2.5 text-xs focus:ring-2 focus:ring-orange-500 font-mono font-bold"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[9px] font-bold text-slate-600 uppercase mb-1 font-mono leading-tight">
+                        Repasse (Motoboy)
+                      </label>
+                      <input
+                        type="number"
+                        step="0.50"
+                        min="0"
+                        value={editClientValorPagoMotoboy}
+                        onChange={(e) => setEditClientValorPagoMotoboy(parseFloat(e.target.value) || 0)}
+                        className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded-lg p-2 px-2.5 text-xs focus:ring-2 focus:ring-orange-500 font-mono font-bold"
+                      />
+                    </div>
+                  </div>
+                  <div className="text-[10px] font-extrabold text-emerald-600 font-mono bg-emerald-50 p-2 rounded border border-emerald-100 flex justify-between">
+                    <span>💵 MARGEM LIQUIDA:</span>
+                    <span>R$ {(editClientValorCobradoCliente - editClientValorPagoMotoboy).toFixed(2)}</span>
+                  </div>
+                </div>
+
+                <div className="flex gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setClienteParaEditar(null)}
+                    className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 py-2 rounded-lg text-xs font-bold font-mono cursor-pointer"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="flex-1 bg-orange-500 hover:bg-orange-600 text-white py-2 rounded-lg text-xs font-bold font-mono cursor-pointer shadow-md"
+                  >
+                    Salvar Alterações
+                  </button>
+                </div>
+              </form>
             </motion.div>
           </div>
         )}
