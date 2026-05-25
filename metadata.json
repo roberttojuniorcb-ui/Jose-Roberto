@@ -1,0 +1,6 @@
+{
+  "name": "TorqueLog",
+  "description": "Plataforma de inteligência logística B2B de distribuição de autopeças e otimização de rotas expressas de motocicletas com segurança e conformidade.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
