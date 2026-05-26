@@ -234,6 +234,17 @@ export default function App() {
   const [firstAccessSenha, setFirstAccessSenha] = useState<string>('');
   const [firstAccessError, setFirstAccessError] = useState<string>('');
 
+  // --- STATE FOR CLIENT PORTAL REGISTERING NEW CLIENTS ---
+  const [isClientAddingNewClient, setIsClientAddingNewClient] = useState<boolean>(false);
+  const [clientNewClientNome, setClientNewClientNome] = useState<string>('');
+  const [clientNewClientQuadrante, setClientNewClientQuadrante] = useState<Quadrante>('A');
+  const [clientNewClientCEP, setClientNewClientCEP] = useState<string>('');
+  const [isClientFetchingNewClientCEP, setIsClientFetchingNewClientCEP] = useState<boolean>(false);
+  const [clientNewClientEndereco, setClientNewClientEndereco] = useState<string>('');
+  const [clientNewClientTelefone, setClientNewClientTelefone] = useState<string>('');
+  const [clientNewClientCidade, setClientNewClientCidade] = useState<string>('Passos - MG');
+  const [clientNewClientEmail, setClientNewClientEmail] = useState<string>('');
+
   // Email confirmation steps for the activation validation workflow
   const [firstAccessEmailStep, setFirstAccessEmailStep] = useState<'send_email' | 'verify_code' | 'completed_form'>('send_email');
   const [isSendingFirstAccessEmail, setIsSendingFirstAccessEmail] = useState<boolean>(false);
@@ -1095,11 +1106,15 @@ export default function App() {
 
   const handleCriarCliente = async (source: 'Empresa' | 'Entregador') => {
     if (!newClientNome.trim()) {
-      alert("Por favor, preencha o Nome / Razão Social do cliente.");
+      alert("Por favor, preencha o Nome da distribuidora.");
+      return;
+    }
+    if (!newClientEndereco.trim()) {
+      alert("Por favor, preencha o Endereço completo da distribuidora.");
       return;
     }
     if (!newClientEmail.trim()) {
-      alert("Por favor, preencha o E-mail de cadastro do cliente.");
+      alert("Por favor, preencha o E-mail de cadastro da distribuidora.");
       return;
     }
 
@@ -1109,7 +1124,7 @@ export default function App() {
       id: `CLI-${newClientQuadrante}-${Math.floor(1000 + Math.random() * 9000)}`,
       nome: newClientNome,
       quadrante: newClientQuadrante,
-      endereco: newClientEndereco || 'Pendente - Preencher no 1º Acesso',
+      endereco: newClientEndereco,
       telefone: newClientTelefone || 'Pendente - Preencher no 1º Acesso',
       cidade: newClientCidade || 'Passos - MG',
       cep: newClientCEP,
@@ -1175,10 +1190,10 @@ export default function App() {
     const apiPayload = compilarAPIResponse(novoCli, mockOrdemSim, [], "Liberado - Cabe no Baú");
     setApiResponseLog(apiPayload);
     setApiLogTimestamp(new Date().toLocaleTimeString());
-    setApiActionDescription(`Novo Cliente Pré-Registrado por [${source === 'Empresa' ? 'Distribuidora' : 'Rua - Motoboy MEI'}]: ${novoCli.nome}. E-mail de confirmação despachado para: ${novoCli.email}`);
+    setApiActionDescription(`Novo Distribuidor Pré-Registrado por [${source === 'Empresa' ? 'Distribuidora' : 'Rua - Motoboy MEI'}]: ${novoCli.nome}. E-mail de confirmação despachado para: ${novoCli.email}`);
 
     // Set interactive confirmation message toast!
-    setSupabaseSuccessMsg(`📧 E-mail de confirmação enviado para ${novoCli.email}! O cliente poderá realizar o auto-cadastro com CNPJ e Senha próprio agora!`);
+    setSupabaseSuccessMsg(`📧 E-mail de confirmação enviado para ${novoCli.email}! O distribuidor poderá realizar o auto-cadastro com CNPJ e Senha próprio agora!`);
     setTimeout(() => setSupabaseSuccessMsg(''), 7000);
 
     // Clean inputs
@@ -1346,13 +1361,14 @@ export default function App() {
   };
 
   // --- INTEGRATED VIA CEP LOOKUP ENGINE (AUTO-RESOLVE ADRESS/CITY) ---
-  const handleFetchCEP = async (cep: string, target: 'selfReg' | 'newClient' | 'editClient') => {
+  const handleFetchCEP = async (cep: string, target: 'selfReg' | 'newClient' | 'editClient' | 'clientNewClient') => {
     const cleanedCEP = cep.replace(/\D/g, '');
     if (cleanedCEP.length !== 8) return;
 
     if (target === 'selfReg') setIsFetchingCEP(true);
     else if (target === 'newClient') setIsFetchingNewClientCEP(true);
     else if (target === 'editClient') setIsFetchingEditClientCEP(true);
+    else if (target === 'clientNewClient') setIsClientFetchingNewClientCEP(true);
 
     try {
       const response = await fetch(`https://viacep.com.br/ws/${cleanedCEP}/json/`);
@@ -1370,6 +1386,9 @@ export default function App() {
         } else if (target === 'editClient') {
           setEditClientEndereco(fullAddress);
           setEditClientCidade(cityState);
+        } else if (target === 'clientNewClient') {
+          setClientNewClientEndereco(fullAddress);
+          setClientNewClientCidade(cityState);
         }
       } else {
         console.warn("CEP não encontrado no ViaCEP.");
@@ -1380,10 +1399,11 @@ export default function App() {
       if (target === 'selfReg') setIsFetchingCEP(false);
       else if (target === 'newClient') setIsFetchingNewClientCEP(false);
       else if (target === 'editClient') setIsFetchingEditClientCEP(false);
+      else if (target === 'clientNewClient') setIsClientFetchingNewClientCEP(false);
     }
   };
 
-  const handleCEPChange = (val: string, target: 'selfReg' | 'newClient' | 'editClient') => {
+  const handleCEPChange = (val: string, target: 'selfReg' | 'newClient' | 'editClient' | 'clientNewClient') => {
     let formatted = val.replace(/\D/g, '');
     if (formatted.length > 8) formatted = formatted.slice(0, 8);
     
@@ -1406,6 +1426,11 @@ export default function App() {
       setEditClientCEP(displayVal);
       if (formatted.length === 8) {
         handleFetchCEP(formatted, 'editClient');
+      }
+    } else if (target === 'clientNewClient') {
+      setClientNewClientCEP(displayVal);
+      if (formatted.length === 8) {
+        handleFetchCEP(formatted, 'clientNewClient');
       }
     }
   };
@@ -1907,8 +1932,8 @@ export default function App() {
         {/* Top header branding */}
         <header className="max-w-4xl w-full mx-auto flex justify-between items-center py-4 border-b border-slate-900">
           <div className="flex items-center gap-2.5">
-            <div className="bg-slate-950/80 p-0.5 rounded-lg border border-slate-800 flex items-center justify-center shadow-lg shrink-0">
-              <TorqueLogLogoIcon size={36} className="text-orange-500" />
+            <div className="bg-slate-950/80 p-1.5 rounded-lg border border-slate-800 flex items-center justify-center shadow-lg shrink-0">
+              <TorqueLogLogoIcon size={52} className="text-orange-500" />
             </div>
             <div>
               <span className="text-xl font-black tracking-tight font-mono text-orange-400">TorqueLog</span>
@@ -2182,7 +2207,7 @@ export default function App() {
                       onClick={() => { setLoginRole('Cliente'); setIsSelfRegistering(false); }}
                       className={`py-2 text-xs font-bold rounded-lg transition-all ${loginRole === 'Cliente' ? 'bg-orange-500 text-white shadow' : 'text-slate-400 hover:text-white'}`}
                     >
-                      🔧 Cliente
+                      🏢 Distribuidora
                     </button>
                   </div>
                 </div>
@@ -2221,7 +2246,7 @@ export default function App() {
                 {loginRole === 'Cliente' && (
                   <div className="space-y-2">
                     <div>
-                      <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">Selecione sua Oficina/Autopeça</label>
+                      <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">Selecione sua Distribuidora</label>
                       <div className="relative">
                         <select
                           value={selectedLoginUserId}
@@ -2310,8 +2335,8 @@ export default function App() {
           
           <div className="flex flex-wrap items-center justify-between md:justify-start w-full md:w-auto gap-4">
             <div className="flex items-center gap-4">
-              <div className="bg-slate-950 p-1 rounded-xl shadow-xl flex items-center justify-center border-2 border-orange-500 scale-105" id="brand-logo">
-                <TorqueLogLogoIcon size={52} className="text-orange-500" />
+              <div className="bg-slate-950 p-2 rounded-xl shadow-xl flex items-center justify-center border-2 border-orange-500 scale-105 hover:scale-110 transition duration-300" id="brand-logo">
+                <TorqueLogLogoIcon size={68} className="text-orange-500" />
               </div>
               <div>
                 <div className="flex items-baseline gap-2 flex-wrap">
@@ -2329,7 +2354,7 @@ export default function App() {
                 <span className="text-orange-400 font-bold">
                   {activeSessionRole === 'Empresa' && "🏢 TorqueLog Admin"}
                   {activeSessionRole === 'Motoboy' && `🏍️ ${activeMotoboyUser?.nome}`}
-                  {activeSessionRole === 'Cliente' && `🔧 ${activeClienteUser?.nome}`}
+                  {activeSessionRole === 'Cliente' && `🏢 Distribuidora: ${activeClienteUser?.nome}`}
                 </span>
               </div>
               <button
@@ -2436,7 +2461,7 @@ export default function App() {
                     : 'bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-755'
                 }`}
               >
-                🔧 Portal do Cliente B2B
+                🏢 Portal da Distribuidora B2B
               </button>
               <button
                 onClick={() => {
@@ -3021,8 +3046,8 @@ export default function App() {
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
             <div className="flex items-center justify-between mb-3.5">
               <div>
-                <h3 className="text-sm font-bold text-slate-800 uppercase font-mono tracking-tight">Clientes Ativos Cadastrados B2B</h3>
-                <p className="text-xs text-slate-400">Exibindo clientes cadastrados na região selecionada</p>
+                <h3 className="text-sm font-bold text-slate-800 uppercase font-mono tracking-tight">Distribuidoras Credenciadas B2B</h3>
+                <p className="text-xs text-slate-400">Exibindo distribuidoras ativas cadastradas em Passos - MG</p>
               </div>
               <button
                 onClick={() => {
@@ -3033,7 +3058,7 @@ export default function App() {
                 id="btn-add-client-distributor"
               >
                 <Plus className="w-3.5 h-3.5 text-orange-400" />
-                Cadastrar
+                Nova Distribuidora
               </button>
             </div>
 
@@ -3042,7 +3067,7 @@ export default function App() {
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               <input
                 type="text"
-                placeholder="Pesquisar oficina/cliente..."
+                placeholder="Pesquisar distribuidora..."
                 value={clienteSearchTerm}
                 onChange={(e) => setClienteSearchTerm(e.target.value)}
                 className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded-lg pl-8.5 pr-3 py-1.5 text-xs font-mono"
@@ -4191,13 +4216,29 @@ export default function App() {
               <span className="text-xs bg-emerald-500/20 text-emerald-400 font-bold px-3 py-1 rounded-full uppercase tracking-widest font-mono">PORTAL DO CLIENTE B2B</span>
               <h1 className="text-2xl font-black mt-2">Olá, {activeClienteUser?.nome}!</h1>
               <p className="text-xs text-slate-400 font-mono mt-1">Sua agência de autopeças/oficina: Setor {activeClienteUser?.quadrante} • Endereço B2B: {activeClienteUser?.endereco} ({activeClienteUser?.cidade})</p>
-              <div className="mt-4">
+              <div className="mt-4 flex flex-wrap gap-2.5">
                 <button
                   type="button"
                   onClick={() => handleAbrirRelatorio('Cliente')}
                   className="bg-emerald-600 hover:bg-emerald-650 text-white text-xs font-black font-mono py-1.5 px-4 rounded-xl flex items-center gap-2 shadow transition-all cursor-pointer hover:scale-[1.02]"
                 >
                   📊 CONFERÊNCIA E FECHAMENTO SEMANA/MÊS 🧾
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setClientNewClientNome('');
+                    setClientNewClientQuadrante(activeClienteUser?.quadrante || 'A');
+                    setClientNewClientCEP('');
+                    setClientNewClientEndereco('');
+                    setClientNewClientTelefone('');
+                    setClientNewClientCidade(activeClienteUser?.cidade || 'Passos - MG');
+                    setClientNewClientEmail('');
+                    setIsClientAddingNewClient(true);
+                  }}
+                  className="bg-orange-500 hover:bg-orange-600 text-white text-xs font-black font-mono py-1.5 px-4 rounded-xl flex items-center gap-1.5 shadow transition-all cursor-pointer hover:scale-[1.02]"
+                >
+                  🚀 CADASTRAR NOVO CLIENTE B2B ➕
                 </button>
               </div>
             </div>
@@ -4375,13 +4416,31 @@ export default function App() {
                       <div className="flex justify-between items-center">
                         <label className="block text-xs font-bold text-slate-700 uppercase font-mono">Destinatário Credenciado</label>
                         {!isQuickRegisteringDestinatario && (
-                          <button
-                            type="button"
-                            onClick={() => setIsQuickRegisteringDestinatario(true)}
-                            className="text-[10px] text-orange-650 hover:text-orange-700 font-bold font-mono uppercase tracking-tight flex items-center gap-0.5 cursor-pointer"
-                          >
-                            <Plus className="w-3 h-3 text-orange-500" /> Cadastrar Novo
-                          </button>
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setIsQuickRegisteringDestinatario(true)}
+                              className="text-[10px] text-orange-650 hover:text-orange-700 font-bold font-mono uppercase tracking-tight flex items-center gap-0.5 cursor-pointer"
+                            >
+                              <Plus className="w-3 h-3 text-orange-500" /> Rápido
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setClientNewClientNome('');
+                                setClientNewClientQuadrante(destinoQuadrante || 'A');
+                                setClientNewClientCEP('');
+                                setClientNewClientEndereco('');
+                                setClientNewClientTelefone('');
+                                setClientNewClientCidade(activeClienteUser?.cidade || 'Passos - MG');
+                                setClientNewClientEmail('');
+                                setIsClientAddingNewClient(true);
+                              }}
+                              className="text-[10px] text-emerald-650 hover:text-emerald-700 font-bold font-mono uppercase tracking-tight flex items-center gap-0.5 cursor-pointer border-l pl-2 border-slate-200"
+                            >
+                              🚀 Completo
+                            </button>
+                          </div>
                         )}
                       </div>
                       
@@ -5110,6 +5169,209 @@ export default function App() {
       </AnimatePresence>
 
       {/* ==========================================
+          MODAL: CLIENT PORTAL CLIENT REGISTRATION
+          ========================================== */}
+      <AnimatePresence>
+        {isClientAddingNewClient && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm" id="modal-client-adding-client">
+            <motion.div 
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white rounded-xl shadow-2xl border border-slate-200 max-w-sm w-full p-5 max-h-[95vh] overflow-y-auto"
+            >
+              <div className="flex justify-between items-start mb-4 border-b border-slate-100 pb-2">
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900 uppercase font-mono tracking-tight">
+                    [Novo Cliente B2B]
+                  </h3>
+                  <span className="text-[10px] text-slate-400 font-mono">Cadastrado pelo Cliente {activeClienteUser?.nome}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsClientAddingNewClient(false)}
+                  className="text-slate-400 hover:text-slate-600 font-bold py-1 px-2 rounded hover:bg-slate-100 cursor-pointer text-xs"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <form onSubmit={async (e) => {
+                e.preventDefault();
+                if (!clientNewClientNome.trim()) {
+                  alert("Por favor, preencha o Nome / Razão Social do cliente.");
+                  return;
+                }
+                if (!clientNewClientEmail.trim()) {
+                  alert("Por favor, preencha o E-mail de cadastro do cliente.");
+                  return;
+                }
+
+                const randCode = Math.floor(1000 + Math.random() * 9000);
+                const generatedId = `CLI-${clientNewClientQuadrante}-${randCode}`;
+
+                const novoCli: Cliente = {
+                  id: generatedId,
+                  nome: clientNewClientNome,
+                  quadrante: clientNewClientQuadrante,
+                  endereco: clientNewClientEndereco || 'Pendente - Preencher no 1º Acesso',
+                  telefone: clientNewClientTelefone || 'Não informado',
+                  cidade: clientNewClientCidade || 'Passos - MG',
+                  cep: clientNewClientCEP,
+                  valorPagoMotoboy: 4.00,
+                  valorCobradoCliente: 10.00,
+                  senha: `cli-${randCode}`,
+                  email: clientNewClientEmail,
+                  emailConfirmado: true,
+                  cadastroCompleto: true,
+                  criadoPor: 'Cliente',
+                  criadoEm: new Date().toISOString(),
+                  motoboysAtivos: 0
+                };
+
+                // Sync with local state
+                const updatedClientesList = [novoCli, ...clientes];
+                setClientes(updatedClientesList);
+
+                // Sync with Firebase Firestore if active
+                if (isFirebaseConfigured) {
+                  try {
+                    await syncClientesToFirebase(updatedClientesList);
+                  } catch (err) {
+                    console.error("Erro ao sincronizar novo cliente com o Firebase:", err);
+                  }
+                }
+
+                setIsClientAddingNewClient(false);
+
+                // Set interactive confirmation message toast!
+                setSupabaseSuccessMsg(`🚀 Cliente B2B "${novoCli.nome}" cadastrado com sucesso!`);
+                setTimeout(() => setSupabaseSuccessMsg(''), 5500);
+
+                // Reset internal state
+                setClientNewClientNome('');
+                setClientNewClientCEP('');
+                setClientNewClientEndereco('');
+                setClientNewClientTelefone('');
+                setClientNewClientCidade('Passos - MG');
+                setClientNewClientEmail('');
+              }} className="space-y-3.5">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1 font-mono">
+                    Nome do Estabelecimento / Oficina *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={clientNewClientNome}
+                    onChange={(e) => setClientNewClientNome(e.target.value)}
+                    placeholder="Ex: Auto Mecânica Passos"
+                    className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded-lg p-2.5 text-xs focus:ring-2 focus:ring-orange-500 font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1 font-mono">
+                    Atribuir à Região (Quadrante Geográfico) *
+                  </label>
+                  <select
+                    value={clientNewClientQuadrante}
+                    onChange={(e) => setClientNewClientQuadrante(e.target.value as Quadrante)}
+                    className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded-lg p-2.5 text-xs focus:ring-2 focus:ring-orange-500 font-mono"
+                  >
+                    {(['A', 'B', 'C', 'D', 'E', 'F'] as Quadrante[]).map((q) => (
+                      <option key={q} value={q}>Quadrante {q}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1 font-mono flex items-center justify-between">
+                    <span>CEP *</span>
+                    {isClientFetchingNewClientCEP && (
+                      <span className="text-emerald-500 animate-pulse text-[10px] font-mono leading-none">🔍 BUSCANDO CEP...</span>
+                    )}
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={clientNewClientCEP}
+                    onChange={(e) => handleCEPChange(e.target.value, 'clientNewClient')}
+                    placeholder="Ex: 37900-124"
+                    className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded-lg p-2.5 text-xs focus:ring-2 focus:ring-orange-500 font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1 font-mono">
+                    Endereço Completo *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={clientNewClientEndereco}
+                    onChange={(e) => setClientNewClientEndereco(e.target.value)}
+                    placeholder="Ex: Rua Central, 45"
+                    className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded-lg p-2.5 text-xs focus:ring-2 focus:ring-orange-500 font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1 font-mono">
+                    Cidade *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={clientNewClientCidade}
+                    onChange={(e) => setClientNewClientCidade(e.target.value)}
+                    placeholder="Ex: Passos - MG"
+                    className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded-lg p-2.5 text-xs focus:ring-2 focus:ring-orange-500 font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1 font-mono">
+                    Telefone de Contato
+                  </label>
+                  <input
+                    type="text"
+                    value={clientNewClientTelefone}
+                    onChange={(e) => setClientNewClientTelefone(e.target.value)}
+                    placeholder="Ex: (35) 99999-9999"
+                    className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded-lg p-2.5 text-xs focus:ring-2 focus:ring-orange-500 font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1 font-mono">
+                    E-mail do Cliente *
+                  </label>
+                  <input
+                    type="email"
+                    required
+                    value={clientNewClientEmail}
+                    onChange={(e) => setClientNewClientEmail(e.target.value)}
+                    placeholder="Ex: oficina@email.com"
+                    className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded-lg p-2.5 text-xs focus:ring-2 focus:ring-orange-500 font-mono"
+                  />
+                </div>
+
+                <div className="pt-2">
+                  <button
+                    type="submit"
+                    className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-mono font-black py-2.5 rounded-lg text-xs transition duration-150 shadow cursor-pointer"
+                  >
+                    Confirmar Cadastro
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ==========================================
           MODAL: ADD NEW CLIENT (DOUBLE REGISTER)
           ========================================== */}
       <AnimatePresence>
@@ -5124,7 +5386,7 @@ export default function App() {
               <div className="flex justify-between items-start mb-4 border-b border-slate-100 pb-2">
                 <div>
                   <h3 className="text-sm font-bold text-slate-900 uppercase font-mono tracking-tight">
-                    [Cadastro de Cliente]
+                    [Cadastro de Distribuidora]
                   </h3>
                   <span className="text-[10px] text-slate-400 font-mono">Sincronização Ativa Distribuidor & Entregador</span>
                 </div>
@@ -5140,32 +5402,19 @@ export default function App() {
               <div className="space-y-3.5">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 uppercase mb-1 font-mono">
-                    Nome do Estabelecimento / Oficina
+                    Nome da Distribuidora *
                   </label>
                   <input
                     type="text"
                     required
                     value={newClientNome}
                     onChange={(e) => setNewClientNome(e.target.value)}
-                    placeholder="Ex: Oficina Mecânica do Renan"
+                    placeholder="Ex: Distribuidora de Autopeças Passos"
                     className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded-lg p-2.5 text-xs focus:ring-2 focus:ring-orange-500 focus:border-orange-500 font-mono"
                   />
                 </div>
 
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1 font-mono">
-                    Atribuir à Região (Quadrante Geográfico)
-                  </label>
-                  <select
-                    value={newClientQuadrante}
-                    onChange={(e) => setNewClientQuadrante(e.target.value as Quadrante)}
-                    className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded-lg p-2.5 text-xs focus:ring-2 focus:ring-orange-500 font-mono"
-                  >
-                    {(['A', 'B', 'C', 'D', 'E', 'F'] as Quadrante[]).map((q) => (
-                      <option key={q} value={q}>Quadrante {q}</option>
-                    ))}
-                  </select>
-                </div>
+                {/* Region selector (Quadrante) removed for Admin, defaulted to A */}
 
                 <div>
                   <label className="block text-xs font-bold text-slate-700 uppercase mb-1 font-mono flex items-center justify-between">
@@ -5185,13 +5434,14 @@ export default function App() {
 
                 <div>
                   <label className="block text-xs font-bold text-slate-700 uppercase mb-1 font-mono">
-                    Endereço Completo (Opcional)
+                    Endereço Completo da Distribuidora *
                   </label>
                   <input
                     type="text"
+                    required
                     value={newClientEndereco}
                     onChange={(e) => setNewClientEndereco(e.target.value)}
-                    placeholder="Opcional - Cliente pode preencher no 1º acesso"
+                    placeholder="Ex: Av. Juca Stockler, 1200 - Centro"
                     className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded-lg p-2.5 text-xs focus:ring-2 focus:ring-orange-500 focus:border-orange-500 font-mono"
                   />
                 </div>
@@ -5204,7 +5454,7 @@ export default function App() {
                     type="text"
                     value={newClientTelefone}
                     onChange={(e) => setNewClientTelefone(e.target.value)}
-                    placeholder="Opcional - Cliente pode preencher no 1º acesso"
+                    placeholder="Ex: (35) 99999-9999"
                     className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded-lg p-2.5 text-xs focus:ring-2 focus:ring-orange-500 focus:border-orange-500 font-mono"
                   />
                 </div>
