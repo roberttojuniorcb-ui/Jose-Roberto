@@ -47,7 +47,8 @@ function generateRealisticClient(idNum: number, quadrante: Quadrante): Cliente {
     emailConfirmado: true,
     cadastroCompleto: true,
     criadoPor: idNum % 5 === 0 ? 'Entregador' : 'Empresa',
-    criadoEm: new Date(Date.now() - (idNum * 3600000)).toISOString()
+    criadoEm: new Date(Date.now() - (idNum * 3600000)).toISOString(),
+    motoboysAtivos: (idNum % 4) + 1
   };
 }
 

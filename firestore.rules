@@ -1,0 +1,38 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 1. Global Safety Net (default-deny catch-all)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper to validate document IDs
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    // 2. Clientes rules
+    match /clientes/{clienteId} {
+      allow read: if true;
+      allow write: if isValidId(clienteId);
+    }
+
+    // 3. Motoboys rules
+    match /motoboys/{motoboyId} {
+      allow read: if true;
+      allow write: if isValidId(motoboyId);
+    }
+
+    // 4. Ordens de Serviço rules
+    match /ordens_servico/{ordemId} {
+      allow read: if true;
+      allow write: if isValidId(ordemId);
+    }
+
+    // 5. Rotas Agrupadas rules
+    match /rotas_agrupadas/{rotaId} {
+      allow read: if true;
+      allow write: if isValidId(rotaId);
+    }
+  }
+}

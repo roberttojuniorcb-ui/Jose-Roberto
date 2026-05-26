@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Bike, 
@@ -36,6 +36,23 @@ import {
 } from 'lucide-react';
 import { Cliente, OrdemServico, Quadrante, APIResponse, Motoboy } from './types';
 import { getInitialClientes, AUTO_PECA_SUGESTOES, INITIAL_MOTOBOYS } from './mockData';
+import { 
+  query, 
+  collection, 
+  orderBy, 
+  onSnapshot 
+} from 'firebase/firestore';
+import {
+  db as firebaseDb,
+  isFirebaseConfigured,
+  syncClientesToFirebase,
+  syncOrdensToFirebase,
+  syncMotoboysToFirebase,
+  syncRotasToFirebase,
+  deleteClienteFromFirebase,
+  deleteMotoboyFromFirebase,
+  loadInitialDataFromFirebase
+} from './utils/firebaseClient';
 import { 
   supabase,
   isSupabaseConfigured,
@@ -175,6 +192,8 @@ export default function App() {
   const [isAddingNewClient, setIsAddingNewClient] = useState<boolean>(false);
   const [newClientNome, setNewClientNome] = useState<string>('');
   const [newClientQuadrante, setNewClientQuadrante] = useState<Quadrante>('A');
+  const [newClientCEP, setNewClientCEP] = useState<string>('');
+  const [isFetchingNewClientCEP, setIsFetchingNewClientCEP] = useState<boolean>(false);
   const [newClientEndereco, setNewClientEndereco] = useState<string>('');
   const [newClientTelefone, setNewClientTelefone] = useState<string>('');
   const [newClientCidade, setNewClientCidade] = useState<string>('Passos - MG');
@@ -182,11 +201,19 @@ export default function App() {
   const [newClientValorCobradoCliente, setNewClientValorCobradoCliente] = useState<number>(10.00);
   const [newClientEmail, setNewClientEmail] = useState<string>('');
   const [newClientSenha, setNewClientSenha] = useState<string>('');
+  const [newClientMotoboysAtivos, setNewClientMotoboysAtivos] = useState<number>(1);
+
+  // --- STATE FOR QUICK REGISTERING CLIENT/DESTINATARIO (CRUD) ---
+  const [isQuickRegisteringDestinatario, setIsQuickRegisteringDestinatario] = useState<boolean>(false);
+  const [quickClientNome, setQuickClientNome] = useState<string>('');
+  const [quickClientEndereco, setQuickClientEndereco] = useState<string>('');
 
   // --- STATE FOR CLIENT EDITING (CRUD) ---
   const [clienteParaEditar, setClienteParaEditar] = useState<Cliente | null>(null);
   const [editClientNome, setEditClientNome] = useState<string>('');
   const [editClientQuadrante, setEditClientQuadrante] = useState<Quadrante>('A');
+  const [editClientCEP, setEditClientCEP] = useState<string>('');
+  const [isFetchingEditClientCEP, setIsFetchingEditClientCEP] = useState<boolean>(false);
   const [editClientEndereco, setEditClientEndereco] = useState<string>('');
   const [editClientTelefone, setEditClientTelefone] = useState<string>('');
   const [editClientCidade, setEditClientCidade] = useState<string>('Passos - MG');
@@ -194,6 +221,7 @@ export default function App() {
   const [editClientValorCobradoCliente, setEditClientValorCobradoCliente] = useState<number>(10.00);
   const [editClientEmail, setEditClientEmail] = useState<string>('');
   const [editClientSenha, setEditClientSenha] = useState<string>('');
+  const [editClientMotoboysAtivos, setEditClientMotoboysAtivos] = useState<number>(1);
 
   // --- STATES FOR FIRST ACCESS SELF-REGISTRATION ---
   const [isFirstAccessModalOpen, setIsFirstAccessModalOpen] = useState<boolean>(false);
@@ -206,6 +234,12 @@ export default function App() {
   const [firstAccessSenha, setFirstAccessSenha] = useState<string>('');
   const [firstAccessError, setFirstAccessError] = useState<string>('');
 
+  // Email confirmation steps for the activation validation workflow
+  const [firstAccessEmailStep, setFirstAccessEmailStep] = useState<'send_email' | 'verify_code' | 'completed_form'>('send_email');
+  const [isSendingFirstAccessEmail, setIsSendingFirstAccessEmail] = useState<boolean>(false);
+  const [firstAccessVerificationCode, setFirstAccessVerificationCode] = useState<string>('');
+  const [correctFirstAccessCode, setCorrectFirstAccessCode] = useState<string>('');
+
   // --- MOTOBOY REGISTRATION & SESSIONS (NEW COMPONENT REQUIREMENTS) ---
   const [motoboys, setMotoboys] = useState<Motoboy[]>(() => INITIAL_MOTOBOYS);
   const [isAddingNewMotoboy, setIsAddingNewMotoboy] = useState<boolean>(false);
@@ -214,11 +248,56 @@ export default function App() {
   const [newMotoboyCidade, setNewMotoboyCidade] = useState<string>('Passos - MG');
   const [newMotoboySenha, setNewMotoboySenha] = useState<string>('passos123');
   const [newMotoboyRepasse, setNewMotoboyRepasse] = useState<number>(4.00);
+  const [newMotoboyEmpresaExclusiva, setNewMotoboyEmpresaExclusiva] = useState<string>('');
+
+  // --- STATE FOR MOTOBOY EDITING (CRUD) ---
+  const [motoboyParaEditar, setMotoboyParaEditar] = useState<Motoboy | null>(null);
+  const [editMotoboyNome, setEditMotoboyNome] = useState<string>('');
+  const [editMotoboyTelefone, setEditMotoboyTelefone] = useState<string>('');
+  const [editMotoboyCidade, setEditMotoboyCidade] = useState<string>('Passos - MG');
+  const [editMotoboySenha, setEditMotoboySenha] = useState<string>('');
+  const [editMotoboyRepasse, setEditMotoboyRepasse] = useState<number>(4.00);
+  const [editMotoboySituacao, setEditMotoboySituacao] = useState<string>('Ativo');
+  const [editMotoboyEmpresaExclusiva, setEditMotoboyEmpresaExclusiva] = useState<string>('');
+
+  // --- STATES FOR EXCLUSION CONFIRMATION ---
+  const [deleteConfirmType, setDeleteConfirmType] = useState<'cliente' | 'motoboy' | null>(null);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [deleteConfirmName, setDeleteConfirmName] = useState<string>('');
 
   // Multi-session credentials portal states
   const [activeSessionRole, setActiveSessionRole] = useState<'Empresa' | 'Motoboy' | 'Cliente' | null>(null);
   const [activeMotoboyUser, setActiveMotoboyUser] = useState<Motoboy | null>(null);
   const [activeClienteUser, setActiveClienteUser] = useState<Cliente | null>(null);
+
+  // --- ADMIN CITY FILTER & SEARCH ---
+  const [selectedAdminCity, setSelectedAdminCity] = useState<string>('Todas');
+
+  // --- CLIENT SELF-REGISTRATION STATE ---
+  const [isSelfRegistering, setIsSelfRegistering] = useState<boolean>(false);
+  const [selfRegNome, setSelfRegNome] = useState<string>('');
+  const [selfRegCNPJ, setSelfRegCNPJ] = useState<string>('');
+  const [selfRegInscricaoEstadual, setSelfRegInscricaoEstadual] = useState<string>('Isento');
+  const [selfRegCEP, setSelfRegCEP] = useState<string>('');
+  const [selfRegEndereco, setSelfRegEndereco] = useState<string>('');
+  const [selfRegCidade, setSelfRegCidade] = useState<string>('Passos - MG');
+  const [selfRegTelefone, setSelfRegTelefone] = useState<string>('');
+  const [selfRegEmail, setSelfRegEmail] = useState<string>('');
+  const [isFetchingCEP, setIsFetchingCEP] = useState<boolean>(false);
+
+  // --- STATES FOR FECHAMENTO / RELATORIOS ---
+  const [isReportModalOpen, setIsReportModalOpen] = useState<boolean>(false);
+  const [reportRole, setReportRole] = useState<'Empresa' | 'Cliente' | 'Motoboy' | null>(null);
+  const [reportPeriod, setReportPeriod] = useState<'Semana' | 'Mes'>('Semana');
+  const [reportFilterClienteId, setReportFilterClienteId] = useState<string>('Todos');
+  const [reportFilterMotoboyId, setReportFilterMotoboyId] = useState<string>('Todos');
+  const [selfRegSenha, setSelfRegSenha] = useState<string>('');
+  const [selfRegQuadrante, setSelfRegQuadrante] = useState<Quadrante>('A');
+  const [selfRegStep, setSelfRegStep] = useState<'form' | 'verify' | 'success'>('form');
+  const [selfRegVerificationCode, setSelfRegVerificationCode] = useState<string>('');
+  const [correctSelfRegCode, setCorrectSelfRegCode] = useState<string>('');
+  const [selfRegError, setSelfRegError] = useState<string>('');
+  const [isSendingSelfRegEmail, setIsSendingSelfRegEmail] = useState<boolean>(false);
   
   // Simulation, map tracker, and real-time tick states
   const [adminVisualPerspective, setAdminVisualPerspective] = useState<'Empresa' | 'Motoboy' | 'Cliente'>('Empresa');
@@ -232,15 +311,16 @@ export default function App() {
     return () => clearInterval(interval);
   }, []);
 
-  // --- SUPABASE SYNCHRONIZATION AND PRE-POPULATION ---
+  // --- DATABASE SYNCHRONIZATION AND PRE-POPULATION (FIREBASE & SUPABASE) ---
   const [supabaseLoading, setSupabaseLoading] = useState<boolean>(false);
   const [supabaseSuccessMsg, setSupabaseSuccessMsg] = useState<string>('');
   const [dbSyncStatus, setDbSyncStatus] = useState<'synced' | 'connecting' | 'updating' | 'local'>(
-    isSupabaseConfigured ? 'connecting' : 'local'
+    (isFirebaseConfigured || isSupabaseConfigured) ? 'connecting' : 'local'
   );
   const isSupabaseBootstrappedRef = React.useRef<boolean>(false);
+  const isFirebaseBootstrappedRef = React.useRef<boolean>(false);
 
-  // Reusable query and mapper function for polling & real-time DB tracking
+  // Reusable query and mapper function for polling & real-time DB tracking for Supabase fallback
   const fetchLatestOrdensFromSupabase = async (isBackground = false) => {
     if (!supabase) return;
     if (!isBackground) setSupabaseLoading(true);
@@ -251,7 +331,7 @@ export default function App() {
         .order('criado_em', { ascending: false });
 
       if (ordErr) {
-        console.error("Error fetching newest ordens:", ordErr);
+        console.error("Error fetching newest ordens from Supabase:", ordErr);
         return;
       }
 
@@ -299,84 +379,131 @@ export default function App() {
     }
   };
 
+  // Main loader: runs on load, prioritizing Firebase over Supabase
   useEffect(() => {
-    if (!supabase) return;
-
     let active = true;
 
     async function loadData() {
-      setSupabaseLoading(true);
-      setDbSyncStatus('connecting');
-      try {
-        // 1. Fetch Clientes
-        const { data: dbCli, error: cliErr } = await supabase!
-          .from('clientes')
-          .select('*')
-          .order('criado_em', { ascending: false });
+      if (isFirebaseConfigured) {
+        setSupabaseLoading(true);
+        setDbSyncStatus('connecting');
+        try {
+          const loaded = await loadInitialDataFromFirebase();
+          if (active) {
+            if (loaded) {
+              if (loaded.clientes && loaded.clientes.length > 0) {
+                setClientes(loaded.clientes);
+              } else {
+                await syncClientesToFirebase(clientes);
+              }
 
-        // 2. Fetch Motoboys
-        const { data: dbMoto, error: motoErr } = await supabase!
-          .from('motoboys')
-          .select('*');
+              if (loaded.motoboys && loaded.motoboys.length > 0) {
+                setMotoboys(loaded.motoboys);
+              } else {
+                await syncMotoboysToFirebase(motoboys);
+              }
 
-        if (cliErr) console.error("Error loading clientes:", cliErr);
-        if (motoErr) console.error("Error loading motoboys:", motoErr);
+              if (loaded.ordens && loaded.ordens.length > 0) {
+                setOrdens(loaded.ordens);
+              } else {
+                await syncOrdensToFirebase(ordens);
+              }
+            } else {
+              // Firebase response was empty or null, seed the data
+              await syncClientesToFirebase(clientes);
+              await syncMotoboysToFirebase(motoboys);
+              await syncOrdensToFirebase(ordens);
+            }
 
-        if (active) {
-          // Process Clientes fallback or load
-          if (dbCli && dbCli.length > 0) {
-            const mappedCli: Cliente[] = dbCli.map(c => ({
-              id: c.id,
-              nome: c.nome,
-              quadrante: c.quadrante as Quadrante,
-              endereco: c.endereco,
-              telefone: c.telefone,
-              cidade: c.cidade,
-              valorPagoMotoboy: Number(c.valor_pago_motoboy),
-              valorCobradoCliente: Number(c.valor_cobrado_cliente),
-              senha: c.senha || undefined,
-              email: c.email || undefined,
-              emailConfirmado: c.email_confirmado,
-              cadastroCompleto: c.cadastro_completo,
-              cnpj: c.cnpj || undefined,
-              inscricaoEstadual: c.inscricao_estadual || undefined,
-              criadoPor: c.criado_por as 'Empresa' | 'Entregador',
-              criadoEm: c.criado_em
-            }));
-            setClientes(mappedCli);
-          } else {
-            await syncClientesToSupabase(clientes);
+            isFirebaseBootstrappedRef.current = true;
+            setSupabaseSuccessMsg('Banco Firebase Firestore carregado em tempo real! 🔥');
+            setTimeout(() => setSupabaseSuccessMsg(''), 5000);
+            setDbSyncStatus('synced');
           }
-
-          // Process Motoboys fallback or load
-          if (dbMoto && dbMoto.length > 0) {
-            const mappedMoto: Motoboy[] = dbMoto.map(m => ({
-              id: m.id,
-              nome: m.nome,
-              telefone: m.telefone,
-              cidade: m.cidade,
-              senha: m.senha,
-              valorRepasseFixo: Number(m.valor_repasse_fixo),
-              criadoEm: m.criado_em
-            }));
-            setMotoboys(mappedMoto);
-          } else {
-            await syncMotoboysToSupabase(motoboys);
-          }
-
-          // Load Ordens via our central reusable fetching method
-          await fetchLatestOrdensFromSupabase(true);
-
-          isSupabaseBootstrappedRef.current = true;
-          setSupabaseSuccessMsg('Banco Supabase e Migrations carregados em tempo real!');
-          setTimeout(() => setSupabaseSuccessMsg(''), 5000);
-          setDbSyncStatus('synced');
+        } catch (err) {
+          console.error("Firebase loader failed:", err);
+          setDbSyncStatus('local');
+        } finally {
+          if (active) setSupabaseLoading(false);
         }
-      } catch (err) {
-        console.error("Supabase failover active:", err);
-        setDbSyncStatus('local');
-      } finally {
-        if (active) setSupabaseLoading(false);
+        return;
+      }
+
+      // Supabase Fallback
+      if (supabase) {
+        setSupabaseLoading(true);
+        setDbSyncStatus('connecting');
+        try {
+          // 1. Fetch Clientes
+          const { data: dbCli, error: cliErr } = await supabase!
+            .from('clientes')
+            .select('*')
+            .order('criado_em', { ascending: false });
+
+          // 2. Fetch Motoboys
+          const { data: dbMoto, error: motoErr } = await supabase!
+            .from('motoboys')
+            .select('*');
+
+          if (cliErr) console.error("Error loading clientes:", cliErr);
+          if (motoErr) console.error("Error loading motoboys:", motoErr);
+
+          if (active) {
+            // Process Clientes fallback or load
+            if (dbCli && dbCli.length > 0) {
+              const mappedCli: Cliente[] = dbCli.map(c => ({
+                id: c.id,
+                nome: c.nome,
+                quadrante: c.quadrante as Quadrante,
+                endereco: c.endereco,
+                telefone: c.telefone,
+                cidade: c.cidade,
+                valorPagoMotoboy: Number(c.valor_pago_motoboy),
+                valorCobradoCliente: Number(c.valor_cobrado_cliente),
+                senha: c.senha || undefined,
+                email: c.email || undefined,
+                emailConfirmado: c.email_confirmado,
+                cadastroCompleto: c.cadastro_completo,
+                cnpj: c.cnpj || undefined,
+                inscricaoEstadual: c.inscricao_estadual || undefined,
+                criadoPor: c.criado_por as 'Empresa' | 'Entregador',
+                criadoEm: c.criado_em
+              }));
+              setClientes(mappedCli);
+            } else {
+              await syncClientesToSupabase(clientes);
+            }
+
+            // Process Motoboys fallback or load
+            if (dbMoto && dbMoto.length > 0) {
+              const mappedMoto: Motoboy[] = dbMoto.map(m => ({
+                id: m.id,
+                nome: m.nome,
+                telefone: m.telefone,
+                cidade: m.cidade,
+                senha: m.senha,
+                valorRepasseFixo: Number(m.valor_repasse_fixo),
+                criadoEm: m.criado_em
+              }));
+              setMotoboys(mappedMoto);
+            } else {
+              await syncMotoboysToSupabase(motoboys);
+            }
+
+            // Load Ordens via our central reusable fetching method
+            await fetchLatestOrdensFromSupabase(true);
+
+            isSupabaseBootstrappedRef.current = true;
+            setSupabaseSuccessMsg('Banco Supabase e Migrations carregados em tempo real!');
+            setTimeout(() => setSupabaseSuccessMsg(''), 5000);
+            setDbSyncStatus('synced');
+          }
+        } catch (err) {
+          console.error("Supabase failover active:", err);
+          setDbSyncStatus('local');
+        } finally {
+          if (active) setSupabaseLoading(false);
+        }
       }
     }
 
@@ -386,62 +513,118 @@ export default function App() {
 
   // --- REUSABLE REAL-TIME & POLLING SETUP FOR CALENDAR REFRESH ---
   useEffect(() => {
-    if (!supabase) {
-      setDbSyncStatus('local');
-      return;
-    }
-
-    // A. Setup Supabase Real-time postgres_changes subscription to track active orders updates
-    const channel = supabase
-      .channel('schema-live-calendar')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'ordens_servico'
-        },
-        async (payload) => {
-          console.log('⚡ Real-time database update detected via Supabase!', payload);
-          setSupabaseSuccessMsg('Módulo de Auditoria Sincronizado em Tempo Real! ⚡');
-          setTimeout(() => setSupabaseSuccessMsg(''), 4000);
-          await fetchLatestOrdensFromSupabase(true);
+    // 1. Firebase snapshot stream is primary
+    if (isFirebaseConfigured) {
+      setDbSyncStatus('synced');
+      const q = query(collection(firebaseDb, 'ordens_servico'), orderBy('criadoEm', 'desc'));
+      const unsubscribe = onSnapshot(q, (snapshot) => {
+        const mapped: OrdemServico[] = [];
+        snapshot.forEach((docSnap) => {
+          const o = docSnap.data();
+          mapped.push({
+            id: o.id,
+            clienteId: o.clienteId,
+            clienteNome: o.clienteNome,
+            quadrante: o.quadrante as Quadrante,
+            itensDescricao: o.itensDescricao,
+            itensAnalistas: o.itensAnalistas || [],
+            enderecoEntrega: o.enderecoEntrega || undefined,
+            destinatarioNome: o.destinatarioNome || undefined,
+            retornoPeca: o.retornoPeca || false,
+            taxaReversa: o.taxaReversa ? Number(o.taxaReversa) : undefined,
+            valorPagoMotoboy: Number(o.valorPagoMotoboy),
+            valorCobradoCliente: Number(o.valorCobradoCliente),
+            motoboyId: o.motoboyId || undefined,
+            motoboyNome: o.motoboyNome || undefined,
+            status: o.status as any,
+            grupoRotaId: o.grupoRotaId || undefined,
+            motivoDesmembramento: o.motivoDesmembramento || undefined,
+            travaCubagemStatus: o.travaCubagemStatus || 'Liberado - Cabe no Baú',
+            criadoEm: o.criadoEm
+          });
+        });
+        if (mapped.length > 0) {
+          setOrdens(mapped);
         }
-      )
-      .subscribe((status) => {
-        console.log(`📡 Supabase real-time status: ${status}`);
-        if (status === 'SUBSCRIBED') {
-          setDbSyncStatus('synced');
-        } else if (status === 'TIMED_OUT' || status === 'CLOSED') {
-          setDbSyncStatus('updating');
-        }
+        setDbSyncStatus('synced');
+      }, (error) => {
+        console.error("Firestore onSnapshot streaming error:", error);
+        setDbSyncStatus('updating');
       });
 
-    // B. Setup 5-Second polling mechanism for dual safety & instant offline/latency recoverability
-    const pollingTimer = setInterval(async () => {
-      await fetchLatestOrdensFromSupabase(true);
-    }, 5000);
+      return () => {
+        unsubscribe();
+      };
+    }
 
-    return () => {
-      supabase.removeChannel(channel);
-      clearInterval(pollingTimer);
-    };
+    // 2. Supabase setup fallback
+    if (supabase) {
+      // A. Setup Supabase Real-time postgres_changes subscription to track active orders updates
+      const channel = supabase
+        .channel('schema-live-calendar')
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'ordens_servico'
+          },
+          async (payload) => {
+            console.log('⚡ Real-time database update detected via Supabase!', payload);
+            setSupabaseSuccessMsg('Módulo de Auditoria Sincronizado em Tempo Real! ⚡');
+            setTimeout(() => setSupabaseSuccessMsg(''), 4000);
+            await fetchLatestOrdensFromSupabase(true);
+          }
+        )
+        .subscribe((status) => {
+          console.log(`📡 Supabase real-time status: ${status}`);
+          if (status === 'SUBSCRIBED') {
+            setDbSyncStatus('synced');
+          } else if (status === 'TIMED_OUT' || status === 'CLOSED') {
+            setDbSyncStatus('updating');
+          }
+        });
+
+      // B. Setup 5-Second polling mechanism for dual safety & instant offline/latency recoverability
+      const pollingTimer = setInterval(async () => {
+        await fetchLatestOrdensFromSupabase(true);
+      }, 5000);
+
+      return () => {
+        supabase.removeChannel(channel);
+        clearInterval(pollingTimer);
+      };
+    }
+
+    setDbSyncStatus('local');
   }, []);
 
-  // Sync changes to Supabase post-bootstrap
+  // Post-bootstrap local-state modifications automated syncing
   useEffect(() => {
-    if (!supabase || !isSupabaseBootstrappedRef.current) return;
-    syncClientesToSupabase(clientes);
+    if (isFirebaseConfigured && isFirebaseBootstrappedRef.current) {
+      syncClientesToFirebase(clientes);
+    }
+    if (supabase && isSupabaseBootstrappedRef.current) {
+      syncClientesToSupabase(clientes);
+    }
   }, [clientes]);
 
   useEffect(() => {
-    if (!supabase || !isSupabaseBootstrappedRef.current) return;
-    syncOrdensToSupabase(ordens);
+    if (isFirebaseConfigured && isFirebaseBootstrappedRef.current) {
+      syncOrdensToFirebase(ordens);
+    }
+    if (supabase && isSupabaseBootstrappedRef.current) {
+      syncOrdensToSupabase(ordens);
+    }
   }, [ordens]);
 
   useEffect(() => {
-    if (!supabase || !isSupabaseBootstrappedRef.current) return;
-    syncMotoboysToSupabase(motoboys);
+    if (isFirebaseConfigured && isFirebaseBootstrappedRef.current) {
+      syncMotoboysToFirebase(motoboys);
+    }
+    if (supabase && isSupabaseBootstrappedRef.current) {
+      syncMotoboysToSupabase(motoboys);
+    }
   }, [motoboys]);
 
   // Login form field states
@@ -471,10 +654,19 @@ export default function App() {
   const [calendarViewYear, setCalendarViewYear] = useState<number>(new Date().getFullYear());
   const [copiedDay, setCopiedDay] = useState<boolean>(false);
 
+  // Helper to obtain a client's city in real-time
+  const getClientCity = useCallback((clientId: string) => {
+    const found = clientes.find(c => c.id === clientId);
+    return found ? found.cidade : 'Passos - MG';
+  }, [clientes]);
+
   // --- DYNAMIC CALCULATED VALUES ---
   const filteredClientListForDispatch = useMemo(() => {
-    return clientes.filter(c => c.quadrante === selectedQuadrant);
-  }, [clientes, selectedQuadrant]);
+    return clientes.filter(c => {
+      const matchCity = selectedAdminCity === 'Todas' || c.cidade === selectedAdminCity;
+      return matchCity && c.quadrante === selectedQuadrant;
+    });
+  }, [clientes, selectedQuadrant, selectedAdminCity]);
 
   // Set default client when quadrant changes to ensure form validity
   useEffect(() => {
@@ -503,16 +695,19 @@ export default function App() {
     return analisarCubagemAutopeças(itemTexto);
   }, [itemTexto]);
 
-  // Real-time calculation of pending orders per quadrant
+  // Real-time calculation of pending orders per quadrant filtered by city
   const pendingCounts = useMemo(() => {
     const counts: Record<Quadrante, number> = { A: 0, B: 0, C: 0, D: 0, E: 0, F: 0 };
     ordens.forEach(o => {
       if (o.status === 'Pendente' || o.status === 'Buscando Parceiro' || o.status === 'Rota Agrupada') {
-        counts[o.quadrante] = (counts[o.quadrante] || 0) + 1;
+        const clientCity = getClientCity(o.clienteId);
+        if (selectedAdminCity === 'Todas' || clientCity === selectedAdminCity) {
+          counts[o.quadrante] = (counts[o.quadrante] || 0) + 1;
+        }
       }
     });
     return counts;
-  }, [ordens]);
+  }, [ordens, selectedAdminCity, getClientCity]);
 
   // Real-time evaluation of geographic hot zones representing highest concentration of dispatcher queues
   const hotZoneStatus = useMemo(() => {
@@ -756,22 +951,26 @@ export default function App() {
     return { billing, repasse, count };
   }, [selectedDayOrders]);
 
-  // Filter clients to show on the visual directory panel
+  // Filter clients to show on the visual directory panel filtered by selected admin city (Quadrants / Sectors removed as per user instruction and limited to 5 examples for testing)
   const directoryFilteredClients = useMemo(() => {
     return clientes.filter(c => {
-      const matchQ = c.quadrante === visualPanelQuadrant;
+      const matchCity = selectedAdminCity === 'Todas' || c.cidade === selectedAdminCity;
       const matchSearch = c.nome.toLowerCase().includes(clienteSearchTerm.toLowerCase()) || 
                           c.endereco.toLowerCase().includes(clienteSearchTerm.toLowerCase()) ||
                           c.id.toLowerCase().includes(clienteSearchTerm.toLowerCase());
-      return matchQ && (clienteSearchTerm === '' || matchSearch);
-    });
-  }, [clientes, visualPanelQuadrant, clienteSearchTerm]);
+      return matchCity && (clienteSearchTerm === '' || matchSearch);
+    }).slice(0, 5);
+  }, [clientes, clienteSearchTerm, selectedAdminCity]);
 
-  // Sector-wide totals of client faturamento for the selected active sector
+  // Sector-wide totals of client faturamento filtered by selected city and quadrant
   const sectorBillingTotal = useMemo(() => {
     let hojeSector = 0;
     let mesSector = 0;
-    clientes.filter(c => c.quadrante === visualPanelQuadrant).forEach(c => {
+    clientes.filter(c => {
+      const matchCity = selectedAdminCity === 'Todas' || c.cidade === selectedAdminCity;
+      const matchQ = c.quadrante === visualPanelQuadrant;
+      return matchCity && matchQ;
+    }).forEach(c => {
       const stats = clientBillingStats[c.id];
       if (stats) {
         hojeSector += stats.hojeBilling;
@@ -779,7 +978,7 @@ export default function App() {
       }
     });
     return { hojeSector, mesSector };
-  }, [clientes, visualPanelQuadrant, clientBillingStats]);
+  }, [clientes, visualPanelQuadrant, clientBillingStats, selectedAdminCity]);
 
   // Initialize first API payload view
   useEffect(() => {
@@ -890,7 +1089,7 @@ export default function App() {
   // Add client directly - Dual Synchronized Action (callable by Faturista or Motoboy)
   const handleConfirmarEmailCliente = async (clientId: string) => {
     setClientes(prev => prev.map(c => c.id === clientId ? { ...c, emailConfirmado: true } : c));
-    setSupabaseSuccessMsg("📧 E-mail cadastrado e confirmado no Supabase com sucesso! Cliente Liberado! ⚡");
+    setSupabaseSuccessMsg("📧 E-mail cadastrado e confirmado no Firebase com sucesso! Cliente Liberado! ⚡");
     setTimeout(() => setSupabaseSuccessMsg(''), 4000);
   };
 
@@ -913,6 +1112,7 @@ export default function App() {
       endereco: newClientEndereco || 'Pendente - Preencher no 1º Acesso',
       telefone: newClientTelefone || 'Pendente - Preencher no 1º Acesso',
       cidade: newClientCidade || 'Passos - MG',
+      cep: newClientCEP,
       valorPagoMotoboy: Number(newClientValorPagoMotoboy) || 4.00,
       valorCobradoCliente: Number(newClientValorCobradoCliente) || 10.00,
       senha: tempSenha, // temporary fallback password
@@ -920,7 +1120,8 @@ export default function App() {
       emailConfirmado: false, // Will be activated/confirmed upon full registration/self activation
       cadastroCompleto: false, // Explicitly false! Trigger B2B onboarding setup on first login/access!
       criadoPor: source,
-      criadoEm: new Date().toISOString()
+      criadoEm: new Date().toISOString(),
+      motoboysAtivos: Number(newClientMotoboysAtivos) || 0
     };
 
     setClientes(prev => [novoCli, ...prev]);
@@ -982,6 +1183,7 @@ export default function App() {
 
     // Clean inputs
     setNewClientNome('');
+    setNewClientCEP('');
     setNewClientEndereco('');
     setNewClientTelefone('');
     setNewClientEmail('');
@@ -1008,10 +1210,12 @@ export default function App() {
       endereco: editClientEndereco || 'Pendente - Preencher no 1º Acesso',
       telefone: editClientTelefone || 'Pendente - Preencher no 1º Acesso',
       cidade: editClientCidade,
+      cep: editClientCEP,
       valorPagoMotoboy: Number(editClientValorPagoMotoboy) || 4.00,
       valorCobradoCliente: Number(editClientValorCobradoCliente) || 10.00,
       email: editClientEmail,
-      senha: editClientSenha || clienteParaEditar.senha
+      senha: editClientSenha || clienteParaEditar.senha,
+      motoboysAtivos: Number(editClientMotoboysAtivos) || 0
     };
 
     setClientes(prev => prev.map(c => c.id === clienteParaEditar.id ? updatedCli : c));
@@ -1021,16 +1225,227 @@ export default function App() {
     setTimeout(() => setSupabaseSuccessMsg(''), 4000);
   };
 
-  // Delete client (CRUD delete)
+  // Delete client (CRUD delete) - Open confirmation modal
   const handleDeletarCliente = (clientId: string) => {
     const targetCli = clientes.find(c => c.id === clientId);
     if (!targetCli) return;
+    setDeleteConfirmType('cliente');
+    setDeleteConfirmId(clientId);
+    setDeleteConfirmName(targetCli.nome);
+  };
 
-    if (window.confirm(`Tem certeza que deseja excluir o cliente "${targetCli.nome}"?`)) {
-      setClientes(prev => prev.filter(c => c.id !== clientId));
-      setSupabaseSuccessMsg(`❌ Cliente "${targetCli.nome}" excluído das bases com sucesso!`);
-      setTimeout(() => setSupabaseSuccessMsg(''), 4000);
+  // Delete motoboy (CRUD delete) - Open confirmation modal
+  const handleDeletarMotoboy = (motoboyId: string) => {
+    const targetMb = motoboys.find(m => m.id === motoboyId);
+    if (!targetMb) return;
+    setDeleteConfirmType('motoboy');
+    setDeleteConfirmId(motoboyId);
+    setDeleteConfirmName(targetMb.nome);
+  };
+
+  // Update motoboy credentials or situation (CRUD update)
+  const handleUpdateMotoboy = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!motoboyParaEditar) return;
+    if (!editMotoboyNome.trim()) {
+      alert("Por favor, preencha o Nome do motoboy.");
+      return;
     }
+
+    const updatedMb: Motoboy = {
+      ...motoboyParaEditar,
+      nome: editMotoboyNome,
+      telefone: editMotoboyTelefone,
+      cidade: editMotoboyCidade,
+      senha: editMotoboySenha || motoboyParaEditar.senha,
+      valorRepasseFixo: Number(editMotoboyRepasse) || 4.00,
+      situacao: editMotoboySituacao || 'Ativo',
+      empresaExclusiva: editMotoboyEmpresaExclusiva || undefined
+    };
+
+    setMotoboys(prev => prev.map(m => m.id === motoboyParaEditar.id ? updatedMb : m));
+    setMotoboyParaEditar(null);
+    setEditMotoboyEmpresaExclusiva('');
+
+    setSupabaseSuccessMsg(`✅ Cadastro do motoboy "${updatedMb.nome}" atualizado com sucesso!`);
+    setTimeout(() => setSupabaseSuccessMsg(''), 4000);
+  };
+
+  // Execute actual deletion from state-based confirmation modal
+  const executeConfirmDelete = async () => {
+    if (!deleteConfirmType || !deleteConfirmId) return;
+
+    if (deleteConfirmType === 'cliente') {
+      const clientId = deleteConfirmId;
+      const targetCli = clientes.find(c => c.id === clientId);
+      if (targetCli) {
+        setClientes(prev => prev.filter(c => c.id !== clientId));
+
+        if (isFirebaseConfigured) {
+          try {
+            await deleteClienteFromFirebase(clientId);
+          } catch (err) {
+            console.error("Erro ao deletar cliente no Firebase:", err);
+          }
+        }
+
+        if (supabase) {
+          try {
+            const { error } = await supabase
+              .from('clientes')
+              .delete()
+              .eq('id', clientId);
+            if (error) {
+              console.error("Erro ao deletar cliente no Supabase:", error.message);
+            }
+          } catch (err) {
+            console.error("Falha ao deletar cliente no Supabase:", err);
+          }
+        }
+
+        setSupabaseSuccessMsg(`❌ Cliente "${targetCli.nome}" excluído com sucesso!`);
+        setTimeout(() => setSupabaseSuccessMsg(''), 4000);
+      }
+    } else if (deleteConfirmType === 'motoboy') {
+      const motoboyId = deleteConfirmId;
+      const targetMb = motoboys.find(m => m.id === motoboyId);
+      if (targetMb) {
+        setMotoboys(prev => prev.filter(m => m.id !== motoboyId));
+
+        if (isFirebaseConfigured) {
+          try {
+            await deleteMotoboyFromFirebase(motoboyId);
+          } catch (err) {
+            console.error("Erro ao deletar motoboy no Firebase:", err);
+          }
+        }
+
+        if (supabase) {
+          try {
+            const { error } = await supabase
+              .from('motoboys')
+              .delete()
+              .eq('id', motoboyId);
+            if (error) {
+              console.error("Erro ao deletar motoboy no Supabase:", error.message);
+            }
+          } catch (err) {
+            console.error("Falha ao deletar motoboy no Supabase:", err);
+          }
+        }
+
+        setSupabaseSuccessMsg(`❌ Motoboy "${targetMb.nome}" excluído com sucesso!`);
+        setTimeout(() => setSupabaseSuccessMsg(''), 4000);
+      }
+    }
+
+    // Reset confirmation states
+    setDeleteConfirmType(null);
+    setDeleteConfirmId(null);
+    setDeleteConfirmName('');
+  };
+
+  // --- INTEGRATED VIA CEP LOOKUP ENGINE (AUTO-RESOLVE ADRESS/CITY) ---
+  const handleFetchCEP = async (cep: string, target: 'selfReg' | 'newClient' | 'editClient') => {
+    const cleanedCEP = cep.replace(/\D/g, '');
+    if (cleanedCEP.length !== 8) return;
+
+    if (target === 'selfReg') setIsFetchingCEP(true);
+    else if (target === 'newClient') setIsFetchingNewClientCEP(true);
+    else if (target === 'editClient') setIsFetchingEditClientCEP(true);
+
+    try {
+      const response = await fetch(`https://viacep.com.br/ws/${cleanedCEP}/json/`);
+      const data = await response.json();
+      if (!data.erro) {
+        const fullAddress = `${data.logradouro}${data.bairro ? `, ${data.bairro}` : ''}`;
+        const cityState = `${data.localidade} - ${data.uf}`;
+
+        if (target === 'selfReg') {
+          setSelfRegEndereco(fullAddress);
+          setSelfRegCidade(cityState);
+        } else if (target === 'newClient') {
+          setNewClientEndereco(fullAddress);
+          setNewClientCidade(cityState);
+        } else if (target === 'editClient') {
+          setEditClientEndereco(fullAddress);
+          setEditClientCidade(cityState);
+        }
+      } else {
+        console.warn("CEP não encontrado no ViaCEP.");
+      }
+    } catch (err) {
+      console.error("Erro ao buscar CEP via ViaCEP API:", err);
+    } finally {
+      if (target === 'selfReg') setIsFetchingCEP(false);
+      else if (target === 'newClient') setIsFetchingNewClientCEP(false);
+      else if (target === 'editClient') setIsFetchingEditClientCEP(false);
+    }
+  };
+
+  const handleCEPChange = (val: string, target: 'selfReg' | 'newClient' | 'editClient') => {
+    let formatted = val.replace(/\D/g, '');
+    if (formatted.length > 8) formatted = formatted.slice(0, 8);
+    
+    let displayVal = formatted;
+    if (formatted.length > 5) {
+      displayVal = `${formatted.slice(0, 5)}-${formatted.slice(5)}`;
+    }
+
+    if (target === 'selfReg') {
+      setSelfRegCEP(displayVal);
+      if (formatted.length === 8) {
+        handleFetchCEP(formatted, 'selfReg');
+      }
+    } else if (target === 'newClient') {
+      setNewClientCEP(displayVal);
+      if (formatted.length === 8) {
+        handleFetchCEP(formatted, 'newClient');
+      }
+    } else if (target === 'editClient') {
+      setEditClientCEP(displayVal);
+      if (formatted.length === 8) {
+        handleFetchCEP(formatted, 'editClient');
+      }
+    }
+  };
+
+  // --- REPORTING AND DELIVERY CLOSURE ENGINE ---
+  const handleAbrirRelatorio = (role: 'Empresa' | 'Cliente' | 'Motoboy') => {
+    setReportRole(role);
+    setReportPeriod('Semana');
+    setReportFilterClienteId('Todos');
+    setReportFilterMotoboyId('Todos');
+    setIsReportModalOpen(true);
+  };
+
+  const getFilteredReportOrders = () => {
+    const today = new Date();
+    return ordens.filter(o => {
+      if (o.status !== 'Entregue') return false;
+
+      const orderDate = new Date(o.criadoEm);
+      if (reportPeriod === 'Semana') {
+        const diffTime = Math.abs(today.getTime() - orderDate.getTime());
+        const diffDays = diffTime / (1000 * 60 * 60 * 24);
+        if (diffDays > 7) return false;
+      } else {
+        if (orderDate.getMonth() !== today.getMonth() || orderDate.getFullYear() !== today.getFullYear()) {
+          return false;
+        }
+      }
+
+      if (reportRole === 'Cliente') {
+        if (o.clienteId !== activeClienteUser?.id) return false;
+      } else if (reportRole === 'Motoboy') {
+        if (o.motoboyId !== activeMotoboyUser?.id) return false;
+      } else if (reportRole === 'Empresa') {
+        if (reportFilterClienteId !== 'Todos' && o.clienteId !== reportFilterClienteId) return false;
+        if (reportFilterMotoboyId !== 'Todos' && o.motoboyId !== reportFilterMotoboyId) return false;
+      }
+
+      return true;
+    });
   };
 
   // --- SESSION CONTROLLERS ---
@@ -1039,12 +1454,14 @@ export default function App() {
     setLoginError('');
 
     if (loginRole === 'Empresa') {
-      if (loginPasswordInput === 'admin123') {
+      // MASTER SECURE DEVELOPER PASSWORD (you may customize this value right here)
+      const MAIN_DEV_MASTER_PASSWORD = 'torqueadmin2026';
+      if (loginPasswordInput === MAIN_DEV_MASTER_PASSWORD) {
         setActiveSessionRole('Empresa');
         setActiveMotoboyUser(null);
         setActiveClienteUser(null);
       } else {
-        setLoginError('Senha incorreta para Empresa (Dica: admin123)');
+        setLoginError('🔒 Acesso restrito ao desenvolvedor do app. Código de autenticação Master incorreto!');
       }
     } else if (loginRole === 'Motoboy') {
       const selected = motoboys.find(m => m.id === selectedLoginUserId);
@@ -1068,6 +1485,9 @@ export default function App() {
       if (selected.cadastroCompleto === false) {
         setFirstAccessClientId(selected.id);
         setFirstAccessEmail(selected.email || '');
+        setFirstAccessEmailStep('send_email');
+        setFirstAccessVerificationCode('');
+        setCorrectFirstAccessCode('');
         setIsFirstAccessModalOpen(true);
         setLoginError('');
         return;
@@ -1081,6 +1501,134 @@ export default function App() {
         setLoginError(`Senha incorreta para ${selected.nome} (Dica: ${actualPW})`);
       }
     }
+  };
+
+  // Envia código de autenticação por e-mail para o autocadastro de cliente novo
+  const handleSendSelfRegEmail = (e: React.FormEvent) => {
+    e.preventDefault();
+    setSelfRegError('');
+
+    if (!selfRegNome.trim() || !selfRegCNPJ.trim() || !selfRegEndereco.trim() || !selfRegTelefone.trim() || !selfRegEmail.trim() || !selfRegSenha.trim()) {
+      setSelfRegError('Por favor, preencha todos os campos obrigatórios (*).');
+      return;
+    }
+
+    if (!selfRegEmail.includes('@') || !selfRegEmail.includes('.')) {
+      setSelfRegError('Por favor, informe um e-mail válido.');
+      return;
+    }
+
+    // Check CNPJ format / email already exist
+    const emailExists = clientes.some(c => c.email?.toLowerCase().trim() === selfRegEmail.toLowerCase().trim());
+    if (emailExists) {
+      setSelfRegError('Este e-mail já está sendo utilizado por outra empresa cadastrada.');
+      return;
+    }
+
+    setIsSendingSelfRegEmail(true);
+
+    // Simulate sending email
+    setTimeout(() => {
+      const code = `TL-${Math.floor(1005 + Math.random() * 8990)}`;
+      setCorrectSelfRegCode(code);
+      setSelfRegStep('verify');
+      setIsSendingSelfRegEmail(false);
+      setSupabaseSuccessMsg(`📩 Código de Ativação enviado para ${selfRegEmail}!`);
+      setTimeout(() => setSupabaseSuccessMsg(''), 4000);
+    }, 1200);
+  };
+
+  // Verifica o código recebido por e-mail e conclui o cadastro de cliente novo
+  const handleVerifySelfRegCode = (e: React.FormEvent) => {
+    e.preventDefault();
+    setSelfRegError('');
+
+    if (!selfRegVerificationCode.trim()) {
+      setSelfRegError('Por favor, digite o código de ativação enviado por e-mail.');
+      return;
+    }
+
+    if (selfRegVerificationCode.trim().toUpperCase() !== correctSelfRegCode.toUpperCase()) {
+      setSelfRegError('Código de Ativação inválido ou expirado. Tente novamente ou use a ferramenta de simulação abaixo.');
+      return;
+    }
+
+    // Success - Construct and save new client
+    const newId = `CLI-${selfRegQuadrante}-${Math.floor(1005 + Math.random() * 8990)}`;
+    const nuevoCli: Cliente = {
+      id: newId,
+      nome: selfRegNome,
+      quadrante: selfRegQuadrante,
+      endereco: selfRegEndereco,
+      telefone: selfRegTelefone,
+      cidade: selfRegCidade,
+      cep: selfRegCEP,
+      valorPagoMotoboy: 4.00, // standard repasse
+      valorCobradoCliente: 10.00, // standard fee
+      senha: selfRegSenha,
+      email: selfRegEmail,
+      emailConfirmado: true,
+      cadastroCompleto: true,
+      cnpj: selfRegCNPJ,
+      inscricaoEstadual: selfRegInscricaoEstadual || 'Isento',
+      criadoPor: 'Cliente', // Automatically flagged as customer-created self registered client
+      criadoEm: new Date().toISOString(),
+      isSelfRegistered: true // For green highlighting in admin dashboard
+    };
+
+    const updatedClientesList = [nuevoCli, ...clientes];
+    setClientes(updatedClientesList);
+
+    // If Supabase is active, sync client list
+    if (supabase) {
+      syncClientesToSupabase(updatedClientesList).catch(err => {
+        console.error("Supabase sync issue with self-registered client:", err);
+      });
+    }
+
+    // Welcome user and logs in automatically
+    setActiveSessionRole('Cliente');
+    setActiveClienteUser(nuevoCli);
+    setAdminVisualPerspective('Cliente');
+
+    // Reset fields
+    setSelfRegStep('form');
+    setIsSelfRegistering(false);
+    setSelfRegNome('');
+    setSelfRegCNPJ('');
+    setSelfRegInscricaoEstadual('Isento');
+    setSelfRegCEP('');
+    setSelfRegEndereco('');
+    setSelfRegCidade('Passos - MG');
+    setSelfRegTelefone('');
+    setSelfRegEmail('');
+    setSelfRegSenha('');
+    setSelfRegVerificationCode('');
+    setCorrectSelfRegCode('');
+
+    // Update API Console
+    const mockOrdemSim: OrdemServico = {
+      id: "AUTO-REG",
+      clienteId: nuevoCli.id,
+      clienteNome: nuevoCli.nome,
+      quadrante: nuevoCli.quadrante,
+      itensDescricao: `Auto-Cadastro de Cliente: ${nuevoCli.nome}`,
+      itensAnalistas: [],
+      retornoPeca: false,
+      valorPagoMotoboy: 4.05,
+      valorCobradoCliente: 10.00,
+      criadoEm: nuevoCli.criadoEm,
+      status: "Pendente",
+      travaCubagemStatus: "Liberado - Cabe no Baú"
+    };
+
+    const apiPayload = compilarAPIResponse(nuevoCli, mockOrdemSim, [], "Liberado - Cabe no Baú");
+    setApiResponseLog(apiPayload);
+    setApiLogTimestamp(new Date().toLocaleTimeString());
+    setApiActionDescription(`Novo Cliente Realizou Auto-Cadastro e Verificação via E-mail: ${nuevoCli.nome} (Setor ${nuevoCli.quadrante})`);
+
+    setSupabaseSuccessMsg(`🚀 Auto-Cadastro ${nuevoCli.nome} ativado com sucesso! Seja bem-vindo ao B2B Portal!`);
+    setTimeout(() => setSupabaseSuccessMsg(''), 6000);
   };
 
   const handleCompletarPrimeiroAcesso = async (e: React.FormEvent) => {
@@ -1171,7 +1719,8 @@ export default function App() {
       cidade: newMotoboyCidade,
       senha: newMotoboySenha || 'passos123',
       valorRepasseFixo: Number(newMotoboyRepasse) || 4.00,
-      criadoEm: new Date().toISOString()
+      criadoEm: new Date().toISOString(),
+      empresaExclusiva: newMotoboyEmpresaExclusiva || undefined
     };
 
     setMotoboys(prev => [novoMotoboy, ...prev]);
@@ -1207,6 +1756,7 @@ export default function App() {
     setNewMotoboyNome('');
     setNewMotoboyTelefone('');
     setNewMotoboySenha('passos123');
+    setNewMotoboyEmpresaExclusiva('');
   };
 
   // Copy current selected day's deliveries audit report
@@ -1370,206 +1920,377 @@ export default function App() {
 
         {/* Main interactive auth card */}
         <main className="max-w-md w-full mx-auto bg-slate-900/80 backdrop-blur-md rounded-2xl border border-slate-800 shadow-2xl p-6 sm:p-8 my-auto relative z-10">
-          <div className="text-center mb-6">
-            <h1 className="text-2xl font-black tracking-tight font-sans text-white">Acesso Restrito B2B</h1>
-            <p className="text-xs text-slate-400 mt-1">Conecte-se com sua senha para ver roteirizações e fretes diários/mensais</p>
-          </div>
-
-          <form onSubmit={handleLogin} className="space-y-4">
-            
-            {/* Tab switchers */}
+          {isSelfRegistering ? (
             <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Perfil de Acesso</label>
-              <div className="grid grid-cols-3 gap-1 bg-slate-950 p-1.5 rounded-xl border border-slate-800">
-                <button
-                  type="button"
-                  onClick={() => setLoginRole('Empresa')}
-                  className={`py-2 text-xs font-bold rounded-lg transition-all ${loginRole === 'Empresa' ? 'bg-orange-500 text-white shadow' : 'text-slate-400 hover:text-white'}`}
-                >
-                  🏢 Admin
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setLoginRole('Motoboy')}
-                  className={`py-2 text-xs font-bold rounded-lg transition-all ${loginRole === 'Motoboy' ? 'bg-orange-500 text-white shadow' : 'text-slate-400 hover:text-white'}`}
-                >
-                  🏍️ Motoboy
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setLoginRole('Cliente')}
-                  className={`py-2 text-xs font-bold rounded-lg transition-all ${loginRole === 'Cliente' ? 'bg-orange-500 text-white shadow' : 'text-slate-400 hover:text-white'}`}
-                >
-                  🔧 Cliente
-                </button>
+              {/* Header */}
+              <div className="text-center mb-5 border-b border-slate-800 pb-3">
+                <h1 className="text-xl font-black tracking-tight font-sans text-emerald-400 flex items-center justify-center gap-1.5">
+                  <span>🆕 Autocadastro de Cliente Novo</span>
+                </h1>
+                <p className="text-[11px] text-slate-400 mt-1">Inscreva sua oficina ou autopeça para integração imediata</p>
               </div>
-            </div>
 
-            {/* Dynamic User Selector dropdown based on selected profile */}
-            {loginRole === 'Empresa' && (
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">Administrador</label>
-                <div className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm flex items-center gap-2 text-slate-300">
-                  <Shield className="w-4 h-4 text-orange-400 shrink-0" />
-                  <span>Distribuidora Geral - Admin Principal</span>
-                </div>
-              </div>
-            )}
+              {selfRegStep === 'form' && (
+                <form onSubmit={handleSendSelfRegEmail} className="space-y-3.5 text-xs text-slate-300">
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Nome Fantasia / Razão Social *</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Ex: Auto Mecânica Palmeiras LTDA"
+                      value={selfRegNome}
+                      onChange={(e) => setSelfRegNome(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-sm text-white focus:outline-none focus:border-emerald-500 font-mono"
+                    />
+                  </div>
 
-            {loginRole === 'Motoboy' && (
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">Selecione seu Nome de Entregador</label>
-                <div className="relative">
-                  <select
-                    value={selectedLoginUserId}
-                    onChange={(e) => setSelectedLoginUserId(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 pr-8 text-sm text-slate-300 focus:outline-none focus:border-orange-500 appearance-none cursor-pointer"
-                  >
-                    {motoboys.map(m => (
-                      <option key={m.id} value={m.id}>
-                        {m.nome} ({m.cidade})
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronRight className="w-4 h-4 text-slate-400 absolute right-3 top-3.5 pointer-events-none rotate-90" />
-                </div>
-              </div>
-            )}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">CNPJ *</label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="00.000.000/0001-00"
+                        value={selfRegCNPJ}
+                        onChange={(e) => setSelfRegCNPJ(e.target.value)}
+                        className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-sm text-white focus:outline-none focus:border-emerald-500 font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Inscrição Estadual</label>
+                      <input
+                        type="text"
+                        placeholder="Isento ou Nº"
+                        value={selfRegInscricaoEstadual}
+                        onChange={(e) => setSelfRegInscricaoEstadual(e.target.value)}
+                        className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-sm text-white focus:outline-none focus:border-emerald-500 font-mono"
+                      />
+                    </div>
+                  </div>
 
-            {loginRole === 'Cliente' && (
-              <div className="space-y-2">
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">Selecione sua Oficina/Autopeça</label>
-                  <div className="relative">
-                    <select
-                      value={selectedLoginUserId}
-                      onChange={(e) => setSelectedLoginUserId(e.target.value)}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 pr-8 text-sm text-slate-300 focus:outline-none focus:border-orange-500 appearance-none cursor-pointer"
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1 flex items-center justify-between">
+                      <span>CEP (Busca Automática)</span>
+                      {isFetchingCEP && (
+                        <span className="text-emerald-400 animate-pulse text-[9px] font-mono font-semibold">🔍 BUSCANDO CEP...</span>
+                      )}
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Ex: 37900-124"
+                      value={selfRegCEP}
+                      onChange={(e) => handleCEPChange(e.target.value, 'selfReg')}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-sm text-white focus:outline-none focus:border-emerald-500 font-mono"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Endereço de Entrega Completo *</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Ex: Av. dos Autistas, 305 - Centro"
+                      value={selfRegEndereco}
+                      onChange={(e) => setSelfRegEndereco(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-sm text-white focus:outline-none focus:border-emerald-500 font-mono"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Cidade / Região B2B *</label>
+                      <input
+                        type="text"
+                        required
+                        value={selfRegCidade}
+                        onChange={(e) => setSelfRegCidade(e.target.value)}
+                        placeholder="Ex: Passos - MG"
+                        className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-sm text-white focus:outline-none focus:border-emerald-500 font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Faturamento Setor *</label>
+                      <select
+                        value={selfRegQuadrante}
+                        onChange={(e) => setSelfRegQuadrante(e.target.value as Quadrante)}
+                        className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-white focus:outline-none focus:border-emerald-500 font-mono cursor-pointer"
+                      >
+                        <option value="A">Setor A - Centro</option>
+                        <option value="B">Setor B - Norte</option>
+                        <option value="C">Setor C - Sul</option>
+                        <option value="D">Setor D - Leste</option>
+                        <option value="E">Setor E - Oeste</option>
+                        <option value="F">Setor F - Periferia</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Telefone WhatsApp *</label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="(19) 99888-7711"
+                        value={selfRegTelefone}
+                        onChange={(e) => setSelfRegTelefone(e.target.value)}
+                        className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-sm text-white focus:outline-none focus:border-emerald-500 font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Senha de Entrada *</label>
+                      <input
+                        type="password"
+                        required
+                        placeholder="Criar nova senha"
+                        value={selfRegSenha}
+                        onChange={(e) => setSelfRegSenha(e.target.value)}
+                        className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-sm text-white focus:outline-none focus:border-emerald-500 font-mono"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">E-mail Corporativo *</label>
+                    <input
+                      type="email"
+                      required
+                      placeholder="financeiro@oficina.com"
+                      value={selfRegEmail}
+                      onChange={(e) => setSelfRegEmail(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-sm text-white focus:outline-none focus:border-emerald-500 font-mono"
+                    />
+                    <span className="text-[9px] text-slate-500 block mt-1">Um token simular será enviado para liberar sua ativação imediata.</span>
+                  </div>
+
+                  {selfRegError && (
+                    <div className="p-2.5 bg-red-950/40 border border-red-800 text-red-300 text-[11px] rounded flex items-center gap-2 font-mono">
+                      <AlertTriangle className="w-3.5 h-3.5 text-red-500 shrink-0" />
+                      <span>{selfRegError}</span>
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-2 gap-3 pt-2 font-mono">
+                    <button
+                      type="button"
+                      onClick={() => setIsSelfRegistering(false)}
+                      className="bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold py-2 px-3 rounded-lg cursor-pointer transition border border-slate-700 active:scale-95 text-xs"
                     >
-                      {clientes.slice(0, 40).map(c => (
-                        <option key={c.id} value={c.id}>
-                          {c.nome} ({c.cidade})
-                        </option>
-                      ))}
-                    </select>
-                    <ChevronRight className="w-4 h-4 text-slate-400 absolute right-3 top-3.5 pointer-events-none rotate-90" />
+                      Voltar ao Login
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={isSendingSelfRegEmail}
+                      className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2 px-3 rounded-lg cursor-pointer transition active:scale-95 flex items-center justify-center gap-1 text-xs shadow-md"
+                    >
+                      {isSendingSelfRegEmail ? 'Gerando...' : 'Assinar Token ✉️'}
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {selfRegStep === 'verify' && (
+                <div className="space-y-4 font-mono text-xs">
+                  <div className="p-3 bg-slate-950 rounded-lg border border-slate-800 leading-normal text-[11px] text-slate-300">
+                    <p>📬 Um código de autorregularização TorqueLog foi emitido corporativamente para o e-mail cadastrado:</p>
+                    <strong className="text-emerald-400 block text-center bg-slate-900 py-1 rounded border border-emerald-950 mt-1.5">{selfRegEmail}</strong>
+                  </div>
+
+                  <form onSubmit={handleVerifySelfRegCode} className="space-y-3">
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Informe o Token recebido *</label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="Ex: TL-2501"
+                        value={selfRegVerificationCode}
+                        onChange={(e) => setSelfRegVerificationCode(e.target.value)}
+                        className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-center text-sm text-emerald-400 placeholder-slate-750 focus:outline-none focus:border-emerald-500 font-black tracking-widest uppercase font-mono"
+                      />
+                    </div>
+
+                    {selfRegError && (
+                      <div className="p-2 bg-red-950/40 border border-red-800 text-red-300 text-[11px] rounded flex items-center gap-1">
+                        <AlertTriangle className="w-3.5 h-3.5 text-red-500 shrink-0" />
+                        <span>{selfRegError}</span>
+                      </div>
+                    )}
+
+                    <div className="grid grid-cols-2 gap-3 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => setSelfRegStep('form')}
+                        className="bg-slate-800 hover:bg-slate-700 text-slate-300 py-2 rounded-lg cursor-pointer transition border border-slate-750"
+                      >
+                        Corrigir Dados
+                      </button>
+                      <button
+                        type="submit"
+                        className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2 rounded-lg cursor-pointer transition shadow-md flex items-center justify-center gap-1"
+                      >
+                        Confirmar Cadastro ✓
+                      </button>
+                    </div>
+                  </form>
+
+                  {/* Simulated Mailbox client helper */}
+                  <div className="p-3 bg-slate-950 border border-orange-500/10 rounded-lg">
+                    <span className="text-[10px] font-bold text-orange-400 flex items-center gap-1 uppercase block mb-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-orange-500 animate-ping"></span>
+                      📬 SIMULADOR DE E-MAIL ADIANTADO (LOCAL):
+                    </span>
+                    <div className="text-[11px] leading-relaxed text-slate-350 border-t border-slate-900 pt-2 font-mono space-y-1">
+                      <p>Para: <span className="text-white text-[10px]">{selfRegEmail}</span></p>
+                      <p>Assunto: <span className="text-white text-[10px]">Ativação de Cadastro TorqueLog</span></p>
+                      <div className="bg-emerald-950/15 border border-emerald-500/20 p-2 rounded mt-2 text-slate-250">
+                        O código de ativação do seu auto-cadastro é: <strong className="text-emerald-400 text-xs bg-slate-900 px-1.5 py-0.2 rounded border border-emerald-500/30">{correctSelfRegCode}</strong>
+                      </div>
+                    </div>
                   </div>
                 </div>
-                
-                <div className="bg-slate-950/70 border border-slate-800 p-3 rounded-lg text-xs leading-normal">
-                  <p className="text-slate-300 font-mono text-[11px]">
-                    🌟 <strong className="text-orange-400">Primeiro Acesso?</strong> Se você foi pré-cadastrado pela distribuidora e está acessando o app pela primeira vez:
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const selId = selectedLoginUserId || (clientes.length > 0 ? clientes[0].id : '');
-                      const found = clientes.find(c => c.id === selId);
-                      setFirstAccessClientId(selId);
-                      setFirstAccessEmail(found?.email || '');
-                      setFirstAccessError('');
-                      setIsFirstAccessModalOpen(true);
-                    }}
-                    className="mt-2 text-orange-400 hover:text-orange-300 underline font-black font-mono text-[11px] block text-left"
-                  >
-                    🛠️ ATIVAR PRIMEIRO ACESSO DA EMPRESA →
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* Password input */}
+              )}
+            </div>
+          ) : (
             <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">Senha de Acesso</label>
-              <div className="relative">
-                <input
-                  type="password"
-                  placeholder="Digite sua senha..."
-                  value={loginPasswordInput}
-                  onChange={(e) => setLoginPasswordInput(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 pl-10 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-orange-500"
-                />
-                <Key className="w-4 h-4 text-slate-500 absolute left-3.5 top-3.5 pointer-events-none" />
+              <div className="text-center mb-6">
+                <h1 className="text-2xl font-black tracking-tight font-sans text-white">Acesso Restrito B2B</h1>
+                <p className="text-xs text-slate-400 mt-1">Conecte-se com sua senha para ver roteirizações e fretes diários/mensais</p>
               </div>
-            </div>
 
-            {/* Error prompt */}
-            {loginError && (
-              <div className="p-3 bg-red-950/50 border border-red-800 text-red-400 text-xs rounded-lg flex items-center gap-2 font-mono">
-                <AlertTriangle className="w-4 h-4 text-red-400 shrink-0" />
-                <span>{loginError}</span>
-              </div>
-            )}
-
-            {/* Login button */}
-            <button
-              type="submit"
-              className="w-full bg-orange-500 hover:bg-orange-600 active:transform active:scale-95 text-white font-mono font-bold text-sm py-3 rounded-xl transition duration-150 flex items-center justify-center gap-2 shadow-lg shadow-orange-500/10 cursor-pointer"
-            >
-              <Lock className="w-4 h-4 text-white" />
-              AUTENTICAR PORTAL
-            </button>
-          </form>
-
-          {/* Quick bypassed testing chips for grading zero-friction experience */}
-          <div className="mt-6 border-t border-slate-800/80 pt-5 space-y-2">
-            <span className="block text-[10px] font-mono font-bold uppercase tracking-widest text-orange-400 text-center">🔐 ATALHOS Rápidos de Teste (Clique para entrar)</span>
-            
-            <div className="grid grid-cols-2 gap-2 text-xs">
-              <button
-                type="button"
-                onClick={() => {
-                  setActiveSessionRole('Empresa');
-                  setActiveMotoboyUser(null);
-                  setActiveClienteUser(null);
-                }}
-                className="bg-slate-950 hover:bg-slate-900 border border-slate-800 hover:border-orange-500/30 text-slate-300 py-2 px-2.5 rounded-lg flex items-center gap-1.5 transition text-left cursor-pointer"
-              >
-                <div className="w-2 h-2 rounded-full bg-orange-500 shrink-0"></div>
-                <div className="leading-tight text-[11px]">
-                  <span className="block font-bold">🏢 Admin Geral</span>
-                  <span className="text-[9px] text-slate-505 font-mono">admin123</span>
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  const mb = motoboys.find(m => m.id === 'MOTO-01') || motoboys[0];
-                  setActiveSessionRole('Motoboy');
-                  setActiveMotoboyUser(mb);
-                  setActiveClienteUser(null);
-                }}
-                className="bg-slate-950 hover:bg-slate-900 border border-slate-800 hover:border-orange-500/30 text-slate-300 py-2 px-2.5 rounded-lg flex items-center gap-1.5 transition text-left cursor-pointer"
-              >
-                <div className="w-2 h-2 rounded-full bg-blue-500 shrink-0"></div>
-                <div className="leading-tight text-[11px]">
-                  <span className="block font-bold">🏍️ Marcos Silva</span>
-                  <span className="text-[9px] text-slate-505 font-mono">passos123</span>
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  const cli = clientes.find(c => c.id === 'CLI-A-1002') || clientes[0];
-                  setActiveSessionRole('Cliente');
-                  setActiveMotoboyUser(null);
-                  setActiveClienteUser(cli);
-                }}
-                className="bg-slate-950 hover:bg-slate-900 border border-slate-800 hover:border-orange-500/30 text-slate-300 py-2 px-2.5 rounded-lg flex items-center gap-1.5 transition text-left cursor-pointer col-span-2 text-ellipsis overflow-hidden"
-              >
-                <div className="w-2 h-2 rounded-full bg-emerald-500 shrink-0"></div>
-                <div className="leading-tight text-[11px] flex justify-between items-center w-full pr-1 overflow-hidden">
-                  <div className="truncate">
-                    <span className="block font-bold truncate">🔧 Moreira #2 (Cliente)</span>
-                    <span className="text-[9px] text-slate-505 font-mono truncate">Passos (R$ 10,00)</span>
+              <form onSubmit={handleLogin} className="space-y-4">
+                
+                {/* Tab switchers */}
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Perfil de Acesso</label>
+                  <div className="grid grid-cols-3 gap-1 bg-slate-950 p-1.5 rounded-xl border border-slate-800">
+                    <button
+                      type="button"
+                      onClick={() => { setLoginRole('Empresa'); setIsSelfRegistering(false); }}
+                      className={`py-2 text-xs font-bold rounded-lg transition-all ${loginRole === 'Empresa' ? 'bg-orange-500 text-white shadow' : 'text-slate-400 hover:text-white'}`}
+                    >
+                      🏢 Admin
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setLoginRole('Motoboy'); setIsSelfRegistering(false); }}
+                      className={`py-2 text-xs font-bold rounded-lg transition-all ${loginRole === 'Motoboy' ? 'bg-orange-500 text-white shadow' : 'text-slate-400 hover:text-white'}`}
+                    >
+                      🏍️ Motoboy
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setLoginRole('Cliente'); setIsSelfRegistering(false); }}
+                      className={`py-2 text-xs font-bold rounded-lg transition-all ${loginRole === 'Cliente' ? 'bg-orange-500 text-white shadow' : 'text-slate-400 hover:text-white'}`}
+                    >
+                      🔧 Cliente
+                    </button>
                   </div>
-                  <span className="text-[9px] bg-slate-900 text-slate-400 py-0.5 px-2 rounded border border-slate-800 font-mono ml-1">cliente123</span>
                 </div>
-              </button>
+
+                {/* Dynamic User Selector dropdown based on selected profile */}
+                {loginRole === 'Empresa' && (
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">Administrador</label>
+                    <div className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm flex items-center gap-2 text-slate-300">
+                      <Shield className="w-4 h-4 text-orange-400 shrink-0" />
+                      <span>ADMIN PRINCIPAL</span>
+                    </div>
+                  </div>
+                )}
+
+                {loginRole === 'Motoboy' && (
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">Selecione seu Nome de Entregador</label>
+                    <div className="relative">
+                      <select
+                        value={selectedLoginUserId}
+                        onChange={(e) => setSelectedLoginUserId(e.target.value)}
+                        className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 pr-8 text-sm text-slate-300 focus:outline-none focus:border-orange-500 appearance-none cursor-pointer"
+                      >
+                        {motoboys.map(m => (
+                          <option key={m.id} value={m.id}>
+                            {m.nome} ({m.cidade})
+                          </option>
+                        ))}
+                      </select>
+                      <ChevronRight className="w-4 h-4 text-slate-400 absolute right-3 top-3.5 pointer-events-none rotate-90" />
+                    </div>
+                  </div>
+                )}
+
+                {loginRole === 'Cliente' && (
+                  <div className="space-y-2">
+                    <div>
+                      <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">Selecione sua Oficina/Autopeça</label>
+                      <div className="relative">
+                        <select
+                          value={selectedLoginUserId}
+                          onChange={(e) => setSelectedLoginUserId(e.target.value)}
+                          className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 pr-8 text-sm text-slate-300 focus:outline-none focus:border-orange-500 appearance-none cursor-pointer"
+                        >
+                          {clientes.slice(0, 40).map(c => (
+                            <option key={c.id} value={c.id}>
+                              {c.nome} ({c.cidade})
+                            </option>
+                          ))}
+                        </select>
+                        <ChevronRight className="w-4 h-4 text-slate-400 absolute right-3 top-3.5 pointer-events-none rotate-90" />
+                      </div>
+                    </div>
+                    
+                    <div className="bg-slate-950/70 border border-slate-800 p-3 rounded-lg text-xs leading-normal">
+                      <p className="text-slate-300 font-mono text-[11.5px]">
+                        🆕 <strong className="text-emerald-400">Cliente Novo?</strong> Se sua oficina não possui convênio ainda, registre sua empresa sozinho imediatamente:
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsSelfRegistering(true);
+                          setSelfRegStep('form');
+                          setSelfRegError('');
+                        }}
+                        className="mt-2 text-emerald-400 hover:text-emerald-300 underline font-black font-mono text-[11.5px] block text-left"
+                      >
+                        🚀 REALIZAR NOVO CADASTRO B2B PROPRIO →
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Password input */}
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">Senha de Acesso</label>
+                  <div className="relative">
+                    <input
+                      type="password"
+                      placeholder="Digite sua senha..."
+                      value={loginPasswordInput}
+                      onChange={(e) => setLoginPasswordInput(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 pl-10 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-orange-500"
+                    />
+                    <Key className="w-4 h-4 text-slate-500 absolute left-3.5 top-3.5 pointer-events-none" />
+                  </div>
+                </div>
+
+                {/* Error prompt */}
+                {loginError && (
+                  <div className="p-3 bg-red-950/50 border border-red-800 text-red-400 text-xs rounded-lg flex items-center gap-2 font-mono">
+                    <AlertTriangle className="w-4 h-4 text-red-400 shrink-0" />
+                    <span>{loginError}</span>
+                  </div>
+                )}
+
+                {/* Login button */}
+                <button
+                  type="submit"
+                  className="w-full bg-orange-500 hover:bg-orange-600 active:transform active:scale-95 text-white font-mono font-bold text-sm py-3 rounded-xl transition duration-150 flex items-center justify-center gap-2 shadow-lg shadow-orange-500/10 cursor-pointer"
+                >
+                  <Lock className="w-4 h-4 text-white" />
+                  AUTENTICAR PORTAL
+                </button>
+              </form>
             </div>
-          </div>
+          )}
         </main>
 
         <footer className="text-center text-[10px] text-slate-600 font-mono tracking-wider max-w-xl mx-auto py-4">
@@ -1655,24 +2376,24 @@ export default function App() {
               </div>
             </div>
 
-            {/* Supabase Integration Live Status Pill */}
+            {/* Database Integration Live Status Pill */}
             <div className={`px-3 py-1.5 rounded border font-mono text-xs flex items-center gap-2 transition-all ${
-              isSupabaseConfigured 
+              (isFirebaseConfigured || isSupabaseConfigured) 
                 ? 'bg-emerald-950/20 border-emerald-500/20 text-emerald-300' 
                 : 'bg-amber-950/20 border-amber-550/20 text-amber-300'
             }`}>
               <span className="relative flex h-2 w-2">
                 <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
-                  isSupabaseConfigured ? 'bg-emerald-400' : 'bg-amber-400'
+                  (isFirebaseConfigured || isSupabaseConfigured) ? 'bg-emerald-400' : 'bg-amber-400'
                 }`}></span>
                 <span className={`relative inline-flex rounded-full h-2 w-2 ${
-                  isSupabaseConfigured ? 'bg-emerald-500' : 'bg-amber-500'
+                  (isFirebaseConfigured || isSupabaseConfigured) ? 'bg-emerald-500' : 'bg-amber-500'
                 }`}></span>
               </span>
               <div>
                 <span className="block text-[9px] text-slate-400 leading-none">Canal Database</span>
                 <span className="text-sm font-bold block uppercase tracking-tight">
-                  {isSupabaseConfigured ? 'Supabase On' : 'Simulador Local'}
+                  {isFirebaseConfigured ? 'Firebase On' : (isSupabaseConfigured ? 'Supabase On' : 'Simulador Local')}
                 </span>
               </div>
             </div>
@@ -1798,23 +2519,87 @@ export default function App() {
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
                   <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
                 </span>
-                LOGÍSTICA GEOGRÁFICA EM TEMPO REAL: PASSOS - MG
+                LOGÍSTICA GEOGRÁFICA EM TEMPO REAL: {selectedAdminCity === 'Todas' ? 'TODAS AS CIDADES' : selectedAdminCity.toUpperCase()}
               </h3>
               <p className="text-xs text-slate-500 mt-0.5">Distribuição estratégica em 6 setores regionais • Arrastre de motoboys e pedidos simulados por satélite</p>
             </div>
-            <div className="flex flex-wrap items-center gap-3 text-xs bg-slate-50 border border-slate-200 p-2 rounded-lg">
-              <span className="text-slate-500 font-bold">Volume Setorial:</span>
-              <div className="flex items-center gap-1.5 font-bold">
-                <span className="inline-block w-2.5 h-2.5 rounded-full bg-red-500"></span>
-                <span className="text-red-700">Crítico (&gt;= 2)</span>
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={() => handleAbrirRelatorio('Empresa')}
+                className="bg-indigo-650 hover:bg-indigo-750 text-white text-xs font-black font-mono py-2 px-4 rounded-xl flex items-center gap-2 shadow-sm transition-all cursor-pointer hover:scale-[1.02] border border-indigo-700"
+              >
+                🧾 FECHAMENTO DE ENTREGAS (S/M/NF) 📊
+              </button>
+              
+              <div className="flex flex-wrap items-center gap-3 text-xs bg-slate-50 border border-slate-200 p-2 rounded-lg">
+                <span className="text-slate-500 font-bold">Volume Setorial:</span>
+                <div className="flex items-center gap-1.5 font-bold">
+                  <span className="inline-block w-2.5 h-2.5 rounded-full bg-red-500"></span>
+                  <span className="text-red-700">Crítico (&gt;= 2)</span>
+                </div>
+                <div className="flex items-center gap-1.5 font-bold">
+                  <span className="inline-block w-2.5 h-2.5 rounded-full bg-amber-400"></span>
+                  <span className="text-amber-700">Ativo (1)</span>
+                </div>
+                <div className="flex items-center gap-1.5 font-bold">
+                  <span className="inline-block w-2.5 h-2.5 rounded-full bg-slate-200"></span>
+                  <span className="text-slate-500">Estável (0)</span>
+                </div>
               </div>
-              <div className="flex items-center gap-1.5 font-bold">
-                <span className="inline-block w-2.5 h-2.5 rounded-full bg-amber-400"></span>
-                <span className="text-amber-700">Ativo (1)</span>
+            </div>
+          </div>
+
+          {/* City Selection Buttons - B2B Routing Audit */}
+          <div className="bg-slate-50 border border-slate-200/80 p-3.5 rounded-xl mb-5 shadow-xs">
+            <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold uppercase text-slate-600 bg-slate-200/80 px-2.5 py-1 rounded-md border border-slate-300 font-mono">
+                  📍 Selecionar Cidade para Monitorar:
+                </span>
               </div>
-              <div className="flex items-center gap-1.5 font-bold">
-                <span className="inline-block w-2.5 h-2.5 rounded-full bg-slate-200"></span>
-                <span className="text-slate-500">Estável (0)</span>
+              <div className="flex flex-wrap gap-2 w-full lg:w-auto">
+                {['Todas', 'Passos - MG', 'Santa Cruz das Palmeiras', 'Belo Horizonte - MG'].map((city) => {
+                  // Count how many total clients in this city
+                  const cityClientCount = city === 'Todas' 
+                    ? clientes.length 
+                    : clientes.filter(c => c.cidade === city).length;
+
+                  // Count how many active/pending orders in this city
+                  const cityOrderCount = ordens.filter(o => {
+                    if (o.status === 'Entregue') return false;
+                    const clientCity = getClientCity(o.clienteId);
+                    return city === 'Todas' || clientCity === city;
+                  }).length;
+
+                  const isSelected = selectedAdminCity === city;
+
+                  return (
+                    <button
+                      key={city}
+                      type="button"
+                      onClick={() => {
+                        setSelectedAdminCity(city);
+                        setSupabaseSuccessMsg(`🔍 Visualização alterada para: ${city === 'Todas' ? 'Todas as Cidades' : city}`);
+                        setTimeout(() => setSupabaseSuccessMsg(''), 3000);
+                      }}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold font-mono transition-all flex items-center gap-2 cursor-pointer border ${
+                        isSelected 
+                          ? 'bg-orange-500 border-orange-500 text-white shadow-sm font-black scale-[1.02]' 
+                          : 'bg-white border-slate-250 hover:border-slate-350 text-slate-705 hover:bg-slate-50'
+                      }`}
+                    >
+                      <span>{city === 'Todas' ? '🌍 Todas as Cidades' : city}</span>
+                      <span className={`text-[9.5px] px-1.5 py-0.2 rounded-full font-bold ${
+                        isSelected 
+                          ? 'bg-orange-700 text-white' 
+                          : 'bg-slate-100 text-slate-500 font-mono'
+                      }`}>
+                        {cityClientCount} cl • {cityOrderCount} OS
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
           </div>
@@ -2232,16 +3017,16 @@ export default function App() {
             </div>
           </div>
 
-          {/* DYNAMIC CLIENT SECTOR REGISTER BROWSER */}
+          {/* DYNAMIC CLIENT SECTOR REGISTER BROWSER (Quadrants removed as per user instruction) */}
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
             <div className="flex items-center justify-between mb-3.5">
               <div>
-                <h3 className="text-sm font-bold text-slate-800 uppercase font-mono tracking-tight">Clientes Ativos Cadastrados por Setor</h3>
-                <p className="text-xs text-slate-400">Exibindo mais de 20 clientes disponíveis por quadrante</p>
+                <h3 className="text-sm font-bold text-slate-800 uppercase font-mono tracking-tight">Clientes Ativos Cadastrados B2B</h3>
+                <p className="text-xs text-slate-400">Exibindo clientes cadastrados na região selecionada</p>
               </div>
               <button
                 onClick={() => {
-                  setNewClientQuadrante(visualPanelQuadrant);
+                  setNewClientQuadrante('A');
                   setIsAddingNewClient(true);
                 }}
                 className="bg-slate-900 text-white font-mono text-xs font-bold py-1.5 px-3 rounded-md hover:bg-slate-800 flex items-center gap-1 cursor-pointer"
@@ -2250,24 +3035,6 @@ export default function App() {
                 <Plus className="w-3.5 h-3.5 text-orange-400" />
                 Cadastrar
               </button>
-            </div>
-
-            {/* Selector of sector for preview */}
-            <div className="grid grid-cols-6 gap-1 mb-3 bg-slate-100 p-1 rounded-lg">
-              {(['A', 'B', 'C', 'D', 'E', 'F'] as Quadrante[]).map((q) => (
-                <button
-                  key={q}
-                  type="button"
-                  onClick={() => setVisualPanelQuadrant(q)}
-                  className={`py-1 text-xs font-bold rounded font-mono transition-all ${
-                    visualPanelQuadrant === q
-                      ? 'bg-white text-slate-900 shadow-sm'
-                      : 'text-slate-500 hover:text-slate-800'
-                  }`}
-                >
-                  Setor {q}
-                </button>
-              ))}
             </div>
 
             {/* Quick Search */}
@@ -2287,11 +3054,20 @@ export default function App() {
               {directoryFilteredClients.map((cli, index) => {
                 const stats = clientBillingStats[cli.id] || { hojeBilling: 0, hojeCount: 0, mesBilling: 0, mesCount: 0 };
                 return (
-                  <div key={cli.id} className="text-xs p-3 hover:bg-white bg-slate-50/50 border border-transparent hover:border-slate-200 rounded-lg transition duration-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                  <div key={cli.id} className={`text-xs p-3 hover:bg-white rounded-lg transition duration-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 border ${
+                    cli.isSelfRegistered || cli.criadoPor === 'Cliente'
+                      ? 'bg-emerald-50/80 hover:bg-emerald-100/90 border-emerald-300 shadow-xs' 
+                      : 'bg-slate-50/50 border-transparent hover:border-slate-200'
+                  }`}>
                     <div className="truncate flex-1 space-y-1">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-bold text-slate-900 truncate block text-xs">{cli.nome}</span>
-                        <span className="text-[9px] bg-slate-200 text-slate-705 px-1.5 rounded font-mono font-bold shrink-0">{cli.id}</span>
+                        <span className="text-[9px] bg-slate-205 text-slate-705 px-1.5 rounded font-mono font-bold shrink-0">{cli.id}</span>
+                        {(cli.isSelfRegistered || cli.criadoPor === 'Cliente') && (
+                          <span className="text-[8.5px] bg-emerald-600 font-extrabold text-white px-2 py-0.5 rounded-md uppercase tracking-wider font-mono shrink-0 animate-pulse">
+                            🟢 CLIENTE NOVO
+                          </span>
+                        )}
                       </div>
                       <span className="text-[10px] text-slate-500 font-mono block truncate">{cli.endereco}</span>
                       
@@ -2300,6 +3076,13 @@ export default function App() {
                         <span>Cobrança padrão: <strong className="text-emerald-700">R$ {(cli.valorCobradoCliente || 10.00).toFixed(2)}</strong></span>
                         <span>•</span>
                         <span>Repasse: <strong className="text-rose-600">R$ {(cli.valorPagoMotoboy || 4.00).toFixed(2)}</strong></span>
+                      </div>
+
+                      <div className="mt-1 flex items-center gap-1.5 bg-slate-200 px-2 py-0.5 rounded border border-slate-300 w-fit">
+                        <span className="w-1.5 h-1.5 rounded-full bg-orange-500 animate-pulse"></span>
+                        <span className="text-[9px] font-mono text-slate-700 uppercase font-bold">
+                          Motoboys Ativos: <span className="text-slate-950 font-extrabold">{cli.motoboysAtivos || 0}</span>
+                        </span>
                       </div>
 
                       {/* Sync Email and Activation Status controls (Requested Supabase sync and email settings) */}
@@ -2347,9 +3130,11 @@ export default function App() {
                       <span className={`text-[8.5px] px-2 py-0.5 rounded font-extrabold uppercase tracking-wide inline-block ${
                         cli.criadoPor === 'Entregador' 
                           ? 'bg-amber-100 text-amber-900 border border-amber-200' 
+                          : cli.isSelfRegistered || cli.criadoPor === 'Cliente'
+                          ? 'bg-emerald-600 text-white border border-emerald-500'
                           : 'bg-slate-205 text-slate-700 border border-slate-300'
                       }`}>
-                        {cli.criadoPor === 'Entregador' ? 'Rua (Rider)' : 'Expedição'}
+                        {cli.criadoPor === 'Entregador' ? 'Rua (Rider)' : cli.isSelfRegistered || cli.criadoPor === 'Cliente' ? 'Auto-Cadastro' : 'Expedição'}
                       </span>
                       
                       {/* CRUD Actions Buttons for Edit and Delete */}
@@ -2359,6 +3144,7 @@ export default function App() {
                           onClick={() => {
                             setClienteParaEditar(cli);
                             setEditClientNome(cli.nome);
+                            setEditClientCEP(cli.cep || '');
                             setEditClientQuadrante(cli.quadrante);
                             setEditClientEndereco(cli.endereco);
                             setEditClientTelefone(cli.telefone);
@@ -2367,6 +3153,7 @@ export default function App() {
                             setEditClientSenha(cli.senha || '');
                             setEditClientValorCobradoCliente(cli.valorCobradoCliente);
                             setEditClientValorPagoMotoboy(cli.valorPagoMotoboy);
+                            setEditClientMotoboysAtivos(cli.motoboysAtivos || 0);
                           }}
                           className="bg-slate-100 hover:bg-slate-200 text-slate-705 p-1 rounded transition border border-slate-250 cursor-pointer"
                           title="Editar cadastro do cliente"
@@ -2388,13 +3175,13 @@ export default function App() {
               })}
               {directoryFilteredClients.length === 0 && (
                 <div className="text-xs text-center text-slate-400 p-4 font-mono">
-                  Nenhum cliente correspondente encontrado neste setor.
+                  Nenhum cliente correspondente encontrado nesta cidade.
                 </div>
               )}
             </div>
             
             <div className="flex justify-between items-center mt-2.5 px-1 text-[10px] text-slate-450 font-mono">
-              <span>Clientes Cadastrados no Setor {visualPanelQuadrant}: <span className="text-slate-900 font-bold">{clientes.filter(c => c.quadrante === visualPanelQuadrant).length}</span></span>
+              <span>Clientes Cadastrados: <span className="text-slate-900 font-bold">{directoryFilteredClients.length}</span></span>
               <span>Previsão Mapeada: OK</span>
             </div>
 
@@ -2502,7 +3289,7 @@ export default function App() {
                       />
                     </div>
                     <div>
-                      <label className="block text-[9px] font-bold text-slate-705 uppercase mb-0.5 font-mono">Repasse por Entrega (R$)</label>
+                      <label className="block text-[9px] font-bold text-slate-755 uppercase mb-0.5 font-mono">Repasse por Entrega (R$)</label>
                       <input
                         type="number"
                         step="0.50"
@@ -2514,6 +3301,36 @@ export default function App() {
                         className="w-full bg-white text-slate-900 border border-slate-250 rounded p-2 text-xs focus:ring-2 focus:ring-orange-550 font-mono font-bold"
                       />
                     </div>
+                  </div>
+
+                  <div>
+                    <div className="flex justify-between items-center mb-0.5">
+                      <label className="block text-[9px] font-bold text-slate-700 uppercase font-mono">Empresa de Serviço Exclusiva (Opcional)</label>
+                      <span className="text-[8px] text-amber-600 font-mono font-bold uppercase">Presta Serviço para quem?</span>
+                    </div>
+                    <select
+                      onChange={(e) => {
+                        if (e.target.value !== 'Personalizado') {
+                          setNewMotoboyEmpresaExclusiva(e.target.value);
+                        } else {
+                          setNewMotoboyEmpresaExclusiva('');
+                        }
+                      }}
+                      className="w-full bg-white text-slate-900 border border-slate-250 rounded p-1.5 text-xs font-mono font-semibold mb-1"
+                    >
+                      <option value="">Sem exclusividade (Polo Geral / Todos)</option>
+                      {clientes.map(c => (
+                        <option key={c.id} value={c.nome}>{c.nome}</option>
+                      ))}
+                      <option value="Personalizado">✍️ Digitar manualmente outra empresa...</option>
+                    </select>
+                    <input
+                      type="text"
+                      value={newMotoboyEmpresaExclusiva}
+                      onChange={(e) => setNewMotoboyEmpresaExclusiva(e.target.value)}
+                      placeholder="Ex: BARROS AUTOPEÇAS"
+                      className="w-full bg-white text-slate-900 border border-slate-250 rounded p-2 text-xs focus:ring-2 focus:ring-orange-550 font-mono font-semibold"
+                    />
                   </div>
 
                   <button
@@ -2538,11 +3355,50 @@ export default function App() {
                         <span className={`w-1.5 h-1.5 rounded-full ${isOnline ? 'bg-orange-500 animate-pulse' : 'bg-slate-300'}`}></span>
                       </div>
                       <span className="text-[10px] text-slate-400 block">{m.cidade} • Tel: {m.telefone}</span>
-                      <span className="text-[9px] bg-slate-200 text-slate-700 px-1 rounded inline-block mt-1">Chave: <strong>{m.senha}</strong></span>
+                      <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                        <span className="text-[9px] bg-slate-200 text-slate-700 px-1 rounded inline-block">Chave: <strong>{m.senha}</strong></span>
+                        {m.situacao && m.situacao !== 'Ativo' && (
+                          <span className="text-[9px] bg-amber-100 text-amber-800 border border-amber-200 px-1.5 rounded font-bold font-sans">
+                            ⚠️ {m.situacao}
+                          </span>
+                        )}
+                        {m.empresaExclusiva && (
+                          <span className="text-[9px] bg-sky-50 text-sky-700 border border-sky-150 px-1.5 rounded font-bold font-sans">
+                            🏢 Exclusivo: {m.empresaExclusiva}
+                          </span>
+                        )}
+                      </div>
                     </div>
-                    <div className="text-right">
-                      <span className="text-[9px] text-slate-450 block uppercase font-bold tracking-tight">Repasse Fixo</span>
-                      <span className="text-sm font-extrabold text-slate-950 font-mono">R$ {m.valorRepasseFixo.toFixed(2)}</span>
+                    <div className="flex items-center gap-2">
+                      <div className="text-right">
+                        <span className="text-[9px] text-slate-450 block uppercase font-bold tracking-tight">Repasse</span>
+                        <span className="text-sm font-extrabold text-slate-950 font-mono">R$ {m.valorRepasseFixo.toFixed(2)}</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setMotoboyParaEditar(m);
+                          setEditMotoboyNome(m.nome);
+                          setEditMotoboyTelefone(m.telefone);
+                          setEditMotoboyCidade(m.cidade);
+                          setEditMotoboySenha(m.senha);
+                          setEditMotoboyRepasse(m.valorRepasseFixo);
+                          setEditMotoboySituacao(m.situacao || 'Ativo');
+                          setEditMotoboyEmpresaExclusiva(m.empresaExclusiva || '');
+                        }}
+                        className="bg-slate-100 hover:bg-slate-200 text-slate-700 p-1.5 rounded transition border border-slate-250 cursor-pointer self-center"
+                        title="Editar credenciamento de motoboy"
+                      >
+                        <Edit className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDeletarMotoboy(m.id)}
+                        className="bg-red-50 hover:bg-red-100 text-red-650 p-1.5 rounded transition border border-red-200 cursor-pointer self-center"
+                        title="Excluir credenciamento de motoboy"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
                     </div>
                   </div>
                 );
@@ -3137,10 +3993,19 @@ export default function App() {
           
           {/* Welcome section & Quick stats */}
           <div className="lg:col-span-12 bg-slate-900 text-white rounded-2xl border border-slate-800 p-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 shadow-md shadow-orange-500/5">
-            <div>
+            <div className="flex-1">
               <span className="text-xs bg-orange-550/20 text-orange-400 font-bold px-3 py-1 rounded-full uppercase tracking-widest font-mono">DASHBOARD DO ENTREGADOR</span>
               <h1 className="text-2xl font-black mt-2">Olá, {activeMotoboyUser?.nome}!</h1>
               <p className="text-xs text-slate-400 font-mono mt-1">Região de atuação contratual: Passos - MG • Tarifa Local: R$ {(activeMotoboyUser?.valorRepasseFixo || 4.00).toFixed(2)} por entrega</p>
+              <div className="mt-4">
+                <button
+                  type="button"
+                  onClick={() => handleAbrirRelatorio('Motoboy')}
+                  className="bg-orange-500 hover:bg-orange-650 text-white text-xs font-black font-mono py-1.5 px-4 rounded-xl flex items-center gap-2 shadow transition-all cursor-pointer hover:scale-[1.02]"
+                >
+                  📊 CONFERÊNCIA & FECHAMENTO SEMANA/MÊS 🧾
+                </button>
+              </div>
             </div>
             
             {/* Daily vs Monthly freights details */}
@@ -3326,6 +4191,15 @@ export default function App() {
               <span className="text-xs bg-emerald-500/20 text-emerald-400 font-bold px-3 py-1 rounded-full uppercase tracking-widest font-mono">PORTAL DO CLIENTE B2B</span>
               <h1 className="text-2xl font-black mt-2">Olá, {activeClienteUser?.nome}!</h1>
               <p className="text-xs text-slate-400 font-mono mt-1">Sua agência de autopeças/oficina: Setor {activeClienteUser?.quadrante} • Endereço B2B: {activeClienteUser?.endereco} ({activeClienteUser?.cidade})</p>
+              <div className="mt-4">
+                <button
+                  type="button"
+                  onClick={() => handleAbrirRelatorio('Cliente')}
+                  className="bg-emerald-600 hover:bg-emerald-650 text-white text-xs font-black font-mono py-1.5 px-4 rounded-xl flex items-center gap-2 shadow transition-all cursor-pointer hover:scale-[1.02]"
+                >
+                  📊 CONFERÊNCIA E FECHAMENTO SEMANA/MÊS 🧾
+                </button>
+              </div>
             </div>
             
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 w-full md:w-auto">
@@ -3498,21 +4372,119 @@ export default function App() {
                     </div>
 
                     <div className="space-y-1">
-                      <label className="block text-xs font-bold text-slate-700 uppercase font-mono">Destinatário Credenciado</label>
-                      <select
-                        value={destinoClienteId}
-                        onChange={(e) => setDestinoClienteId(e.target.value)}
-                        required
-                        className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded-lg p-2 text-xs font-mono"
-                      >
-                        {clientes.filter(c => c.quadrante === destinoQuadrante && c.id !== activeClienteUser?.id).length === 0 ? (
-                          <option value="">Nenhum cliente cadastrado neste setor</option>
-                        ) : (
-                          clientes.filter(c => c.quadrante === destinoQuadrante && c.id !== activeClienteUser?.id).map(c => (
-                            <option key={c.id} value={c.id}>{c.nome} ({c.endereco.slice(0, 25)}...)</option>
-                          ))
+                      <div className="flex justify-between items-center">
+                        <label className="block text-xs font-bold text-slate-700 uppercase font-mono">Destinatário Credenciado</label>
+                        {!isQuickRegisteringDestinatario && (
+                          <button
+                            type="button"
+                            onClick={() => setIsQuickRegisteringDestinatario(true)}
+                            className="text-[10px] text-orange-650 hover:text-orange-700 font-bold font-mono uppercase tracking-tight flex items-center gap-0.5 cursor-pointer"
+                          >
+                            <Plus className="w-3 h-3 text-orange-500" /> Cadastrar Novo
+                          </button>
                         )}
-                      </select>
+                      </div>
+                      
+                      {!isQuickRegisteringDestinatario ? (
+                        <select
+                          value={destinoClienteId}
+                          onChange={(e) => setDestinoClienteId(e.target.value)}
+                          required={!isQuickRegisteringDestinatario}
+                          className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded-lg p-2 text-xs font-mono"
+                        >
+                          {clientes.filter(c => c.quadrante === destinoQuadrante && c.id !== activeClienteUser?.id).length === 0 ? (
+                            <option value="">Nenhum cliente cadastrado neste setor</option>
+                          ) : (
+                            clientes.filter(c => c.quadrante === destinoQuadrante && c.id !== activeClienteUser?.id).map(c => (
+                              <option key={c.id} value={c.id}>{c.nome} ({c.endereco.slice(0, 25)}...)</option>
+                            ))
+                          )}
+                        </select>
+                      ) : (
+                        <div className="bg-orange-50/55 p-3 rounded-xl border border-orange-200/60 space-y-2 mt-1 shadow-sm">
+                          <span className="text-[10px] font-extrabold text-orange-750 uppercase font-mono tracking-wider block">
+                            ✨ NOVO DESTINATÁRIO NO SETOR {destinoQuadrante}
+                          </span>
+                          
+                          <div>
+                            <input
+                              type="text"
+                              required
+                              value={quickClientNome}
+                              onChange={(e) => setQuickClientNome(e.target.value)}
+                              placeholder="Nome da Oficina / Destinatário"
+                              className="w-full bg-white text-slate-900 border border-slate-200 rounded-lg p-2 text-xs font-mono focus:ring-1 focus:ring-orange-500"
+                            />
+                          </div>
+
+                          <div>
+                            <input
+                              type="text"
+                              required
+                              value={quickClientEndereco}
+                              onChange={(e) => setQuickClientEndereco(e.target.value)}
+                              placeholder="Endereço (Rua, Número, Bairro)"
+                              className="w-full bg-white text-slate-900 border border-slate-200 rounded-lg p-2 text-xs font-mono focus:ring-1 focus:ring-orange-500"
+                            />
+                          </div>
+
+                          <div className="flex gap-2 pt-1">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setIsQuickRegisteringDestinatario(false);
+                                setQuickClientNome('');
+                                setQuickClientEndereco('');
+                              }}
+                              className="flex-1 bg-white hover:bg-slate-100 text-slate-600 border border-slate-200 py-1 px-2 rounded text-[10px] font-bold font-mono transition cursor-pointer"
+                            >
+                              Cancelar
+                            </button>
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                if (!quickClientNome.trim() || !quickClientEndereco.trim()) {
+                                  alert("Por favor, informe o Nome e o Endereço do destinatário.");
+                                  return;
+                                }
+
+                                const randId = Math.floor(1000 + Math.random() * 9000);
+                                const newId = `CLI-${destinoQuadrante}-${randId}`;
+                                
+                                const novoCli: Cliente = {
+                                  id: newId,
+                                  nome: quickClientNome,
+                                  quadrante: destinoQuadrante,
+                                  endereco: quickClientEndereco,
+                                  telefone: 'Não informado',
+                                  cidade: activeClienteUser?.cidade || 'Passos - MG',
+                                  valorPagoMotoboy: 4.00,
+                                  valorCobradoCliente: 10.00,
+                                  senha: `cli-${randId}`,
+                                  email: `contato-${newId.toLowerCase()}@torque-log-b2b.com`,
+                                  emailConfirmado: true,
+                                  cadastroCompleto: true,
+                                  criadoPor: 'Entregador',
+                                  criadoEm: new Date().toISOString()
+                                };
+
+                                setClientes(prev => [novoCli, ...prev]);
+                                setDestinoClienteId(novoCli.id);
+
+                                setQuickClientNome('');
+                                setQuickClientEndereco('');
+                                setIsQuickRegisteringDestinatario(false);
+
+                                setSupabaseSuccessMsg(`✅ Destinatário "${novoCli.nome}" cadastrado e selecionado!`);
+                                setTimeout(() => setSupabaseSuccessMsg(''), 5000);
+                              }}
+                              className="flex-1 bg-orange-500 hover:bg-orange-600 text-white py-1 px-2 rounded text-[10px] font-bold font-mono shadow-sm transition cursor-pointer"
+                            >
+                              Salvar e Selecionar
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </>
                 )}
@@ -3777,18 +4749,31 @@ export default function App() {
                 <div><strong>Oficina Destinatária:</strong> {activeSignOrder.clienteNome}</div>
                 <div><strong>Peças Entregues:</strong> {activeSignOrder.itensDescricao}</div>
                 <div className="border-t border-slate-200 mt-2 pt-1.5 text-[11px]">
-                  <div className="flex justify-between">
-                    <span>💵 Cobrança Cliente B2B:</span>
-                    <span className="font-bold text-slate-800">R$ {((activeSignOrder.valorCobradoCliente || 10.00) + (activeSignOrder.retornoPeca ? (activeSignOrder.taxaReversa || 15) : 0)).toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>🏍️ Repasse ao Motoboy:</span>
-                    <span className="font-bold text-rose-600">R$ {((activeSignOrder.valorPagoMotoboy || 4.00) + (activeSignOrder.retornoPeca ? (activeSignOrder.taxaReversa || 15) : 0)).toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between font-bold text-emerald-600 border-t border-dashed border-slate-200 mt-1 pt-1">
-                    <span>⚡ Lucro Líquido TorqueLog:</span>
-                    <span>R$ {(activeSignOrder.valorCobradoCliente - activeSignOrder.valorPagoMotoboy).toFixed(2)}</span>
-                  </div>
+                  {activeMotoboyUser ? (
+                    // Within courier / driver session: ONLY show the freight price
+                    <div className="flex justify-between items-center py-1 bg-amber-50 px-2 rounded border border-amber-100">
+                      <span className="font-bold text-amber-800 font-mono">🏍️ VALOR DO FRETE (REPASSE ACORDADO):</span>
+                      <span className="font-extrabold text-amber-955 text-xs font-mono">
+                        R$ {((activeSignOrder.valorPagoMotoboy || 4.00) + (activeSignOrder.retornoPeca ? (activeSignOrder.taxaReversa || 15) : 0)).toFixed(2)}
+                      </span>
+                    </div>
+                  ) : (
+                    // Admin view or other view context: show the full breakdown
+                    <>
+                      <div className="flex justify-between">
+                        <span>💵 Cobrança Cliente B2B:</span>
+                        <span className="font-bold text-slate-800">R$ {((activeSignOrder.valorCobradoCliente || 10.00) + (activeSignOrder.retornoPeca ? (activeSignOrder.taxaReversa || 15) : 0)).toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>🏍️ Repasse ao Motoboy:</span>
+                        <span className="font-bold text-rose-600">R$ {((activeSignOrder.valorPagoMotoboy || 4.00) + (activeSignOrder.retornoPeca ? (activeSignOrder.taxaReversa || 15) : 0)).toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between font-bold text-emerald-600 border-t border-dashed border-slate-200 mt-1 pt-1">
+                        <span>⚡ Lucro Líquido TorqueLog:</span>
+                        <span>R$ {(activeSignOrder.valorCobradoCliente - activeSignOrder.valorPagoMotoboy).toFixed(2)}</span>
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
 
@@ -3854,6 +4839,277 @@ export default function App() {
       </AnimatePresence>
 
       {/* ==========================================
+          MODAL: RELATORIO & FECHAMENTO DE ENTREGAS (REPORTING AND CLOSURE)
+          ========================================== */}
+      <AnimatePresence>
+        {isReportModalOpen && reportRole && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm" id="modal-report">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-4xl w-full p-6 max-h-[90vh] overflow-y-auto"
+            >
+              <div className="flex justify-between items-start mb-5 border-b border-slate-100 pb-3">
+                <div>
+                  <h3 className="text-base font-black text-slate-900 uppercase font-mono tracking-tight flex items-center gap-2">
+                    📊 RELATÓRIO DO FECHAMENTO OPERACIONAL 🧾
+                  </h3>
+                  <p className="text-xs text-slate-400 font-mono">
+                    {reportRole === 'Empresa' && 'Painel Geral de Conciliação e Auditoria para Emissão de Notas Fiscais'}
+                    {reportRole === 'Cliente' && `Painel de Auditoria de Entregas – ${activeClienteUser?.nome}`}
+                    {reportRole === 'Motoboy' && `Painel de Ganhos e Emissão de Notas MEI – ${activeMotoboyUser?.nome}`}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsReportModalOpen(false)}
+                  className="text-slate-400 hover:text-slate-600 font-bold py-1 px-2.5 rounded hover:bg-slate-100 cursor-pointer text-xs"
+                >
+                  ✕ Fechar
+                </button>
+              </div>
+
+              {/* Selector for Period & Filters */}
+              <div className="bg-slate-50 border border-slate-150 p-4 rounded-xl mb-5 space-y-4">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                  <div className="flex items-center gap-2 font-mono text-xs">
+                    <span className="font-bold text-slate-650">📅 Período de Conferência:</span>
+                    <div className="inline-flex rounded-lg border border-slate-200 bg-white p-0.5">
+                      <button
+                        type="button"
+                        onClick={() => setReportPeriod('Semana')}
+                        className={`px-3 py-1 text-[11px] font-bold rounded-md transition ${reportPeriod === 'Semana' ? 'bg-orange-500 text-white shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}
+                      >
+                        Semana Atual (Últimos 7 dias)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setReportPeriod('Mes')}
+                        className={`px-3 py-1 text-[11px] font-bold rounded-md transition ${reportPeriod === 'Mes' ? 'bg-orange-500 text-white shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}
+                      >
+                        Mês Atual
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Print / Export Action button */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      window.print();
+                    }}
+                    className="bg-slate-900 hover:bg-slate-850 text-white text-[11px] font-bold font-mono py-1.5 px-3 rounded-lg flex items-center gap-1.5 shadow transition-all cursor-pointer"
+                  >
+                    🖨️ Imprimir Fechamento (Imprimir/PDF)
+                  </button>
+                </div>
+
+                {/* Filters specifically for torqueLog Admin (Empresa role) */}
+                {reportRole === 'Empresa' && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-3 border-t border-slate-200">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1 font-mono">Filtro por Cliente (B2B)</label>
+                      <select
+                        value={reportFilterClienteId}
+                        onChange={(e) => setReportFilterClienteId(e.target.value)}
+                        className="w-full bg-white text-slate-900 border border-slate-200 rounded-lg p-2 text-xs font-mono font-semibold"
+                      >
+                        <option value="Todos">🔧 Todos os Clientes B2B</option>
+                        {clientes.map(c => (
+                          <option key={c.id} value={c.id}>{c.nome}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1 font-mono">Filtro por Motoboy (Credenciado MEI)</label>
+                      <select
+                        value={reportFilterMotoboyId}
+                        onChange={(e) => setReportFilterMotoboyId(e.target.value)}
+                        className="w-full bg-white text-slate-900 border border-slate-200 rounded-lg p-2 text-xs font-mono font-semibold"
+                      >
+                        <option value="Todos">🏍️ Todos os Motoboys</option>
+                        {motoboys.map(m => (
+                          <option key={m.id} value={m.id}>{m.nome}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Report Tables and Data Calculations */}
+              {(() => {
+                const filteredOrders = getFilteredReportOrders();
+                
+                // Value aggregations
+                let totalBilledToClients = 0;
+                let totalOwedToMotoboys = 0;
+
+                filteredOrders.forEach(o => {
+                  totalBilledToClients += (o.valorCobradoCliente || 10.00) + (o.retornoPeca ? (o.taxaReversa || 15.00) : 0);
+                  totalOwedToMotoboys += (o.valorPagoMotoboy || 4.00) + (o.retornoPeca ? (o.taxaReversa || 15.00) : 0);
+                });
+
+                const totalProfit = totalBilledToClients - totalOwedToMotoboys;
+                const totalCount = filteredOrders.length;
+
+                return (
+                  <div className="space-y-5">
+                    {/* Totals Summary Cards Row */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl font-mono text-center">
+                        <span className="block text-[9px] text-slate-500 uppercase tracking-wide">Qtd de Entregas</span>
+                        <span className="text-xl font-black text-slate-900">{totalCount} concluídas</span>
+                      </div>
+
+                      {/* Display content adapting based on logged-in role */}
+                      {reportRole === 'Empresa' && (
+                        <>
+                          <div className="p-3.5 bg-indigo-50 border border-indigo-100 rounded-xl font-mono text-center">
+                            <span className="block text-[9px] text-indigo-700 uppercase tracking-wide">Faturado Clientes B2B</span>
+                            <span className="text-xl font-black text-indigo-900">R$ {totalBilledToClients.toFixed(2)}</span>
+                          </div>
+                          <div className="p-3.5 bg-rose-50 border border-rose-105 rounded-xl font-mono text-center">
+                            <span className="block text-[9px] text-rose-700 uppercase tracking-wide">Repassar a Motoboys</span>
+                            <span className="text-xl font-black text-rose-900">R$ {totalOwedToMotoboys.toFixed(2)}</span>
+                          </div>
+                          <div className="p-3.5 bg-emerald-50 border border-emerald-100 rounded-xl font-mono text-center">
+                            <span className="block text-[9px] text-emerald-700 uppercase tracking-wide">Lucro TorqueLog</span>
+                            <span className="text-xl font-black text-emerald-905">R$ {totalProfit.toFixed(2)}</span>
+                          </div>
+                        </>
+                      )}
+
+                      {reportRole === 'Cliente' && (
+                        <>
+                          <div className="p-3.5 bg-emerald-50 border border-emerald-100 rounded-xl font-mono text-center col-span-3">
+                            <span className="block text-[9px] text-emerald-700 uppercase tracking-wide">VALOR TOTAL DO FATURAMENTO (Cobrança TorqueLog)</span>
+                            <span className="text-2xl font-black text-emerald-900 mt-1 block">R$ {totalBilledToClients.toFixed(2)}</span>
+                          </div>
+                        </>
+                      )}
+
+                      {reportRole === 'Motoboy' && (
+                        <>
+                          <div className="p-3.5 bg-amber-50 border border-amber-100 rounded-xl font-mono text-center col-span-3">
+                            <span className="block text-[9px] text-amber-700 uppercase tracking-wide">VALOR TOTAL DE REPASSE A RECEBER (Faturamento MEI)</span>
+                            <span className="text-2xl font-black text-amber-900 mt-1 block">R$ {totalOwedToMotoboys.toFixed(2)}</span>
+                          </div>
+                        </>
+                      )}
+                    </div>
+
+                    {/* Report Help boxes */}
+                    <div className="text-xs bg-amber-50 border border-amber-200 text-amber-900 p-3.5 rounded-xl">
+                      {reportRole === 'Empresa' && (
+                        <p className="font-mono">
+                          💡 <strong>Painel Fiduciário:</strong> Use os totais de <strong>Faturado Clientes B2B</strong> para gerar e enviar as respectivas cobranças ou notas fiscais para as oficinas clientes. O total de <strong>Repassar a Motoboys</strong> é o valor acumulado que os entregadores MEI faturarão e emitirão de nota para receber do pátio centrale.
+                        </p>
+                      )}
+                      {reportRole === 'Cliente' && (
+                        <p className="font-mono">
+                          ℹ️ <strong>Histórico Fiscal:</strong> Este relatório serve para auditoria e conciliação do seu contrato B2B. A TorqueLog emitirá a fatura correspondente ao total acima no fechamento periódico.
+                        </p>
+                      )}
+                      {reportRole === 'Motoboy' && (
+                        <p className="font-mono">
+                          ✌️ <strong>Parceiro MEI:</strong> Este é o valor consolidado de fretes que você tem a receber no período selecionado. Emita sua Nota Fiscal Avulsa (NFP/MEI) com o valor exato de <strong>R$ {totalOwedToMotoboys.toFixed(2)}</strong> e mande para a administração TorqueLog efetuar o PIX.
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Table listing */}
+                    <div className="border border-slate-205 rounded-xl overflow-hidden shadow-xs">
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-left border-collapse font-sans">
+                          <thead>
+                            <tr className="bg-slate-100 border-b border-slate-200 font-mono text-[10px] text-slate-500 uppercase tracking-wider">
+                              <th className="p-3">Cod OS</th>
+                              <th className="p-3">Data/Hora</th>
+                              <th className="p-3">B2B Cliente / Oficina</th>
+                              <th className="p-3">Entregador (Motoboy)</th>
+                              <th className="p-3">Peças Descrição</th>
+                              <th className="p-3">Status</th>
+                              <th className="p-3 text-right">
+                                {reportRole === 'Cliente' ? 'Custo (R$)' : (reportRole === 'Motoboy' ? 'Frete (R$)' : 'Valores (R$)')}
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-150 text-xs text-slate-705 font-mono">
+                            {filteredOrders.length === 0 ? (
+                              <tr>
+                                <td colSpan={7} className="p-8 text-center text-slate-400 font-sans italic">
+                                  Nenhuma ordem entregue encontrada no período / combinação de filtros selecionado.
+                                </td>
+                              </tr>
+                            ) : (
+                              filteredOrders.map(o => {
+                                const b2bVal = (o.valorCobradoCliente || 10.00) + (o.retornoPeca ? (o.taxaReversa || 15.00) : 0);
+                                const mbVal = (o.valorPagoMotoboy || 4.00) + (o.retornoPeca ? (o.taxaReversa || 15.00) : 0);
+                                return (
+                                  <tr key={o.id} className="hover:bg-slate-50">
+                                    <td className="p-3 font-bold text-slate-900">{o.id}</td>
+                                    <td className="p-3 text-slate-500 text-[11px]">
+                                      {new Date(o.criadoEm).toLocaleDateString('pt-BR')} {new Date(o.criadoEm).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                                    </td>
+                                    <td className="p-3">
+                                      <span className="font-bold text-slate-850 block">{o.clienteNome}</span>
+                                      <span className="text-[10px] text-slate-400 font-sans">Setor {o.quadrante}</span>
+                                    </td>
+                                    <td className="p-3 grid grid-cols-1 border-none">
+                                      <span className="font-sans block text-slate-700 font-bold whitespace-nowrap">{o.motoboyNome || 'Sem atribuição'}</span>
+                                    </td>
+                                    <td className="p-3 max-w-[150px] truncate" title={o.itensDescricao}>
+                                      {o.itensDescricao}
+                                    </td>
+                                    <td className="p-3">
+                                      <span className="text-[9.5px] font-sans font-bold bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded border border-emerald-150 whitespace-nowrap font-mono">
+                                        ✓ Concluído
+                                      </span>
+                                    </td>
+                                    <td className="p-3 text-right">
+                                      {reportRole === 'Cliente' && (
+                                        <span className="font-bold text-slate-900">R$ {b2bVal.toFixed(2)}</span>
+                                      )}
+                                      {reportRole === 'Motoboy' && (
+                                        <span className="font-bold text-indigo-700">R$ {mbVal.toFixed(2)}</span>
+                                      )}
+                                      {reportRole === 'Empresa' && (
+                                        <div className="flex flex-col text-[10px] items-end space-y-0.5">
+                                          <div className="whitespace-nowrap"><span className="text-slate-455 font-mono">B2B:</span> <span className="font-bold text-indigo-750">R$ {b2bVal.toFixed(2)}</span></div>
+                                          <div className="whitespace-nowrap"><span className="text-slate-455 font-mono">Moto:</span> <span className="font-bold text-rose-650">R$ {mbVal.toFixed(2)}</span></div>
+                                        </div>
+                                      )}
+                                    </td>
+                                  </tr>
+                                );
+                              })
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              <div className="mt-6 flex justify-end gap-3 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsReportModalOpen(false)}
+                  className="bg-slate-100 hover:bg-slate-200 text-slate-705 py-2 px-6 rounded-xl text-xs font-bold font-mono cursor-pointer transition border border-slate-250"
+                >
+                  Voltar ao Portal
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ==========================================
           MODAL: ADD NEW CLIENT (DOUBLE REGISTER)
           ========================================== */}
       <AnimatePresence>
@@ -3909,6 +5165,22 @@ export default function App() {
                       <option key={q} value={q}>Quadrante {q}</option>
                     ))}
                   </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1 font-mono flex items-center justify-between">
+                    <span>CEP (Opcional)</span>
+                    {isFetchingNewClientCEP && (
+                      <span className="text-emerald-500 animate-pulse text-[10px] font-mono leading-none">🔍 BUSCANDO CEP...</span>
+                    )}
+                  </label>
+                  <input
+                    type="text"
+                    value={newClientCEP}
+                    onChange={(e) => handleCEPChange(e.target.value, 'newClient')}
+                    placeholder="Ex: 37900-124"
+                    className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded-lg p-2.5 text-xs focus:ring-2 focus:ring-orange-500 focus:border-orange-500 font-mono"
+                  />
                 </div>
 
                 <div>
@@ -4007,6 +5279,20 @@ export default function App() {
                       />
                     </div>
                   </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1 font-mono">
+                      Motoboys Ativos no Cliente
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={newClientMotoboysAtivos}
+                      onChange={(e) => setNewClientMotoboysAtivos(parseInt(e.target.value) || 0)}
+                      className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded-lg p-2 text-xs focus:ring-2 focus:ring-orange-500 font-mono font-bold"
+                    />
+                  </div>
+
                   <div className="text-[10px] font-extrabold text-emerald-600 font-mono bg-emerald-50 p-2 rounded border border-emerald-100 flex justify-between">
                     <span>💵 MARGEM LIQUIDA:</span>
                     <span>R$ {(newClientValorCobradoCliente - newClientValorPagoMotoboy).toFixed(2)}</span>
@@ -4096,6 +5382,22 @@ export default function App() {
                       <option key={q} value={q}>Quadrante {q}</option>
                     ))}
                   </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1 font-mono flex items-center justify-between">
+                    <span>CEP</span>
+                    {isFetchingEditClientCEP && (
+                      <span className="text-emerald-500 animate-pulse text-[10px] font-mono leading-none font-bold">🔍 BUSCANDO CEP...</span>
+                    )}
+                  </label>
+                  <input
+                    type="text"
+                    value={editClientCEP}
+                    onChange={(e) => handleCEPChange(e.target.value, 'editClient')}
+                    placeholder="Ex: 37900-124"
+                    className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded-lg p-2.5 text-xs focus:ring-2 focus:ring-orange-500 focus:border-orange-500 font-mono"
+                  />
                 </div>
 
                 <div>
@@ -4202,6 +5504,20 @@ export default function App() {
                       />
                     </div>
                   </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1 font-mono">
+                      Motoboys Ativos no Cliente
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={editClientMotoboysAtivos}
+                      onChange={(e) => setEditClientMotoboysAtivos(parseInt(e.target.value) || 0)}
+                      className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded-lg p-2 text-xs focus:ring-2 focus:ring-orange-500 font-mono font-bold"
+                    />
+                  </div>
+
                   <div className="text-[10px] font-extrabold text-emerald-600 font-mono bg-emerald-50 p-2 rounded border border-emerald-100 flex justify-between">
                     <span>💵 MARGEM LIQUIDA:</span>
                     <span>R$ {(editClientValorCobradoCliente - editClientValorPagoMotoboy).toFixed(2)}</span>
@@ -4230,6 +5546,243 @@ export default function App() {
       </AnimatePresence>
 
       {/* ==========================================
+          MODAL: EDIT MOTOBOY (CRUD UPDATE)
+          ========================================== */}
+      <AnimatePresence>
+        {motoboyParaEditar && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm" id="modal-edit-motoboy">
+            <motion.div 
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white rounded-xl shadow-2xl border border-slate-200 max-w-sm w-full p-5 max-h-[90vh] overflow-y-auto"
+            >
+              <div className="flex justify-between items-start mb-4 border-b border-slate-100 pb-2">
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900 uppercase font-mono tracking-tight">
+                    [Editar Motoboy: {motoboyParaEditar.id}]
+                  </h3>
+                  <span className="text-[10px] text-slate-400 font-mono">Atualize os dados e a situação operacional do entregador</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setMotoboyParaEditar(null)}
+                  className="text-slate-400 hover:text-slate-600 font-bold py-1 px-2 rounded hover:bg-slate-100 cursor-pointer text-xs"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <form onSubmit={handleUpdateMotoboy} className="space-y-3.5">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1 font-mono">
+                    Nome do Profissional
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={editMotoboyNome}
+                    onChange={(e) => setEditMotoboyNome(e.target.value)}
+                    placeholder="Nome completo do motoboy"
+                    className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded-lg p-2.5 text-xs focus:ring-2 focus:ring-orange-500 font-mono font-bold"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1 font-mono">
+                    Contato Telefônico
+                  </label>
+                  <input
+                    type="text"
+                    value={editMotoboyTelefone}
+                    onChange={(e) => setEditMotoboyTelefone(e.target.value)}
+                    placeholder="Ex: (35) 99123-4567"
+                    className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded-lg p-2.5 text-xs focus:ring-2 focus:ring-orange-500 font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1 font-mono">
+                    Cidade / Base
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={editMotoboyCidade}
+                    onChange={(e) => setEditMotoboyCidade(e.target.value)}
+                    className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded-lg p-2.5 text-xs focus:ring-2 focus:ring-orange-500 font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1 font-mono">
+                    Senha de Acesso
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={editMotoboySenha}
+                    onChange={(e) => setEditMotoboySenha(e.target.value)}
+                    className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded-lg p-2.5 text-xs focus:ring-2 focus:ring-orange-500 font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1 font-mono">
+                    Valor de Repasse Fixo (R$)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.50"
+                    min="0"
+                    required
+                    value={editMotoboyRepasse}
+                    onChange={(e) => setEditMotoboyRepasse(parseFloat(e.target.value) || 0)}
+                    className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded-lg p-2.5 text-xs focus:ring-2 focus:ring-orange-500 font-mono font-bold"
+                  />
+                </div>
+
+                <div>
+                  <div className="flex justify-between items-center mb-1">
+                    <label className="block text-xs font-bold text-slate-700 uppercase font-mono">
+                      Empresa de Serviço Exclusiva (Opcional)
+                    </label>
+                    <span className="text-[9px] text-amber-600 font-bold uppercase font-mono">Exclusividade B2B</span>
+                  </div>
+                  
+                  <select
+                    onChange={(e) => {
+                      if (e.target.value !== 'Personalizado') {
+                        setEditMotoboyEmpresaExclusiva(e.target.value);
+                      } else {
+                        setEditMotoboyEmpresaExclusiva('');
+                      }
+                    }}
+                    value={clientes.some(c => c.nome === editMotoboyEmpresaExclusiva) ? editMotoboyEmpresaExclusiva : (editMotoboyEmpresaExclusiva ? 'Personalizado' : '')}
+                    className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded-lg p-2 text-xs font-mono font-semibold mb-2"
+                  >
+                    <option value="">Sem exclusividade (Polo Geral / Todos)</option>
+                    {clientes.map(c => (
+                      <option key={c.id} value={c.nome}>{c.nome}</option>
+                    ))}
+                    <option value="Personalizado">✍️ Digitar manualmente outra empresa...</option>
+                  </select>
+
+                  <input
+                    type="text"
+                    value={editMotoboyEmpresaExclusiva}
+                    onChange={(e) => setEditMotoboyEmpresaExclusiva(e.target.value)}
+                    placeholder="Escreva ou escolha a empresa exclusiva de atendimento"
+                    className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded-lg p-2 text-xs focus:ring-2 focus:ring-orange-500 font-mono font-semibold"
+                  />
+                </div>
+
+                <div>
+                  <div className="flex justify-between items-center mb-1">
+                    <label className="block text-xs font-bold text-slate-700 uppercase font-mono">
+                      Situação / Observação Operacional
+                    </label>
+                    <span className="text-[9px] text-orange-600 font-bold uppercase font-mono">Status e Alertas</span>
+                  </div>
+                  
+                  {/* Select templates */}
+                  <select
+                    onChange={(e) => setEditMotoboySituacao(e.target.value)}
+                    value={editMotoboySituacao}
+                    className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded-lg p-2 text-xs font-mono font-semibold mb-2"
+                  >
+                    <option value="Ativo">Ativo e Operacional</option>
+                    <option value="Faltou hoje">⚠️ Faltou hoje</option>
+                    <option value="Faltou há 2 dias">⚠️ Faltou há 2 dias</option>
+                    <option value="Telefone mudou - atualizar">📞 Mudou telefone</option>
+                    <option value="Afastado temporariamente">🛑 Afastado temporariamente</option>
+                    <option value="Aviso Prévio">⏳ Aviso Prévio</option>
+                    <option value="Customizado">✍️ Escrever situação personalizada...</option>
+                  </select>
+
+                  <input
+                    type="text"
+                    value={editMotoboySituacao}
+                    onChange={(e) => setEditMotoboySituacao(e.target.value)}
+                    placeholder="Escreva a situação operacional do entregador"
+                    className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded-lg p-2 text-xs focus:ring-2 focus:ring-orange-500 font-mono"
+                  />
+                  <p className="text-[9px] text-slate-400 mt-1 font-sans">
+                    Esta anotação de situação aparecerá como um alerta ao lado do entregador na lista para tomada de decisão antecipada.
+                  </p>
+                </div>
+
+                <div className="flex gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setMotoboyParaEditar(null)}
+                    className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 py-2 rounded-lg text-xs font-bold font-mono cursor-pointer"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="flex-1 bg-orange-500 hover:bg-orange-600 text-white py-2 rounded-lg text-xs font-bold font-mono cursor-pointer shadow-md"
+                  >
+                    Salvar
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ==========================================
+          MODAL: CONFIRM EXCLUSION (STATE BASED)
+          ========================================== */}
+      <AnimatePresence>
+        {deleteConfirmType && deleteConfirmId && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-sm shadow-2xl" id="modal-delete-confirm">
+            <motion.div 
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-slate-900 border border-slate-800 text-slate-100 rounded-2xl shadow-2xl max-w-sm w-full p-6 text-center"
+            >
+              <div className="w-12 h-12 bg-red-500/10 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4 border border-red-500/20">
+                <Trash2 className="w-6 h-6" />
+              </div>
+              <h3 className="text-sm font-bold text-slate-100 uppercase font-mono tracking-tight mb-2">
+                Confirmar Exclusão ⚠️
+              </h3>
+              <p className="text-xs text-slate-400 mb-6 font-sans text-center">
+                Tem certeza que deseja excluir permanentemente o cadastro de{" "}
+                <strong className="text-white font-mono break-all font-bold block mt-1.5 bg-slate-950 p-2 rounded border border-slate-850">
+                  {deleteConfirmName || deleteConfirmId}
+                </strong>
+              </p>
+              <div className="flex gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDeleteConfirmType(null);
+                    setDeleteConfirmId(null);
+                    setDeleteConfirmName('');
+                  }}
+                  className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-mono text-xs font-bold py-2.5 rounded-lg border border-slate-700 cursor-pointer active:scale-95 transition-all text-center"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={executeConfirmDelete}
+                  className="flex-1 bg-red-600 hover:bg-red-700 text-white font-mono text-xs font-bold py-2.5 rounded-lg border border-red-500 cursor-pointer active:scale-95 transition-all text-center"
+                >
+                  Confirmar
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ==========================================
           MODAL: CLIENT FIRST ACCESS / ACTIVATION
           ========================================== */}
       <AnimatePresence>
@@ -4246,7 +5799,7 @@ export default function App() {
                   <h3 className="text-sm font-extrabold text-orange-400 uppercase font-mono tracking-tight flex items-center gap-1.5">
                     ⚙️ ATIVAÇÃO DE PRIMEIRO ACESSO B2B
                   </h3>
-                  <span className="text-[10px] text-slate-400 font-mono">Complete o perfil de sua empresa e crie sua senha</span>
+                  <span className="text-[10px] text-slate-400 font-mono">Complete o perfil de sua empresa e confirme seu e-mail</span>
                 </div>
                 <button
                   type="button"
@@ -4259,117 +5812,205 @@ export default function App() {
 
               <form onSubmit={handleCompletarPrimeiroAcesso} className="space-y-4">
                 
-                <div>
-                  <label className="block text-xs font-bold text-slate-300 uppercase mb-1.5 font-mono">
-                    1. Escolha sua Empresa Pré-Cadastrada *
-                  </label>
-                  <select
-                    value={firstAccessClientId}
-                    onChange={(e) => {
-                      const selectedId = e.target.value;
-                      setFirstAccessClientId(selectedId);
-                      const cli = clientes.find(c => c.id === selectedId);
-                      if (cli) {
-                        setFirstAccessEmail(cli.email || '');
-                        setFirstAccessEndereco(cli.endereco && !cli.endereco.startsWith('Pendente') ? cli.endereco : '');
-                        setFirstAccessTelefone(cli.telefone && !cli.telefone.startsWith('Pendente') ? cli.telefone : '');
-                        setFirstAccessCNPJ(cli.cnpj || '');
-                        setFirstAccessInscricaoEstadual(cli.inscricaoEstadual || '');
-                      }
-                    }}
-                    className="w-full bg-slate-950 text-white border border-slate-800 rounded-lg p-2.5 text-xs font-mono focus:outline-none focus:border-orange-500 cursor-pointer"
-                    required
-                  >
-                    <option value="">-- Selecione o nome de sua Oficina/Autopeça --</option>
-                    {clientes.filter(c => !c.cadastroCompleto).map(c => (
-                      <option key={c.id} value={c.id}>{c.nome} ({c.cidade})</option>
-                    ))}
-                  </select>
-                  {clientes.filter(c => !c.cadastroCompleto).length === 0 && (
-                    <p className="text-[10px] text-amber-500 font-mono mt-1 leading-normal">
-                      ⚠️ Nenhum cliente com cadastro pendente encontrado no momento. Cadastre um novo cliente no painel Admin primeiro!
-                    </p>
-                  )}
-                </div>
-
-                <div className="border-t border-slate-800 pt-3.5 space-y-3.5 text-left">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase font-mono block">
-                    2. Dados Cadastrais e Faturamento B2B:
-                  </span>
-
-                  <div className="grid grid-cols-2 gap-2 text-left">
+                {firstAccessEmailStep === 'send_email' && (
+                  <div className="space-y-4 text-left">
                     <div>
-                      <label className="block text-[10px] font-bold text-slate-300 uppercase mb-1 font-mono text-left">CNPJ da Empresa *</label>
+                      <label className="block text-xs font-bold text-slate-300 uppercase mb-1.5 font-mono">
+                        1. Escolha sua Empresa Pré-Cadastrada *
+                      </label>
+                      <select
+                        value={firstAccessClientId}
+                        onChange={(e) => {
+                          const selectedId = e.target.value;
+                          setFirstAccessClientId(selectedId);
+                          const cli = clientes.find(c => c.id === selectedId);
+                          if (cli) {
+                            setFirstAccessEmail(cli.email || '');
+                            setFirstAccessEndereco(cli.endereco && !cli.endereco.startsWith('Pendente') ? cli.endereco : '');
+                            setFirstAccessTelefone(cli.telefone && !cli.telefone.startsWith('Pendente') ? cli.telefone : '');
+                            setFirstAccessCNPJ(cli.cnpj || '');
+                            setFirstAccessInscricaoEstadual(cli.inscricaoEstadual || '');
+                          }
+                        }}
+                        className="w-full bg-slate-950 text-white border border-slate-800 rounded-lg p-2.5 text-xs font-mono focus:outline-none focus:border-orange-500 cursor-pointer"
+                        required
+                      >
+                        <option value="">-- Selecione o nome de sua Oficina/Autopeça --</option>
+                        {clientes.filter(c => !c.cadastroCompleto).map(c => (
+                          <option key={c.id} value={c.id}>{c.nome} ({c.cidade})</option>
+                        ))}
+                      </select>
+                      {clientes.filter(c => !c.cadastroCompleto).length === 0 && (
+                        <p className="text-[10px] text-amber-500 font-mono mt-1 leading-normal">
+                          ⚠️ Nenhum cliente com cadastro pendente encontrado no momento. Cadastre um novo cliente no painel Admin primeiro!
+                        </p>
+                      )}
+                    </div>
+
+                    {firstAccessClientId && (
+                      <div className="bg-slate-950/80 border border-slate-800 p-4 rounded-xl space-y-3">
+                        <p className="text-xs text-slate-300 leading-relaxed">
+                          Para garantir a conformidade e a segurança de sua conta faturada B2B, enviaremos um e-mail com o código exclusivo de faturamento e ativação para:
+                        </p>
+                        <div className="bg-slate-900 border border-slate-800 p-2.5 rounded-lg font-mono text-[11px] flex items-center justify-between">
+                          <span className="text-slate-400">E-mail Cadastrado:</span>
+                          <span className="text-orange-400 font-extrabold">{firstAccessEmail || 'suporte@torque-log.com'}</span>
+                        </div>
+                        
+                        <button
+                          type="button"
+                          disabled={isSendingFirstAccessEmail}
+                          onClick={() => {
+                            if (!firstAccessEmail) {
+                              setFirstAccessError('Nenhum e-mail pré-cadastrado encontrado para este cliente.');
+                              return;
+                            }
+                            setIsSendingFirstAccessEmail(true);
+                            setFirstAccessError('');
+                            
+                            setTimeout(() => {
+                              const code = 'TL-' + Math.floor(1000 + Math.random() * 9000);
+                              setCorrectFirstAccessCode(code);
+                              setIsSendingFirstAccessEmail(false);
+                              setFirstAccessEmailStep('verify_code');
+                              setSupabaseSuccessMsg(`📩 E-mail enviado com código de segurança para ${firstAccessEmail}!`);
+                              setTimeout(() => setSupabaseSuccessMsg(''), 5000);
+                            }, 1200);
+                          }}
+                          className="w-full bg-orange-500 hover:bg-orange-600 disabled:bg-slate-800 hover:scale-[1.02] active:scale-[0.98] transition-all text-white font-mono font-bold text-xs py-2.5 rounded-lg flex items-center justify-center gap-2 cursor-pointer shadow-md shadow-orange-500/10"
+                        >
+                          {isSendingFirstAccessEmail ? (
+                            <>
+                              <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+                              <span>Processando Envios de E-mail...</span>
+                            </>
+                          ) : (
+                            <>
+                              <span>✉️ Enviar Código de Confirmação por E-mail</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {firstAccessEmailStep === 'verify_code' && (
+                  <div className="space-y-4 text-left">
+                    <div className="bg-orange-950/20 border border-orange-900/40 p-3 rounded-lg text-xs leading-normal font-mono mb-2">
+                      <p className="text-orange-400 font-bold mb-1">📬 NOTIFICAÇÃO DO PROVEDOR (Simulação de E-mail)</p>
+                      <p className="text-slate-300 text-[11px]">
+                        Servidor TorqueLog gerou o token de segurança para {firstAccessEmail}:
+                      </p>
+                      <div className="mt-2 text-center bg-slate-950 p-2 rounded border border-orange-500">
+                        <p className="text-[10px] text-slate-400">TorqueLog B2B Verification Token:</p>
+                        <p className="text-sm font-black text-white tracking-widest">{correctFirstAccessCode}</p>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-300 uppercase mb-1.5 font-mono">
+                        Digite o código de confirmação recebido: *
+                      </label>
                       <input
                         type="text"
                         required
-                        placeholder="Ex: 00.000.000/0001-00"
-                        value={firstAccessCNPJ}
-                        onChange={(e) => setFirstAccessCNPJ(e.target.value)}
-                        className="w-full bg-slate-100/10 text-white placeholder-slate-600 border border-slate-800 rounded-lg p-2.5 text-xs font-mono focus:outline-none focus:border-orange-500"
+                        placeholder="Insira o Token TL-XXXX..."
+                        value={firstAccessVerificationCode}
+                        onChange={(e) => setFirstAccessVerificationCode(e.target.value.toUpperCase().trim())}
+                        className="w-full bg-slate-950 text-white placeholder-slate-700 border border-slate-800 rounded-lg p-2.5 text-xs font-mono focus:outline-none focus:border-orange-500"
                       />
                     </div>
-                    <div>
-                      <label className="block text-[10px] font-bold text-slate-300 uppercase mb-1 font-mono text-left">Inscrição Estadual</label>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (firstAccessVerificationCode === correctFirstAccessCode) {
+                          setFirstAccessEmailStep('completed_form');
+                          setFirstAccessError('');
+                        } else {
+                          setFirstAccessError('Código de segurança incorreto. Verifique o simulador azul e tente novamente.');
+                        }
+                      }}
+                      className="w-full bg-emerald-600 hover:bg-emerald-700 hover:scale-[1.02] active:scale-[0.98] transition text-white font-mono font-bold text-xs py-2.5 rounded-lg flex items-center justify-center gap-2 cursor-pointer shadow-md"
+                    >
+                      <span>🔓 Confirmar E-mail & Liberar Cadastro</span>
+                    </button>
+                  </div>
+                )}
+
+                {firstAccessEmailStep === 'completed_form' && (
+                  <div className="border-t border-slate-800 pt-3.5 space-y-3.5 text-left">
+                    <div className="bg-emerald-950/20 border border-emerald-900/40 text-emerald-400 text-xs p-3 rounded-lg flex items-center gap-2 font-mono mb-2">
+                      <span>✓</span>
+                      <span>E-mail verificado! Preencha os dados finais para faturar rotas agregadas.</span>
+                    </div>
+
+                    <span className="text-[10px] font-bold text-slate-400 uppercase font-mono block">
+                      2. Dados Cadastrais e Faturamento B2B:
+                    </span>
+
+                    <div className="grid grid-cols-2 gap-2 text-left">
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-300 uppercase mb-1 font-mono text-left">CNPJ da Empresa *</label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="Ex: 00.000.000/0001-00"
+                          value={firstAccessCNPJ}
+                          onChange={(e) => setFirstAccessCNPJ(e.target.value)}
+                          className="w-full bg-slate-100/10 text-white placeholder-slate-600 border border-slate-800 rounded-lg p-2.5 text-xs font-mono focus:outline-none focus:border-orange-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-300 uppercase mb-1 font-mono text-left">Inscrição Estadual</label>
+                        <input
+                          type="text"
+                          placeholder="Ex: Isento ou Nº"
+                          value={firstAccessInscricaoEstadual}
+                          onChange={(e) => setFirstAccessInscricaoEstadual(e.target.value)}
+                          className="w-full bg-slate-100/10 text-white placeholder-slate-600 border border-slate-800 rounded-lg p-2.5 text-xs font-mono focus:outline-none focus:border-orange-500"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="text-left">
+                      <label className="block text-xs font-bold text-slate-300 uppercase mb-1 font-mono text-left">Endereço Completo da Sede *</label>
                       <input
                         type="text"
-                        placeholder="Ex: Isento ou Nº"
-                        value={firstAccessInscricaoEstadual}
-                        onChange={(e) => setFirstAccessInscricaoEstadual(e.target.value)}
+                        required
+                        placeholder="Ex: Rua das Flores, 123 - Centro"
+                        value={firstAccessEndereco}
+                        onChange={(e) => setFirstAccessEndereco(e.target.value)}
                         className="w-full bg-slate-100/10 text-white placeholder-slate-600 border border-slate-800 rounded-lg p-2.5 text-xs font-mono focus:outline-none focus:border-orange-500"
                       />
                     </div>
-                  </div>
 
-                  <div className="text-left">
-                    <label className="block text-xs font-bold text-slate-300 uppercase mb-1 font-mono text-left">Endereço Completo da Sede *</label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="Ex: Rua das Flores, 123 - Centro"
-                      value={firstAccessEndereco}
-                      onChange={(e) => setFirstAccessEndereco(e.target.value)}
-                      className="w-full bg-slate-100/10 text-white placeholder-slate-600 border border-slate-800 rounded-lg p-2.5 text-xs font-mono focus:outline-none focus:border-orange-500"
-                    />
-                  </div>
+                    <div className="text-left">
+                      <label className="block text-xs font-bold text-slate-300 uppercase mb-1 font-mono text-left">Telefone de Contato B2B *</label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="Ex: (35) 98765-4321"
+                        value={firstAccessTelefone}
+                        onChange={(e) => setFirstAccessTelefone(e.target.value)}
+                        className="w-full bg-slate-100/10 text-white placeholder-slate-600 border border-slate-800 rounded-lg p-2.5 text-xs font-mono focus:outline-none focus:border-orange-500"
+                      />
+                    </div>
 
-                  <div className="text-left">
-                    <label className="block text-xs font-bold text-slate-300 uppercase mb-1 font-mono text-left">Telefone de Contato B2B *</label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="Ex: (35) 98765-4321"
-                      value={firstAccessTelefone}
-                      onChange={(e) => setFirstAccessTelefone(e.target.value)}
-                      className="w-full bg-slate-100/10 text-white placeholder-slate-600 border border-slate-800 rounded-lg p-2.5 text-xs font-mono focus:outline-none focus:border-orange-500"
-                    />
+                    <div className="text-left">
+                      <label className="block text-xs font-bold text-slate-300 uppercase mb-1 font-mono text-left text-orange-400">Criar Sua Senha de Acesso *</label>
+                      <input
+                        type="password"
+                        required
+                        placeholder="Defina uma senha segura para fazer login"
+                        value={firstAccessSenha}
+                        onChange={(e) => setFirstAccessSenha(e.target.value)}
+                        className="w-full bg-slate-100/10 border-orange-500/30 text-white placeholder-slate-600 border rounded-lg p-2.5 text-xs font-mono focus:outline-none focus:border-orange-500"
+                      />
+                    </div>
                   </div>
-
-                  <div className="text-left">
-                    <label className="block text-xs font-bold text-slate-300 uppercase mb-1 font-mono text-left">Confirme o E-mail de Notificação *</label>
-                    <input
-                      type="email"
-                      required
-                      placeholder="Ex: contato@suaempresa.com"
-                      value={firstAccessEmail}
-                      onChange={(e) => setFirstAccessEmail(e.target.value)}
-                      className="w-full bg-slate-100/10 text-white placeholder-slate-600 border border-slate-800 rounded-lg p-2.5 text-xs font-mono focus:outline-none focus:border-orange-500"
-                    />
-                    <p className="text-[10px] text-slate-500 font-mono mt-0.5 leading-none text-left">Deve corresponder ao e-mail registrado pelo faturista.</p>
-                  </div>
-
-                  <div className="text-left">
-                    <label className="block text-xs font-bold text-slate-300 uppercase mb-1 font-mono text-left text-orange-400">Criar Sua Senha de Acesso *</label>
-                    <input
-                      type="password"
-                      required
-                      placeholder="Defina uma senha segura para fazer login"
-                      value={firstAccessSenha}
-                      onChange={(e) => setFirstAccessSenha(e.target.value)}
-                      className="w-full bg-slate-100/10 border-orange-500/30 text-white placeholder-slate-600 border rounded-lg p-2.5 text-xs font-mono focus:outline-none focus:border-orange-500"
-                    />
-                  </div>
-                </div>
+                )}
 
                 {firstAccessError && (
                   <div className="p-3 bg-red-950/40 border border-red-900/60 text-red-400 text-xs rounded-lg flex items-start gap-1.5 font-mono">
@@ -4381,17 +6022,27 @@ export default function App() {
                 <div className="flex gap-2.5 pt-2 border-t border-slate-800">
                   <button
                     type="button"
-                    onClick={() => setIsFirstAccessModalOpen(false)}
+                    onClick={() => {
+                      if (firstAccessEmailStep === 'completed_form') {
+                        setFirstAccessEmailStep('verify_code');
+                      } else if (firstAccessEmailStep === 'verify_code') {
+                        setFirstAccessEmailStep('send_email');
+                      } else {
+                        setIsFirstAccessModalOpen(false);
+                      }
+                    }}
                     className="flex-1 bg-slate-850 hover:bg-slate-800 text-slate-300 py-2.5 rounded-xl text-xs font-bold font-mono transition cursor-pointer"
                   >
-                    Voltar
+                    {firstAccessEmailStep === 'send_email' ? 'Cancelar' : 'Voltar'}
                   </button>
-                  <button
-                    type="submit"
-                    className="flex-1 bg-orange-500 hover:bg-orange-600 active:scale-95 text-white py-2.5 rounded-xl text-xs font-extrabold font-mono transition cursor-pointer shadow-lg shadow-orange-500/10"
-                  >
-                    Ativar Cadastro 🚀
-                  </button>
+                  {firstAccessEmailStep === 'completed_form' && (
+                    <button
+                      type="submit"
+                      className="flex-1 bg-orange-500 hover:bg-orange-600 active:scale-95 text-white py-2.5 rounded-xl text-xs font-extrabold font-mono transition cursor-pointer shadow-lg shadow-orange-500/10"
+                    >
+                      Ativar Cadastro 🚀
+                    </button>
+                  )}
                 </div>
               </form>
             </motion.div>

@@ -22,10 +22,7 @@ export const supabase = isSupabaseConfigured
   : null;
 
 if (!isSupabaseConfigured) {
-  console.warn(
-    "⚠️ Supabase is not fully configured yet. Dynamic state is successfully running on robust localStorage / memory fallback! " +
-    "To link your cloud database, configure 'VITE_SUPABASE_URL' and 'VITE_SUPABASE_ANON_KEY' in your environments / secrets."
-  );
+  // Supabase warning silenced as the application is configured to run on Firebase Firestore
 }
 
 // Helpers for data synchronization if active database connection exists

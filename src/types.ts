@@ -7,6 +7,7 @@ export interface Cliente {
   endereco: string;
   telefone: string;
   cidade: string; // Ex: "Passos - MG" or "Franca - SP"
+  cep?: string; // Postal code
   valorPagoMotoboy: number; // Ex: 4.00
   valorCobradoCliente: number; // Ex: 10.00
   senha?: string; // Password for Customer login
@@ -15,8 +16,10 @@ export interface Cliente {
   cadastroCompleto?: boolean; // True when client completed company info & set custom password
   cnpj?: string;
   inscricaoEstadual?: string;
-  criadoPor: 'Empresa' | 'Entregador';
+  criadoPor: 'Empresa' | 'Entregador' | 'Cliente';
   criadoEm: string;
+  isSelfRegistered?: boolean; // Highlight self-registered B2B clients in green
+  motoboysAtivos?: number; // Quantidade de motoboys ativos cadastrados/viculados
 }
 
 export interface Motoboy {
@@ -27,6 +30,8 @@ export interface Motoboy {
   senha: string;
   valorRepasseFixo: number;
   criadoEm: string;
+  situacao?: string; // Observação sobre a situação do motoboy (ex: ativo, faltou, mudou telefone)
+  empresaExclusiva?: string; // Empresa/B2B Cliente exclusivo ao qual o motoboy presta serviços (ex: BARROS AUTOPEÇAS)
 }
 
 export interface PecasItem {

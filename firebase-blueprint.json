@@ -1,0 +1,102 @@
+{
+  "entities": {
+    "Cliente": {
+      "title": "Cliente",
+      "description": "Dados cadastrais de clientes (oficinas e auto-peças) no sistema B2B.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Identificador exclusivo Ex: CLI-A-1234" },
+        "nome": { "type": "string", "description": "Razão social ou nome fantasia do cliente" },
+        "quadrante": { "type": "string", "enum": ["A", "B", "C", "D", "E", "F"] },
+        "endereco": { "type": "string" },
+        "telefone": { "type": "string" },
+        "cidade": { "type": "string" },
+        "valorPagoMotoboy": { "type": "number" },
+        "valorCobradoCliente": { "type": "number" },
+        "senha": { "type": "string" },
+        "email": { "type": "string" },
+        "emailConfirmado": { "type": "boolean" },
+        "cadastroCompleto": { "type": "boolean" },
+        "cnpj": { "type": "string" },
+        "inscricaoEstadual": { "type": "string" },
+        "criadoPor": { "type": "string", "enum": ["Empresa", "Entregador"] },
+        "criadoEm": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "nome", "quadrante", "endereco", "cidade", "valorPagoMotoboy", "valorCobradoCliente", "criadoPor", "criadoEm"]
+    },
+    "Motoboy": {
+      "title": "Motoboy",
+      "description": "Entregadores cadastrados na plataforma TorqueLog.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "nome": { "type": "string" },
+        "telefone": { "type": "string" },
+        "cidade": { "type": "string" },
+        "senha": { "type": "string" },
+        "valorRepasseFixo": { "type": "number" },
+        "criadoEm": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "nome", "telefone", "cidade", "senha", "valorRepasseFixo", "criadoEm"]
+    },
+    "OrdemServico": {
+      "title": "OrdemServico",
+      "description": "Ordens de serviço de frete de autopeças.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "clienteId": { "type": "string" },
+        "clienteNome": { "type": "string" },
+        "quadrante": { "type": "string", "enum": ["A", "B", "C", "D", "E", "F"] },
+        "itensDescricao": { "type": "string" },
+        "enderecoEntrega": { "type": "string" },
+        "destinatarioNome": { "type": "string" },
+        "retornoPeca": { "type": "boolean" },
+        "taxaReversa": { "type": "number" },
+        "valorPagoMotoboy": { "type": "number" },
+        "valorCobradoCliente": { "type": "number" },
+        "motoboyId": { "type": "string" },
+        "motoboyNome": { "type": "string" },
+        "criadoEm": { "type": "string", "format": "date-time" },
+        "status": { "type": "string", "enum": ["Pendente", "Buscando Parceiro", "Moto a Caminho", "Rota Agrupada", "Entregue"] },
+        "grupoRotaId": { "type": "string" },
+        "motivoDesmembramento": { "type": "string" },
+        "travaCubagemStatus": { "type": "string", "enum": ["Liberado - Cabe no Baú", "Bloqueado - Excesso de Volume"] }
+      },
+      "required": ["id", "clienteId", "clienteNome", "quadrante", "itensDescricao", "valorPagoMotoboy", "valorCobradoCliente", "status", "travaCubagemStatus", "criadoEm"]
+    },
+    "RotaAgrupada": {
+      "title": "RotaAgrupada",
+      "description": "Rotas logísticas agrupadas por quadrante.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "quadrante": { "type": "string", "enum": ["A", "B", "C", "D", "E", "F"] },
+        "ordensIds": { "type": "array" },
+        "status": { "type": "string", "enum": ["Buscando Parceiro", "Moto a Caminho", "Entregue"] },
+        "itensAgrupados": { "type": "array" },
+        "motociclistaAtribuido": { "type": "string" },
+        "criadoEm": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "quadrante", "ordensIds", "status", "criadoEm"]
+    }
+  },
+  "firestore": {
+    "/clientes/{clienteId}": {
+      "schema": { "$ref": "#/entities/Cliente" },
+      "description": "Coleção de clientes corporativos (oficinas)."
+    },
+    "/motoboys/{motoboyId}": {
+      "schema": { "$ref": "#/entities/Motoboy" },
+      "description": "Coleção de entregadores registrados."
+    },
+    "/ordens_servico/{ordemId}": {
+      "schema": { "$ref": "#/entities/OrdemServico" },
+      "description": "Coleção de ordens de serviço de entregas e coletas."
+    },
+    "/rotas_agrupadas/{rotaId}": {
+      "schema": { "$ref": "#/entities/RotaAgrupada" },
+      "description": "Coleção de agrupamentos inteligentes de rotas (bento-grid logístico)."
+    }
+  }
+}
