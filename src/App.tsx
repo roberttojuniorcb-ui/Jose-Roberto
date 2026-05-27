@@ -2416,8 +2416,40 @@ export default function App() {
             <div className="bg-slate-800/80 px-3 py-1.5 rounded border border-slate-700 font-mono text-xs flex items-center gap-2">
               <Users className="w-4 h-4 text-orange-400" />
               <div>
-                <span className="block text-[9px] text-slate-400 leading-none">Clientes Totais</span>
-                <span className="text-sm font-bold text-white">{stats.totalClientesCount} <span className="text-[10px] text-slate-400">(22+ p/ setor)</span></span>
+                {effectiveRole === 'Empresa' ? (
+                  <>
+                    <span className="block text-[9px] text-slate-400 leading-none">Distribuidoras Cadastradas</span>
+                    <span className="text-sm font-bold text-white">
+                      {clientes.filter(c => c.criadoPor !== 'Cliente').length}{' '}
+                      <span className="text-[10px] text-slate-400">ativas</span>
+                    </span>
+                  </>
+                ) : effectiveRole === 'Cliente' ? (
+                  <>
+                    <span className="block text-[9px] text-emerald-400 leading-none">Seus Clientes B2B</span>
+                    <span className="text-sm font-bold text-white">
+                      {clientes.filter(c => c.criadoPorClienteId === activeClienteUser?.id || c.criadoPorClienteId === activeClienteUser?.nome).length}{' '}
+                      <span className="text-[10px] text-slate-400">ativos</span>
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <span className="block text-[9px] text-slate-400 leading-none">
+                      Clientes de {activeMotoboyUser?.empresaExclusiva || 'Distribuidor'}
+                    </span>
+                    <span className="text-sm font-bold text-white">
+                      {(() => {
+                        const linkedDist = clientes.find(
+                          c => c.nome.toLowerCase() === activeMotoboyUser?.empresaExclusiva?.toLowerCase() || c.id === activeMotoboyUser?.empresaExclusiva
+                        );
+                        return linkedDist
+                          ? clientes.filter(c => c.criadoPorClienteId === linkedDist.id).length
+                          : clientes.length;
+                      })()}{' '}
+                      <span className="text-[10px] text-slate-400">parceiros</span>
+                    </span>
+                  </>
+                )}
               </div>
             </div>
 
@@ -4495,10 +4527,10 @@ export default function App() {
                           required={!isQuickRegisteringDestinatario}
                           className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded-lg p-2 text-xs font-mono"
                         >
-                          {clientes.filter(c => c.quadrante === destinoQuadrante && c.id !== activeClienteUser?.id).length === 0 ? (
+                          {clientes.filter(c => c.criadoPorClienteId === activeClienteUser?.id && c.quadrante === destinoQuadrante).length === 0 ? (
                             <option value="">Nenhum cliente cadastrado neste setor</option>
                           ) : (
-                            clientes.filter(c => c.quadrante === destinoQuadrante && c.id !== activeClienteUser?.id).map(c => (
+                            clientes.filter(c => c.criadoPorClienteId === activeClienteUser?.id && c.quadrante === destinoQuadrante).map(c => (
                               <option key={c.id} value={c.id}>{c.nome} ({c.endereco.slice(0, 25)}...)</option>
                             ))
                           )}
@@ -4567,7 +4599,8 @@ export default function App() {
                                   email: `contato-${newId.toLowerCase()}@torque-log-b2b.com`,
                                   emailConfirmado: true,
                                   cadastroCompleto: true,
-                                  criadoPor: 'Entregador',
+                                  criadoPor: 'Cliente',
+                                  criadoPorClienteId: activeClienteUser?.id,
                                   criadoEm: new Date().toISOString()
                                 };
 
@@ -5262,6 +5295,7 @@ export default function App() {
                   emailConfirmado: true,
                   cadastroCompleto: true,
                   criadoPor: 'Cliente',
+                  criadoPorClienteId: activeClienteUser?.id,
                   criadoEm: new Date().toISOString(),
                   motoboysAtivos: 0
                 };

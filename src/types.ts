@@ -17,6 +17,7 @@ export interface Cliente {
   cnpj?: string;
   inscricaoEstadual?: string;
   criadoPor: 'Empresa' | 'Entregador' | 'Cliente';
+  criadoPorClienteId?: string; // ID of the distributor who registered this sub-client
   criadoEm: string;
   isSelfRegistered?: boolean; // Highlight self-registered B2B clients in green
   motoboysAtivos?: number; // Quantidade de motoboys ativos cadastrados/viculados

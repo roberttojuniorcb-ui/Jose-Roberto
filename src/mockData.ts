@@ -33,6 +33,9 @@ function generateRealisticClient(idNum: number, quadrante: Quadrante): Cliente {
   const valorPagoMotoboy = isPassos ? 4.00 : 5.50;
   const valorCobradoCliente = isPassos ? 10.00 : 13.00;
 
+  const isDefaultFirstDistributor = (quadrante === 'A' && idNum === 1);
+  const isCreatedByDistributor = !isDefaultFirstDistributor && (idNum % 3 === 0);
+
   return {
     id: `CLI-${quadrante}-${1000 + idNum}`,
     nome: `${prefix} ${patron} #${idNum}`,
@@ -46,8 +49,10 @@ function generateRealisticClient(idNum: number, quadrante: Quadrante): Cliente {
     email: `oficina${idNum % 100}@torqueteste.com.br`,
     emailConfirmado: true,
     cadastroCompleto: true,
-    criadoPor: idNum % 5 === 0 ? 'Entregador' : 'Empresa',
+    criadoPor: isCreatedByDistributor ? 'Cliente' : (idNum % 5 === 0 ? 'Entregador' : 'Empresa'),
+    criadoPorClienteId: isCreatedByDistributor ? 'CLI-A-1001' : undefined,
     criadoEm: new Date(Date.now() - (idNum * 3600000)).toISOString(),
+    isSelfRegistered: isCreatedByDistributor,
     motoboysAtivos: (idNum % 4) + 1
   };
 }
@@ -60,6 +65,7 @@ export const INITIAL_MOTOBOYS = [
     cidade: "Passos - MG",
     senha: "passos123",
     valorRepasseFixo: 4.00,
+    empresaExclusiva: "Distribuidora de Peças Ferreira #1",
     criadoEm: new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString()
   },
   {
