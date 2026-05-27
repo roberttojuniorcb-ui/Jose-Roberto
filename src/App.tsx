@@ -277,6 +277,7 @@ export default function App() {
   const [deleteConfirmName, setDeleteConfirmName] = useState<string>('');
 
   // Multi-session credentials portal states
+  const [logoVariant, setLogoVariant] = useState<'esportivo' | 'premium'>('esportivo');
   const [activeSessionRole, setActiveSessionRole] = useState<'Empresa' | 'Motoboy' | 'Cliente' | null>(null);
   const [activeMotoboyUser, setActiveMotoboyUser] = useState<Motoboy | null>(null);
   const [activeClienteUser, setActiveClienteUser] = useState<Cliente | null>(null);
@@ -1927,20 +1928,21 @@ export default function App() {
         
         {/* Abstract background ambient aura */}
         <div className="absolute top-[-20%] left-[-10%] w-[500px] h-[500px] rounded-full bg-orange-600/10 blur-[130px] pointer-events-none" />
-        <div className="absolute bottom-[-20%] right-[-10%] w-[500px] h-[500px] rounded-full bg-slate-500/10 blur-[130px] pointer-events-none" />
-
         {/* Top header branding */}
-        <header className="max-w-4xl w-full mx-auto flex justify-between items-center py-4 border-b border-slate-900">
-          <div className="flex items-center gap-2.5">
-            <div className="bg-slate-950/80 p-1.5 rounded-lg border border-slate-800 flex items-center justify-center shadow-lg shrink-0">
-              <TorqueLogLogoIcon size={52} className="text-orange-500" />
+        <header className="max-w-4xl w-full mx-auto flex flex-col md:flex-row justify-between items-center gap-4 py-6 border-b border-slate-900">
+          <div className="flex items-center gap-4">
+            <div className="bg-slate-950/90 p-3 rounded-xl border-2 border-orange-500 flex items-center justify-center shadow-xl shadow-orange-500/10 shrink-0 scale-105 transition-all duration-300 hover:scale-110">
+              <TorqueLogLogoIcon size={80} className="text-orange-500" variant="esportivo" />
             </div>
             <div>
-              <span className="text-xl font-black tracking-tight font-mono text-orange-400">TorqueLog</span>
-              <span className="text-[10px] bg-slate-900 border border-orange-500/20 text-orange-400 px-1.5 py-0.5 rounded ml-2 font-bold font-mono animate-pulse">B2B PORTAL</span>
+              <div className="flex items-center gap-3">
+                <span className="text-4.5xl font-black tracking-tighter font-mono text-orange-400 drop-shadow-md">TorqueLog</span>
+                <span className="text-[10px] bg-slate-900 border border-orange-500/30 text-orange-400 px-2.5 py-0.5 rounded font-black font-mono animate-pulse">B2B PORTAL</span>
+              </div>
+              <p className="text-[10.5px] text-slate-400 font-mono tracking-wider uppercase mt-1">SISTEMA INTEGRADO DE AUTOPEÇAS & DISTRIBUIDORAS</p>
             </div>
           </div>
-          <span className="text-xs font-mono text-slate-500 tracking-widest hidden sm:inline">ROTEIRIZAÇÃO AUTOMOTIVA INTELIGENTE</span>
+          <span className="text-xs font-mono text-slate-500 tracking-widest hidden lg:inline">ROTEIRIZAÇÃO AUTOMOTIVA INTELIGENTE</span>
         </header>
 
         {/* Main interactive auth card */}
@@ -2315,11 +2317,27 @@ export default function App() {
                 </button>
               </form>
 
-              {/* Whatsapp Support Button & Email Container */}
-              <div className="border-t border-slate-900 pt-4 mt-5 space-y-3">
-                <div className="text-center">
+              {/* Proposal Link, Whatsapp Support Button & Email Container */}
+              <div className="border-t border-slate-930 pt-4 mt-5 space-y-3.5">
+                <div className="p-3 bg-slate-900 border border-orange-500/30 rounded-xl relative overflow-hidden group">
+                  <div className="absolute top-0 right-0 w-16 h-16 bg-orange-500/5 rounded-full blur-xl pointer-events-none"></div>
+                  <span className="text-[9px] font-mono font-black text-orange-400 bg-orange-500/10 px-1.5 py-0.5 rounded tracking-widest uppercase block w-max mb-1">PROPOSTA B2B EXCLUSIVA</span>
+                  <p className="text-[11px] text-slate-300 font-mono leading-normal mb-2">
+                    Economia garantida de <strong className="text-white">40% de custos</strong> e passivo trabalhista zero!
+                  </p>
+                  <a
+                    href="/proposta_comercial.html"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-500 hover:to-amber-500 text-white font-mono font-bold text-[11px] py-1.5 px-3 rounded-lg transition duration-150 flex items-center justify-center gap-1.5 shadow shadow-orange-500/10 cursor-pointer animate-[pulse_4s_infinite_alternate]"
+                  >
+                    📈 Abrir Proposta e Simulador →
+                  </a>
+                </div>
+
+                <div className="text-center pt-1">
                   <p className="text-[11px] text-slate-400 font-mono">Qualquer dúvida do cliente ou suporte técnico?</p>
-                  <p className="text-xs text-orange-400 font-bold select-all mt-1">
+                  <p className="text-xs text-orange-400 font-bold select-all mt-0.5">
                     📧 <a href="mailto:administracao@torquelog.com.br" className="underline hover:text-orange-300">administracao@torquelog.com.br</a>
                   </p>
                 </div>
@@ -2331,7 +2349,7 @@ export default function App() {
                   className="w-full bg-emerald-600 hover:bg-emerald-500 active:scale-[0.98] text-white font-mono font-bold text-xs py-2.5 px-4 rounded-xl transition duration-150 flex items-center justify-center gap-2 shadow-md cursor-pointer text-center"
                 >
                   <svg className="w-4.5 h-4.5 fill-current shrink-0" viewBox="0 0 24 24" referrerPolicy="no-referrer">
-                    <path d="M12.031 6.172c-2.02 0-3.659 1.635-3.659 3.659 0 .614.152 1.209.444 1.74l-.472 1.72 1.764-.46a3.618 3.618 0 0 0 1.923.541c2.019 0 3.66-1.636 3.66-3.66 0-2.022-1.64-3.66-3.66-3.66zm1.905 5.155c-.078.22-.44.426-.644.453-.203.027-.457.042-.741-.051a2.822 2.822 0 0 1-1.127-.723 3.123 3.123 0 0 1-.774-1.22c-.156-.37-.024-.572.073-.674.098-.102.219-.254.329-.381.11-.127.147-.212.22-.352.073-.14.037-.263-.018-.37-.056-.107-.491-1.185-.674-1.62-.178-.426-.358-.369-.492-.375-.123-.005-.264-.006-.405-.006a.78.78 0 0 0-.563.262c-.195.214-.741.724-.741 1.763 0 1.04.757 2.046.862 2.188.106.14 1.491 2.278 3.611 3.193.504.218.898.348 1.206.446.505.161.966.138 1.33.084.406-.06.126-.412.247-.412a1.008 1.008 0 0 0 .7.493c.241.05.485.074.726.074.458 0 .895-.083 1.298-.246zM12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm.019 21.72c-1.83 0-3.623-.483-5.203-1.397l-.373-.222-3.867 1.013 1.03-3.768-.243-.387A9.673 9.673 0 0 1 2.28 12c0-5.352 4.36-9.712 9.72-9.712 5.353 0 9.712 4.36 9.712 9.712 0 5.353-4.36 9.72-9.712 9.72z"/>
+                    <path d="M12.031 6.172c-2.02 0-3.659 1.635-3.659 3.659 0 .614.152 1.209.444 1.74l-.472 1.72 1.764-.46a3.618 3.618 0 0 0 1.923.541c2.019 0 3.66-1.636 3.66-3.66 0-2.022-1.64-3.66-3.66-3.66zm1.905 5.155c-.078.22-.44.426-.644.453-.203.027-.457.042-.741-.051a2.822 2.822 0 0 1-1.127-.723 3.123 3.123 0 0 1-.774-1.22c-.156-.37-.024-.572.073-.674.098-.102.219-.254.329-.381.11-.127.147-.212.22-.352.073-.14.037-.263-.018-.37-.056-.107-.491-1.185-.674-1.62-.178-.426-.358-.369-.492-.375-.123-.005-.264-.006-.405-.006a.78.78 0 0 0-.563.262c-.195.214-.741.724-.741 1.763 0 1.04.757 2.046.862 2.188.106.14 1.491 2.278 3.611 3.193.504.218.898.348 1.206.446.505.161.966.138 1.33.084.406-.06.126-.412.247-.412a1.008 1.008 0 0 0 .7.493c.241.05.485.074.726.074.458 0 .895-.083 1.298-.246zM12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm.019 21.72c-1.83 0-3.623-.483-5.203-1.397l-.373-.222-3.867 1.013 1.03-3.768-.243-.387A9.673 9.673 0 0 1 2.28 12c0-5.352 4.36-9.712 9.72-9.712 5.353 0 9.712 4.36 9.712 9.712 0 5.353-4.36 9.72-9.712 9.72z" />
                   </svg>
                   Suporte Urgente via WhatsApp
                 </a>
@@ -2357,41 +2375,41 @@ export default function App() {
       
       {/* --- TOP HIGH-PERFORMANCE NAVIGATION & HUD --- */}
       <header className="bg-slate-900 text-white border-b-4 border-orange-500 sticky top-0 z-50 shadow-md p-4" id="header-hud">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
+        <div className="max-w-7xl mx-auto flex flex-col lg:flex-row justify-between items-center gap-4">
           
-          <div className="flex flex-wrap items-center justify-between md:justify-start w-full md:w-auto gap-4">
+          <div className="flex flex-wrap items-center justify-between lg:justify-start w-full lg:w-auto gap-4">
             <div className="flex items-center gap-4">
-              <div className="bg-slate-950 p-2 rounded-xl shadow-xl flex items-center justify-center border-2 border-orange-500 scale-105 hover:scale-110 transition duration-300" id="brand-logo">
-                <TorqueLogLogoIcon size={68} className="text-orange-500" />
+              <div className="bg-slate-950 p-2.5 rounded-xl shadow-xl flex items-center justify-center border-2 border-orange-500 scale-105 hover:scale-110 transition duration-300" id="brand-logo">
+                <TorqueLogLogoIcon size={84} className="text-orange-500" variant="esportivo" />
               </div>
               <div>
                 <div className="flex items-baseline gap-2 flex-wrap">
-                  <span className="text-4xl font-black tracking-tighter font-mono text-orange-400 drop-shadow-sm select-none uppercase">TorqueLog</span>
+                  <span className="text-5xl font-black tracking-tighter font-mono text-orange-400 drop-shadow-md select-none uppercase">TorqueLog</span>
                   <span className="text-[10px] bg-amber-500 text-slate-950 font-black px-2 py-0.5 rounded shadow-sm border border-amber-400 animate-pulse">LOGÍSTICA B2B EXPRESS</span>
                 </div>
-                <p className="text-[10px] text-orange-100 font-mono tracking-widest font-extrabold uppercase mt-0.5">PLATAFORMA INTEGRADA DE AUTOPEÇAS & DISTRIBUIDORAS</p>
+                <p className="text-[10.5px] text-orange-100 font-mono tracking-widest font-extrabold uppercase mt-1">PLATAFORMA INTEGRADA DE AUTOPEÇAS & DISTRIBUIDORAS</p>
               </div>
             </div>
-
-            {/* Account Status details & Logout Button */}
-            <div className="flex items-center gap-2 bg-slate-950/60 p-1.5 rounded-lg border border-slate-800">
-              <div className="px-2.5 py-1 text-[11px] font-mono leading-none border-r border-slate-800/50">
-                <span className="text-slate-500 block text-[9px] uppercase tracking-wider mb-0.5">Sessão</span>
-                <span className="text-orange-400 font-bold">
-                  {activeSessionRole === 'Empresa' && "🏢 TorqueLog Admin"}
-                  {activeSessionRole === 'Motoboy' && `🏍️ ${activeMotoboyUser?.nome}`}
-                  {activeSessionRole === 'Cliente' && `🏢 Distribuidora: ${activeClienteUser?.nome}`}
-                </span>
-              </div>
-              <button
-                onClick={handleLogout}
-                className="bg-red-950 text-red-400 hover:bg-red-900 hover:text-white transition px-2.5 py-1.5 rounded font-mono font-bold text-[10px] flex items-center gap-1 cursor-pointer border border-red-850/40"
-              >
-                <LogOut className="w-3.5 h-3.5" />
-                SAIR
-              </button>
-            </div>
-          </div>
+ 
+             {/* Account Status details & Logout Button */}
+             <div className="flex items-center gap-2 bg-slate-950/60 p-1.5 rounded-lg border border-slate-800">
+               <div className="px-2.5 py-1 text-[11px] font-mono leading-none border-r border-slate-800/50">
+                 <span className="text-slate-500 block text-[9px] uppercase tracking-wider mb-0.5">Sessão</span>
+                 <span className="text-orange-400 font-bold">
+                   {activeSessionRole === 'Empresa' && "🏢 TorqueLog Admin"}
+                   {activeSessionRole === 'Motoboy' && `🏍️ ${activeMotoboyUser?.nome}`}
+                   {activeSessionRole === 'Cliente' && `🏢 Distribuidora: ${activeClienteUser?.nome}`}
+                 </span>
+               </div>
+               <button
+                 onClick={handleLogout}
+                 className="bg-red-950 text-red-400 hover:bg-red-900 hover:text-white transition px-2.5 py-1.5 rounded font-mono font-bold text-[10px] flex items-center gap-1 cursor-pointer border border-red-850/40"
+               >
+                 <LogOut className="w-3.5 h-3.5" />
+                 SAIR
+               </button>
+             </div>
+           </div>
 
           {/* Quick HUD Metrics */}
           <div className="flex flex-wrap items-center gap-2 sm:gap-4 md:self-end">
@@ -4086,7 +4104,7 @@ export default function App() {
               <div className="flex justify-between items-center border-b border-slate-100 pb-3 mb-4">
                 <div>
                   <h2 className="text-sm font-black text-slate-900 uppercase tracking-wider flex items-center gap-2">
-                    <TorqueLogLogoIcon size={18} className="text-orange-500 animate-pulse" />
+                    <TorqueLogLogoIcon size={18} className="text-orange-500 animate-pulse" variant={logoVariant} />
                     Demandas Disponíveis na Região (Passos - MG)
                   </h2>
                   <p className="text-xs text-slate-400">Clique para aceitar uma corrida e realizar entrega expressa</p>
@@ -4142,7 +4160,7 @@ export default function App() {
                             onClick={() => handleAtualizarStatusOrdem(o.id, 'Moto a Caminho')}
                             className="bg-orange-500 hover:bg-orange-600 active:scale-95 text-white font-mono font-bold text-xs px-3 py-2 rounded-lg transition shadow shadow-orange-500/10 cursor-pointer flex items-center gap-1.5 w-full sm:w-auto text-center justify-center"
                           >
-                            <TorqueLogLogoIcon size={16} className="text-white" />
+                            <TorqueLogLogoIcon size={16} className="text-white" variant={logoVariant} />
                             Aceitar Corrida 🏍️
                           </button>
                         ) : (
@@ -4167,7 +4185,7 @@ export default function App() {
             {/* GPS Map for Motoboy tracking */}
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
               <h3 className="text-xs font-black text-slate-900 uppercase font-mono tracking-widest mb-3 flex items-center gap-1.5 border-b border-slate-100 pb-2">
-                <TorqueLogLogoIcon size={18} className="text-orange-500 animate-[pulse_2s_infinite]" />
+                <TorqueLogLogoIcon size={18} className="text-orange-500 animate-[pulse_2s_infinite]" variant={logoVariant} />
                 Seu GPS Setorial: Passos - MG
               </h3>
               <div className="h-56 rounded-lg overflow-hidden border border-slate-200">
@@ -4611,7 +4629,7 @@ export default function App() {
             <div>
               <div className="border-b border-slate-100 pb-3 mb-4">
                 <h2 className="text-sm font-black text-slate-900 uppercase tracking-wider flex items-center gap-2 font-mono">
-                  <TorqueLogLogoIcon size={18} className="text-emerald-600" />
+                  <TorqueLogLogoIcon size={18} className="text-emerald-600" variant={logoVariant} />
                   Motoboys Credenciados
                 </h2>
                 <p className="text-xs text-slate-450 font-mono">Clique no botão para seguir a rota de cada prestador em tempo real</p>
@@ -4766,7 +4784,21 @@ export default function App() {
       <footer className="bg-slate-900 text-slate-400 font-mono text-center py-6 border-t border-slate-800 text-xs mt-auto px-4" id="application-footer">
         <p>© 2026 TorqueLog B2B S.A. Todos os direitos reservados. – Tecnologia em Logística Autônoma Garantida.</p>
         <p className="text-[10px] text-slate-500 mt-1">Frota homologada: 100% Motocicleta | Contrato de Risco Trabalhista Zero em vigor.</p>
-        <div className="mt-3 pt-3 border-t border-slate-800/60 max-w-lg mx-auto flex flex-col sm:flex-row items-center justify-center gap-3 text-[11px]">
+        
+        {/* Link to the brand new proposal accessible from inside any session */}
+        <div className="mt-3.5 max-w-lg mx-auto bg-slate-950 p-2.5 rounded-lg border border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-md">
+          <span className="text-[10.5px] text-slate-300 font-bold block">📈 Quer apresentar a TorqueLog para novos parceiros?</span>
+          <a
+            href="/proposta_comercial.html"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="bg-orange-600 hover:bg-orange-500 text-white text-[10.5px] font-bold py-1 px-3.5 rounded transition shadow-sm text-center w-full sm:w-auto"
+          >
+            Abrir Proposta B2B →
+          </a>
+        </div>
+
+        <div className="mt-4 pt-4 border-t border-slate-800/60 max-w-lg mx-auto flex flex-col sm:flex-row items-center justify-center gap-3 text-[11px]">
           <span className="text-orange-400 font-bold select-all">📧 Suporte: administracao@torquelog.com.br</span>
           <span className="hidden sm:inline text-slate-700">|</span>
           <a
