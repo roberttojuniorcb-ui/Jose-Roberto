@@ -4734,43 +4734,7 @@ export default function App() {
         </main>
       )}
 
-      {/* ==========================================
-          BOTTOM TERMINAL: OUTPUT API CONSOLE & INSPECTOR
-          ========================================== */}
-      <section className="max-w-7xl mx-auto px-4 lg:px-6 mb-8 w-full" id="terminal-api-inspector">
-        <div className="bg-slate-950 text-orange-400 rounded-xl shadow-xl overflow-hidden border-2 border-slate-800">
-          
-          <div className="bg-slate-900 px-4 py-2.5 flex items-center justify-between border-b border-slate-800">
-            <div className="flex items-center gap-2">
-              <Terminal className="w-4 h-4 text-orange-500" />
-              <span className="text-xs font-extrabold tracking-wider font-mono text-white uppercase">
-                TorqueLog API response inspector (Saída JSON estruturada)
-              </span>
-            </div>
-            <div className="flex items-center gap-1 text-[11px] text-slate-400 font-mono">
-              <Clock className="w-3.5 h-3.5 text-slate-400" />
-              <span>Sincronizado: {apiLogTimestamp || '--:--:--'}</span>
-            </div>
-          </div>
 
-          <div className="p-4 bg-slate-950/95 font-mono text-xs overflow-x-auto">
-            <div className="flex items-start gap-2.5 text-slate-400 mb-3 border-b border-slate-800/80 pb-2.5">
-              <span className="text-orange-500 shrink-0 font-bold">[Trigger Evento]:</span>
-              <span className="text-slate-300 italic">{apiActionDescription}</span>
-              <span className="ml-auto text-[10px] bg-emerald-950/50 text-emerald-400 border border-emerald-900 py-0.2 px-1.5 rounded">HTTP 200 OK</span>
-            </div>
-
-            <pre className="text-slate-300 leading-snug select-all bg-slate-950 p-3 rounded-lg border border-slate-900/60 max-h-[360px] overflow-y-auto">
-              {JSON.stringify(apiResponseLog, null, 2)}
-            </pre>
-
-            <div className="mt-3 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 text-[10px] text-slate-500 bg-slate-900/40 p-2.5 rounded border border-slate-900">
-              <span>🚀 Use o botão acima para cadastrar clientes via Web ou via Botão de Rua do Motoboy, faturando rotas agregadas.</span>
-              <span className="bg-slate-900 px-2 py-0.5 rounded text-orange-400 font-bold">API COMPLIANT 1.0 JSON verified</span>
-            </div>
-          </div>
-        </div>
-      </section>
 
       {/* --- REUSABLE FOOTER --- */}
       <footer className="bg-slate-900 text-slate-400 font-mono text-center py-6 border-t border-slate-800 text-xs mt-auto" id="application-footer">
