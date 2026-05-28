@@ -721,13 +721,7 @@ export default function App() {
         setSelectedLoginUserId('');
       }
     } else if (loginRole === 'Cliente') {
-      const availableClientes = clientes.filter(c => 
-        (!c.criadoPorClienteId) && 
-        c.id !== 'CLI-BARROS' && 
-        c.id !== 'CLI-MARIA' &&
-        c.nome !== 'BARROS AUTOPEÇAS' &&
-        c.nome !== 'MARIA ANDRADE'
-      );
+      const availableClientes = clientes.filter(c => c.criadoPor !== 'Cliente' && !c.criadoPorClienteId);
       if (availableClientes.length > 0) {
         if (!selectedLoginUserId || !availableClientes.some(c => c.id === selectedLoginUserId)) {
           setSelectedLoginUserId(availableClientes[0].id);
@@ -1062,7 +1056,7 @@ export default function App() {
   // --- CONTROLLER FUNCTIONS ---
 
   // Dispatch a new Order from the distributor
-  const handleDespacharOrdem = (e: React.FormEvent) => {
+  const handleDespacharOrdem = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedClienteId) return;
 
@@ -1129,7 +1123,23 @@ export default function App() {
       novaOrdem.grupoRotaId = groupIdentity;
     }
 
-    setOrdens([novaOrdem, ...updatedOrdens]);
+    const nextOrdensList = [novaOrdem, ...updatedOrdens];
+    setOrdens(nextOrdensList);
+
+    if (isFirebaseConfigured) {
+      try {
+        await syncOrdensToFirebase(nextOrdensList);
+      } catch (err) {
+        console.error("Erro ao sincronizar ordem faturada no Firebase:", err);
+      }
+    }
+    if (supabase) {
+      try {
+        await syncOrdensToSupabase(nextOrdensList);
+      } catch (err) {
+        console.error("Erro ao sincronizar ordem faturada no Supabase:", err);
+      }
+    }
 
     // Construct and update Live API console Response
     const apiPayload = compilarAPIResponse(targetCliente, novaOrdem, sweepMatchIds, layoutAnalise.status);
@@ -1137,8 +1147,11 @@ export default function App() {
     setApiLogTimestamp(new Date().toLocaleTimeString());
     setApiActionDescription(`Despacho de entrega para [${targetCliente.nome}] no Setor ${targetCliente.quadrante}`);
 
-    // Show a success notification toast internally (clean reset of items draft if appropriate)
-    // Keep raw item text or provide feedback
+    // Clean reset of form variables for next entry
+    setItemTexto('Peças Diversas');
+    setRetornoPeca(false);
+    setSelectedClienteId('');
+    alert(`Entrega ${novaOrdemId} despachada com sucesso! Já está visível na tela dos entregadores para aceite.`);
   };
 
   // Add client directly - Dual Synchronized Action (callable by Faturista or Motoboy)
@@ -1918,11 +1931,11 @@ export default function App() {
   };
 
   // Simulate Accepting/Routing on the deliverer's app
-  const handleAtualizarStatusOrdem = (ordemId: string, novoStatus: OrdemServico['status']) => {
+  const handleAtualizarStatusOrdem = async (ordemId: string, novoStatus: OrdemServico['status']) => {
     let targetO = ordens.find(o => o.id === ordemId);
     if (!targetO) return;
 
-    setOrdens(prev => prev.map(o => {
+    const nextOrdens = ordens.map(o => {
       if (o.id === ordemId) {
         const extra: Partial<OrdemServico> = { status: novoStatus };
         if (activeMotoboyUser) {
@@ -1932,7 +1945,24 @@ export default function App() {
         return { ...o, ...extra };
       }
       return o;
-    }));
+    });
+
+    setOrdens(nextOrdens);
+
+    if (isFirebaseConfigured) {
+      try {
+        await syncOrdensToFirebase(nextOrdens);
+      } catch (err) {
+        console.error("Erro ao sincronizar atualização de status no Firebase:", err);
+      }
+    }
+    if (supabase) {
+      try {
+        await syncOrdensToSupabase(nextOrdens);
+      } catch (err) {
+        console.error("Erro ao sincronizar atualização de status no Supabase:", err);
+      }
+    }
 
     const associatedCli = clientes.find(c => c.id === targetO?.clienteId) || {
       id: targetO.clienteId,
@@ -1962,12 +1992,12 @@ export default function App() {
   };
 
   // Trigger Signature Handover representing digital receipt "Canhoto Digital"
-  const handleAssinarCanhotoDigital = (e: React.FormEvent) => {
+  const handleAssinarCanhotoDigital = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!activeSignOrder || !signatureName.trim()) return;
 
     const ordemId = activeSignOrder.id;
-    setOrdens(prev => prev.map(o => {
+    const nextOrdens = ordens.map(o => {
       if (o.id === ordemId) {
         const extra: Partial<OrdemServico> = {
           status: 'Entregue' as const,
@@ -1980,7 +2010,24 @@ export default function App() {
         return { ...o, ...extra };
       }
       return o;
-    }));
+    });
+
+    setOrdens(nextOrdens);
+
+    if (isFirebaseConfigured) {
+      try {
+        await syncOrdensToFirebase(nextOrdens);
+      } catch (err) {
+        console.error("Erro ao sincronizar assinatura de canhoto no Firebase:", err);
+      }
+    }
+    if (supabase) {
+      try {
+        await syncOrdensToSupabase(nextOrdens);
+      } catch (err) {
+        console.error("Erro ao sincronizar assinatura de canhoto no Supabase:", err);
+      }
+    }
 
     const clientAssociated = clientes.find(c => c.id === activeSignOrder.clienteId) || {
       id: activeSignOrder.clienteId,
@@ -2353,13 +2400,7 @@ export default function App() {
                           onChange={(e) => setSelectedLoginUserId(e.target.value)}
                           className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 pr-8 text-sm text-slate-300 focus:outline-none focus:border-orange-500 appearance-none cursor-pointer"
                         >
-                          {clientes.filter(c => 
-                            (!c.criadoPorClienteId) && 
-                            c.id !== 'CLI-BARROS' && 
-                            c.id !== 'CLI-MARIA' &&
-                            c.nome !== 'BARROS AUTOPEÇAS' &&
-                            c.nome !== 'MARIA ANDRADE'
-                          ).map(c => (
+                          {clientes.filter(c => c.criadoPor !== 'Cliente' && !c.criadoPorClienteId).map(c => (
                             <option key={c.id} value={c.id}>
                               {c.nome} ({c.cidade})
                             </option>
@@ -2524,13 +2565,7 @@ export default function App() {
                   <>
                     <span className="block text-[9px] text-slate-400 leading-none">Distribuidoras Cadastradas</span>
                     <span className="text-sm font-bold text-white">
-                      {clientes.filter(c => 
-                        (!c.criadoPorClienteId) && 
-                        c.id !== 'CLI-BARROS' && 
-                        c.id !== 'CLI-MARIA' &&
-                        c.nome !== 'BARROS AUTOPEÇAS' &&
-                        c.nome !== 'MARIA ANDRADE'
-                      ).length}{' '}
+                      {clientes.filter(c => c.criadoPor !== 'Cliente' && !c.criadoPorClienteId).length}{' '}
                       <span className="text-[10px] text-slate-400">ativas</span>
                     </span>
                   </>
@@ -4637,7 +4672,23 @@ export default function App() {
                   tempoRestanteSweep: 15
                 };
 
-                setOrdens(prev => [novaOrdem, ...prev]);
+                const updatedList = [novaOrdem, ...ordens];
+                setOrdens(updatedList);
+
+                if (isFirebaseConfigured) {
+                  try {
+                    await syncOrdensToFirebase(updatedList);
+                  } catch (err) {
+                    console.error("Erro ao sincronizar nova ordem individual no Firebase:", err);
+                  }
+                }
+                if (supabase) {
+                  try {
+                    await syncOrdensToSupabase(updatedList);
+                  } catch (err) {
+                    console.error("Erro ao sincronizar nova ordem individual no Supabase:", err);
+                  }
+                }
 
                 // Update API Output view
                 const apiPayload = compilarAPIResponse(activeClienteUser, novaOrdem, [], 'Liberado - Cabe no Baú');
@@ -4645,8 +4696,15 @@ export default function App() {
                 setApiLogTimestamp(new Date().toLocaleTimeString());
                 setApiActionDescription(`Novo despacho solicitado individualmente no portal do cliente: ${novaOrdemId}`);
 
+                // Reset B2B dispatch fields to empty / false defaults for the next entry
                 setDestinoEndereco('');
-                alert(`Solicitação ${novaOrdemId} criada com sucesso para ${finalDestName}!`);
+                setDestinoClienteId('');
+                setRetornoPeca(false);
+                setQuickClientNome('');
+                setQuickClientEndereco('');
+                setIsQuickRegisteringDestinatario(false);
+
+                alert(`Entrega ${novaOrdemId} despachada com sucesso para ${finalDestName}! Já está disponível para os entregadores aceitarem em tempo real.`);
               }} className="space-y-4">
                 
                 {destinoTipo === 'endereco' ? (
