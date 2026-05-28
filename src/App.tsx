@@ -2616,47 +2616,83 @@ export default function App() {
               </form>
 
               {/* SECTION: DOWNLOAD MOBILE APP (CAPACITOR HYBRID BUILD) */}
-              <div className="border-t border-slate-800/80 pt-4 mt-5 space-y-3" id="mobile-download-section">
+              <div className="border-t border-slate-800/80 pt-5 mt-5 space-y-4" id="mobile-download-section">
                 <div className="text-center">
                   <span className="text-[9px] font-mono font-black text-orange-400 bg-orange-500/10 px-1.5 py-0.5 rounded tracking-widest uppercase inline-block mb-1">CAPACITOR HYBRID BUILD</span>
                   <h3 className="text-xs font-bold text-slate-200 uppercase tracking-tight font-sans flex items-center justify-center gap-1.5">
-                    <Smartphone className="w-3.5 h-3.5 text-orange-400 shrink-0" />
-                    Baixar TorqueLog no Celular
+                    <Smartphone className="w-4 h-4 text-orange-400 shrink-0" />
+                    Instalar TorqueLog no Celular
                   </h3>
-                  <p className="text-[10px] text-slate-400 font-sans mt-0.5">Rode o aplicativo nativo em tempo real no seu dispositivo</p>
+                  <p className="text-[10px] text-slate-400 font-sans mt-0.5">Baixe o aplicativo nativo para rodar diretamente em seu dispositivo</p>
                 </div>
 
-                {/* Badges UI Grid */}
-                <div className="grid grid-cols-2 gap-2" id="download-badges">
-                  {/* iOS Button */}
-                  <button
-                    type="button"
-                    onClick={() => setMobileInstallPrompt(mobileInstallPrompt === 'ios' ? null : 'ios')}
-                    className={`flex items-center gap-2 bg-black hover:bg-slate-950 border text-left p-2.5 rounded-xl transition duration-150 cursor-pointer w-full ${mobileInstallPrompt === 'ios' ? 'border-orange-500 shadow-lg shadow-orange-500/10' : 'border-slate-800'}`}
-                  >
-                    <svg className="w-5 h-5 text-white shrink-0 fill-current" viewBox="0 0 24 24" referrerPolicy="no-referrer">
-                      <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M15.97 4.17c.66-.81 1.11-1.93.99-3.06-.96.04-2.13.64-2.82 1.45-.6.7-1.13 1.84-.99 2.94.1.08.2.12.3.12.87 0 1.96-.54 2.52-1.45z"/>
-                    </svg>
-                    <div className="leading-tight font-sans">
-                      <p className="text-[8px] text-slate-400 capitalize tracking-tight font-light">Baixar na</p>
-                      <p className="text-[11.5px] font-bold text-white tracking-tight">App Store</p>
+                {/* Direct & Interactive Download Grid */}
+                <div className="space-y-3" id="download-cards-container">
+                  {/* Android Direct Download Card */}
+                  <div className="bg-slate-950/80 border border-slate-800/85 rounded-xl p-3 space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <svg className="w-5 h-5 text-emerald-400 shrink-0 fill-current" viewBox="0 0 24 24" referrerPolicy="no-referrer">
+                          <path d="M17.523 15.3l-1.85-3.197a1.03 1.03 0 0 0-.895-.503h-.136V5.448A4.148 4.148 0 0 0 10.493 1.3a4.148 4.148 0 0 0-4.149 4.148v6.152h-.136c-.37 0-.71.196-.895.503L3.463 15.3a1.035 1.035 0 0 0 .515 1.408l2.12.983c.31.144.673.1.944-.122l2.368-1.928a.513.513 0 0 1 .655 0l2.367 1.928a1.035 1.035 0 0 0 .945.122l2.12-.983a1.034 1.034 0 0 0 .515-1.408zm-8.875-5.45c-.426 0-.776-.35-.776-.777 0-.427.35-.776.776-.776s.777.349.777.776c0 .428-.35.777-.777.777zm3.696 0c-.427 0-.777-.35-.777-.777s.35-.776.777-.776c.427 0 .776.349.776.776-.001.428-.35.777-.776.777z"/>
+                        </svg>
+                        <span className="text-xs font-bold text-slate-100 font-sans">Aplicativo Android</span>
+                      </div>
+                      <span className="text-[8px] font-mono text-emerald-400 bg-emerald-400/10 px-1 py-0.2 rounded font-black tracking-wider uppercase">Pronto para Uso</span>
                     </div>
-                  </button>
 
-                  {/* Android Button */}
-                  <button
-                    type="button"
-                    onClick={() => setMobileInstallPrompt(mobileInstallPrompt === 'android' ? null : 'android')}
-                    className={`flex items-center gap-2 bg-black hover:bg-slate-950 border text-left p-2.5 rounded-xl transition duration-150 cursor-pointer w-full ${mobileInstallPrompt === 'android' ? 'border-orange-500 shadow-lg shadow-orange-500/10' : 'border-slate-800'}`}
-                  >
-                    <svg className="w-5 h-5 text-emerald-400 shrink-0 fill-current" viewBox="0 0 24 24" referrerPolicy="no-referrer">
-                      <path d="M17.523 15.3l-1.85-3.197a1.03 1.03 0 0 0-.895-.503h-.136V5.448A4.148 4.148 0 0 0 10.493 1.3a4.148 4.148 0 0 0-4.149 4.148v6.152h-.136c-.37 0-.71.196-.895.503L3.463 15.3a1.035 1.035 0 0 0 .515 1.408l2.12.983c.31.144.673.1.944-.122l2.368-1.928a.513.513 0 0 1 .655 0l2.367 1.928a1.035 1.035 0 0 0 .945.122l2.12-.983a1.034 1.034 0 0 0 .515-1.408zm-8.875-5.45c-.426 0-.776-.35-.776-.777 0-.427.35-.776.776-.776s.777.349.777.776c0 .428-.35.777-.777.777zm3.696 0c-.427 0-.777-.35-.777-.777s.35-.776.777-.776c.427 0 .776.349.776.776-.001.428-.35.777-.776.777z"/>
-                    </svg>
-                    <div className="leading-tight font-sans">
-                      <p className="text-[8px] text-slate-400 capitalize tracking-tight font-light">Disponível no</p>
-                      <p className="text-[11.5px] font-bold text-white tracking-tight">Google Play</p>
+                    <div className="grid grid-cols-5 gap-1.5Packed font-mono">
+                      {/* Direct Link */}
+                      <a
+                        href="/downloads/app-debug.apk"
+                        download="TorqueLog-Android.apk"
+                        className="col-span-3 bg-emerald-600 hover:bg-emerald-500 active:transform active:scale-95 text-white py-1.5 px-2.5 rounded-lg text-[10.5px] font-mono font-bold transition duration-150 flex items-center justify-center gap-1.5 shadow-sm shadow-emerald-600/15 cursor-pointer text-center"
+                      >
+                        <span className="text-xs">⬇️</span> Baixar APK Direto
+                      </a>
+
+                      {/* Info Toggle Button */}
+                      <button
+                        type="button"
+                        onClick={() => setMobileInstallPrompt(mobileInstallPrompt === 'android' ? null : 'android')}
+                        className={`col-span-2 border transition duration-150 rounded-lg text-[9.5px] font-sans font-medium flex items-center justify-center gap-1 cursor-pointer ${mobileInstallPrompt === 'android' ? 'bg-orange-500/10 border-orange-500 text-orange-300' : 'bg-slate-900 border-slate-800 hover:border-slate-700 text-slate-300'}`}
+                      >
+                        ℹ️ {mobileInstallPrompt === 'android' ? 'Fechar' : 'Instruções'}
+                      </button>
                     </div>
-                  </button>
+                  </div>
+
+                  {/* iOS Direct Download Card */}
+                  <div className="bg-slate-950/80 border border-slate-800/85 rounded-xl p-3 space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <svg className="w-5 h-5 text-white shrink-0 fill-current" viewBox="0 0 24 24" referrerPolicy="no-referrer">
+                          <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M15.97 4.17c.66-.81 1.11-1.93.99-3.06-.96.04-2.13.64-2.82 1.45-.6.7-1.13 1.84-.99 2.94.1.08.2.12.3.12.87 0 1.96-.54 2.52-1.45z"/>
+                        </svg>
+                        <span className="text-xs font-bold text-slate-100 font-sans">Aplicativo iOS</span>
+                      </div>
+                      <span className="text-[8px] font-mono text-cyan-400 bg-cyan-400/10 px-1 py-0.2 rounded font-black tracking-wider uppercase">Suporte IPA</span>
+                    </div>
+
+                    <div className="grid grid-cols-5 gap-1.5 font-mono">
+                      {/* Direct Link */}
+                      <a
+                        href="/downloads/TorqueLog-Unsigned.ipa"
+                        download="TorqueLog-iOS.ipa"
+                        className="col-span-3 bg-orange-600 hover:bg-orange-500 active:transform active:scale-95 text-white py-1.5 px-2.5 rounded-lg text-[10.5px] font-mono font-bold transition duration-150 flex items-center justify-center gap-1.5 shadow-sm shadow-orange-600/15 cursor-pointer text-center"
+                      >
+                        <span className="text-xs">⬇️</span> Baixar IPA Direto
+                      </a>
+
+                      {/* Info Toggle Button */}
+                      <button
+                        type="button"
+                        onClick={() => setMobileInstallPrompt(mobileInstallPrompt === 'ios' ? null : 'ios')}
+                        className={`col-span-2 border transition duration-150 rounded-lg text-[9.5px] font-sans font-medium flex items-center justify-center gap-1 cursor-pointer ${mobileInstallPrompt === 'ios' ? 'bg-orange-500/10 border-orange-500 text-orange-300' : 'bg-slate-900 border-slate-800 hover:border-slate-700 text-slate-300'}`}
+                      >
+                        ℹ️ {mobileInstallPrompt === 'ios' ? 'Fechar' : 'Instruções'}
+                      </button>
+                    </div>
+                  </div>
                 </div>
 
                 {/* Animated Interactive Guide Subpanel */}
@@ -2677,17 +2713,15 @@ export default function App() {
                             <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24" referrerPolicy="no-referrer">
                               <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M15.97 4.17c.66-.81 1.11-1.93.99-3.06-.96.04-2.13.64-2.82 1.45-.6.7-1.13 1.84-.99 2.94.1.08.2.12.3.12.87 0 1.96-.54 2.52-1.45z"/>
                             </svg>
-                            <span>Guia de Instalação iOS (IPA)</span>
+                            <span>Como usar o IPA (iOS)</span>
                           </div>
-                          <p className="text-[10px] text-slate-350">
-                            A integração do fluxo macOS via GitHub Actions compilou o arquivo executável com sucesso! Instale-o seguindo os passos:
+                          <p className="text-[10px] text-slate-350 leading-relaxed">
+                            O botão de download direto obtém o arquivo compilado imediatamente. Ao implantar seu sistema ou lançar atualizações nas lojas:
                           </p>
-                          <ol className="list-decimal pl-4 text-[10px] text-slate-300 space-y-1">
-                            <li>Acesse a aba <strong>Actions</strong> no repositório GitHub.</li>
-                            <li>Localize a execução mais recente do fluxo: <strong className="text-orange-300">"Build iOS IPA (TorqueLog)"</strong>.</li>
-                            <li>Role até a seção de <strong>"Artifacts"</strong> e faça o download de <strong className="underline text-orange-400">TorqueLog-Unsigned-iOS-IPA</strong>.</li>
-                            <li>Transfira o arquivo <code className="text-[10.5px] bg-slate-900 border border-slate-800 px-1 py-0.5 rounded text-orange-250">TorqueLog-Unsigned.ipa</code> para o seu iPhone via AltStore, Sideloadly, TrollStore ou através das credenciais de desenvolvedor Apple Developer Account.</li>
-                          </ol>
+                          <ul className="list-disc pl-4 text-[10px] text-slate-300 space-y-1">
+                            <li><strong>Instalação Fácil (Sideload)</strong>: Você pode rodar este arquivo no iOS usando aplicativos como TrollStore, AltStore, Sideloadly ou Scarlet diretamente do computador.</li>
+                            <li><strong>Atualização Automática</strong>: Como administrador, basta substituir o arquivo na pasta <code className="text-orange-300">/public/downloads/TorqueLog-Unsigned.ipa</code> do seu código fonte para atualizar para todos os usuários comuns sem requerer conta no GitHub!</li>
+                          </ul>
                         </>
                       ) : (
                         <>
@@ -2695,17 +2729,16 @@ export default function App() {
                             <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24" referrerPolicy="no-referrer">
                               <path d="M17.523 15.3l-1.85-3.197a1.03 1.03 0 0 0-.895-.503h-.136V5.448A4.148 4.148 0 0 0 10.493 1.3a4.148 4.148 0 0 0-4.149 4.148v6.152h-.136c-.37 0-.71.196-.895.503L3.463 15.3a1.035 1.035 0 0 0 .515 1.408l2.12.983c.31.144.673.1.944-.122l2.368-1.928a.513.513 0 0 1 .655 0l2.367 1.928a1.035 1.035 0 0 0 .945.122l2.12-.983a1.034 1.034 0 0 0 .515-1.408zm-8.875-5.45c-.426 0-.776-.35-.776-.777 0-.427.35-.776.776-.776s.777.349.777.776c0 .428-.35.777-.777.777zm3.696 0c-.427 0-.776-.35-.777-.777s.35-.776.777-.776c.427 0 .776.349.776.776-.001.428-.35.777-.776.777z"/>
                             </svg>
-                            <span>Guia de Instalação Android (APK)</span>
+                            <span>Como usar o APK (Android)</span>
                           </div>
-                          <p className="text-[10px] text-slate-350">
-                            O build do ecossistema Android foi gerado em formato diretamente instalável (.APK). Veja como instalar:
+                          <p className="text-[10px] text-slate-350 leading-relaxed">
+                            O arquivo APK será baixado imediatamente no seu celular ao pressionar o botão verde.
                           </p>
-                          <ol className="list-decimal pl-4 text-[10px] text-slate-300 space-y-1">
-                            <li>Abra o repositório no GitHub do projeto.</li>
-                            <li>Acesse a aba <strong>Actions</strong> e clique na execução correspondente: <strong className="text-orange-300">"Build Android APK (TorqueLog)"</strong>.</li>
-                            <li>Na base do workflow de arquivos resultantes, baixe o artefato <strong className="underline text-emerald-400">TorqueLog-Debug-APK</strong>.</li>
-                            <li>Copie o pacote <code className="text-[10.5px] bg-slate-900 border border-slate-800 px-1 py-0.5 rounded text-emerald-300">app-debug.apk</code> para o seu celular Android e execute o instalador. Caso solicitado, conceda permissão de fontes externas no aparelho.</li>
-                          </ol>
+                          <ul className="list-disc pl-4 text-[10px] text-slate-300 space-y-1">
+                            <li><strong>Instalação</strong>: Abra o arquivo baixado no seu dispositivo Android. Se solicitado pelo sistema operacional, autorize a instalação de "fontes desconhecidas" ou pelo navegador.</li>
+                            <li><strong>Sem Conta do GitHub</strong>: Qualquer pessoa ou motoboy pode baixar sem acesso ou login em outras ferramentas.</li>
+                            <li><strong>Substituição Prática</strong>: Para mudar a versão oficial do download no seu site, basta colocar o arquivo final compilado do aplicativo na pasta <code className="text-emerald-300">/public/downloads/app-debug.apk</code> do código de produção.</li>
+                          </ul>
                         </>
                       )}
                       
