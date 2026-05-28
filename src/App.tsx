@@ -254,6 +254,20 @@ export default function App() {
   const [firstAccessVerificationCode, setFirstAccessVerificationCode] = useState<string>('');
   const [correctFirstAccessCode, setCorrectFirstAccessCode] = useState<string>('');
 
+  // --- STATES FOR SIMULATED EMAIL INBOX ---
+  const [simulatedEmails, setSimulatedEmails] = useState<any[]>(() => [
+    {
+      id: 'EML-WELCOME',
+      para: 'suporte@torque-log.com',
+      assunto: '🚀 Central de Simulador de E-mails TorqueLog Ativada',
+      corpo: 'Seja bem-vindo ao Hub de E-mails de Ativação B2B!\n\nEste painel foi ativado para resolver o problema de recebimento de e-mails de ativação em ambiente de visualização e testes.\n\nQualquer e-mail de confirmação de cadastro de cliente, ou código do "Primeiro Acesso" enviado pelo sistema, será entregue neste painel instantaneamente em tempo real com seu respectivo token.\n\nExperimente adicionar um cliente ou tentar o Primeiro Acesso para ver e-mails chegando aqui!\n\nAtenciosamente,\nEquipe de Engenharia TorqueLog',
+      data: new Date().toLocaleTimeString(),
+      lido: false
+    }
+  ]);
+  const [showSimulatedInbox, setShowSimulatedInbox] = useState<boolean>(false);
+  const [selectedSimulatedEmail, setSelectedSimulatedEmail] = useState<any | null>(null);
+
   // --- MOTOBOY REGISTRATION & SESSIONS (NEW COMPONENT REQUIREMENTS) ---
   const [motoboys, setMotoboys] = useState<Motoboy[]>(() => INITIAL_MOTOBOYS);
   const [isAddingNewMotoboy, setIsAddingNewMotoboy] = useState<boolean>(false);
@@ -724,7 +738,7 @@ export default function App() {
         setSelectedLoginUserId('');
       }
     } else if (loginRole === 'Cliente') {
-      const availableClientes = clientes.filter(c => c.criadoPor !== 'Cliente' && !c.criadoPorClienteId);
+      const availableClientes = clientes.filter(c => !c.criadoPorClienteId);
       if (availableClientes.length > 0) {
         if (!selectedLoginUserId || !availableClientes.some(c => c.id === selectedLoginUserId)) {
           setSelectedLoginUserId(availableClientes[0].id);
@@ -1020,7 +1034,7 @@ export default function App() {
 
   // Calculate monthly stats by distributor for the currently viewed month (calendarViewMonth / calendarViewYear)
   const monthlyDistributorStats = useMemo(() => {
-    const distributorsList = clientes.filter(c => c.criadoPor !== 'Cliente' && !c.criadoPorClienteId);
+    const distributorsList = clientes.filter(c => !c.criadoPorClienteId);
     
     return distributorsList.map(dist => {
       const completedOrdersThisMonth = ordens.filter(o => {
@@ -1267,6 +1281,18 @@ export default function App() {
 
     setClientes(prev => [novoCli, ...prev]);
     setIsAddingNewClient(false);
+
+    // Simulated Inbox Dispatch
+    const clientEmailEntry = {
+      id: `EML-${Math.floor(1005 + Math.random() * 8990)}`,
+      para: novoCli.email,
+      assunto: `🔑 Ativação de Cadastro B2B - ${novoCli.nome}`,
+      corpo: `Olá, ${novoCli.nome}!\n\nSua empresa foi pré-cadastrada com sucesso nas rotas agregadas da TorqueLog.\n\nPara realizar o seu auto-cadastro final, definir sua senha e habilitar o faturamento por CNPJ, acesse a área de login, selecione o Perfil "Cliente B2B", escolha o nome "${novoCli.nome}" na lista e tente entrar.\n\nO sistema abrirá a tela de Primeiro Acesso para você concluir o faturamento por CNPJ de forma descomplicada.\n\nSeu Código de Segurança / Token de Primeiro Acesso é: ${tempSenha}\n\nAtenciosamente,\nSuporte Técnico TorqueLog`,
+      codigo: tempSenha,
+      data: new Date().toLocaleTimeString(),
+      lido: false
+    };
+    setSimulatedEmails(prev => [clientEmailEntry, ...prev]);
 
     // Call Supabase native auth register link if configured (real integration)
     if (supabase) {
@@ -1736,6 +1762,19 @@ export default function App() {
       setSelfRegStep('verify');
       setIsSendingSelfRegEmail(false);
       setSupabaseSuccessMsg(`📩 Código de Ativação enviado para ${selfRegEmail}!`);
+
+      // Simulated Inbox Dispatch
+      const selfRegEmailMsg = {
+        id: `EML-${Math.floor(1005 + Math.random() * 8990)}`,
+        para: selfRegEmail,
+        assunto: `✉️ Confirmação de Autocadastro de Cliente Novo - ${selfRegNome}`,
+        corpo: `Olá, ${selfRegNome}!\n\nSeu código de segurança para validação e auto-ativação da sua conta de faturamento TorqueLog B2B é: ${code}.\n\nDigite este token na tela do sistema para ativar sua oficina/distribuidora e liberar login imediato.\n\nAtenciosamente,\nEquipe de Suporte TorqueLog`,
+        codigo: code,
+        data: new Date().toLocaleTimeString(),
+        lido: false
+      };
+      setSimulatedEmails(prev => [selfRegEmailMsg, ...prev]);
+
       setTimeout(() => setSupabaseSuccessMsg(''), 4000);
     }, 1200);
   };
@@ -2469,7 +2508,7 @@ export default function App() {
                           onChange={(e) => setSelectedLoginUserId(e.target.value)}
                           className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 pr-8 text-sm text-slate-300 focus:outline-none focus:border-orange-500 appearance-none cursor-pointer"
                         >
-                          {clientes.filter(c => c.criadoPor !== 'Cliente' && !c.criadoPorClienteId).map(c => (
+                          {clientes.filter(c => !c.criadoPorClienteId).map(c => (
                             <option key={c.id} value={c.id}>
                               {c.nome} ({c.cidade})
                             </option>
@@ -2634,7 +2673,7 @@ export default function App() {
                   <>
                     <span className="block text-[9px] text-slate-400 leading-none">Distribuidoras Cadastradas</span>
                     <span className="text-sm font-bold text-white">
-                      {clientes.filter(c => c.criadoPor !== 'Cliente' && !c.criadoPorClienteId).length}{' '}
+                      {clientes.filter(c => !c.criadoPorClienteId).length}{' '}
                       <span className="text-[10px] text-slate-400">ativas</span>
                     </span>
                   </>
@@ -4061,7 +4100,7 @@ export default function App() {
                     className="w-full bg-slate-50 border border-slate-250 text-slate-850 rounded-md p-1.5 text-xs font-bold focus:outline-none focus:border-orange-505 cursor-pointer"
                   >
                     <option value="Todas">📊 Todas as Distribuidoras (Geral)</option>
-                    {clientes.filter(c => c.criadoPor !== 'Cliente' && !c.criadoPorClienteId).map(dist => (
+                    {clientes.filter(c => !c.criadoPorClienteId).map(dist => (
                       <option key={dist.id} value={dist.id}>
                         🏢 {dist.nome} ({dist.cidade})
                       </option>
@@ -6793,6 +6832,18 @@ export default function App() {
                               setIsSendingFirstAccessEmail(false);
                               setFirstAccessEmailStep('verify_code');
                               setSupabaseSuccessMsg(`📩 E-mail enviado com código de segurança para ${firstAccessEmail}!`);
+
+                              const firstAccessEmailMsg = {
+                                id: `EML-${Math.floor(1005 + Math.random() * 8990)}`,
+                                para: firstAccessEmail,
+                                assunto: `🔐 Código de Ativação (1º Acesso) - TorqueLog`,
+                                corpo: `Olá!\n\nSeu código de segurança TorqueLog exclusivo para faturamento e-faturado B2B é: ${code}.\n\nInsira este token no formulário do Primeiro Acesso no painel para validar o e-mail da sua empresa e desbloquear seu login.\n\nAtenciosamente,\nSuporte Técnico TorqueLog`,
+                                codigo: code,
+                                data: new Date().toLocaleTimeString(),
+                                lido: false
+                              };
+                              setSimulatedEmails(prev => [firstAccessEmailMsg, ...prev]);
+
                               setTimeout(() => setSupabaseSuccessMsg(''), 5000);
                             }, 1200);
                           }}
@@ -6998,6 +7049,196 @@ export default function App() {
           </div>
         )}
       </AnimatePresence>
+
+      {/* 📬 INTERACTIVE SIMULATED EMAIL INBOX (CENTRAL DE NOTIFICAÇÕES & TOKENS B2B) */}
+      {activeSessionRole === 'Empresa' && (
+        <div className="fixed bottom-6 left-6 z-50 flex flex-col items-start transition-all" id="central-emails-simulados">
+          {!showSimulatedInbox ? (
+            <button
+              type="button"
+              onClick={() => setShowSimulatedInbox(true)}
+              className="flex items-center gap-2 bg-slate-900 border border-orange-500 hover:border-orange-400 text-white font-mono font-bold text-[11px] uppercase tracking-wide px-3.5 py-2.5 rounded-2xl shadow-2xl transition hover:scale-105 active:scale-95 cursor-pointer relative"
+            >
+              <span className="absolute -top-1.5 -right-1.5 shrink-0 bg-orange-500 text-white text-[9px] font-black w-5 h-5 rounded-full flex items-center justify-center border-2 border-slate-900 animate-bounce">
+                {simulatedEmails.length}
+              </span>
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-orange-500"></span>
+              </span>
+              <span>📬 Caixa de Entrada B2B</span>
+            </button>
+          ) : (
+            <div className="bg-slate-900/95 border border-slate-800 rounded-2xl shadow-2xl w-[350px] sm:w-[420px] max-h-[500px] flex flex-col overflow-hidden backdrop-blur-md animate-in fade-in slide-in-from-bottom-5 duration-200">
+              {/* Header */}
+              <div className="bg-slate-950 border-b border-slate-800 p-3.5 flex justify-between items-center">
+                <div className="flex items-center gap-2">
+                  <div className="relative">
+                    <span className="absolute top-0 right-0 w-2.5 h-2.5 bg-green-500 border-2 border-slate-950 rounded-full"></span>
+                    <span className="text-lg">📬</span>
+                  </div>
+                  <div>
+                    <h4 className="text-[11px] font-black text-white font-mono uppercase tracking-widest leading-none">SMTP Local Sandbox</h4>
+                    <p className="text-[9px] text-slate-400 font-mono mt-0.5 leading-none">Visualização Geral de E-mails Enviados</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSimulatedEmails([
+                        {
+                          id: 'EML-CLEARED',
+                          para: 'suporte@torque-log.com',
+                          assunto: '🧹 Caixa Limpa',
+                          corpo: 'A caixa de e-mails de simulação foi esvaziada.\n\nNovos registros ou tentativas de Primeiro Acesso gerarão novos e-mails simulados aqui em tempo real!',
+                          data: new Date().toLocaleTimeString(),
+                          lido: true
+                        }
+                      ]);
+                      setSelectedSimulatedEmail(null);
+                    }}
+                    className="bg-slate-900 hover:bg-slate-850 text-slate-400 hover:text-white px-2 py-1 text-[9px] font-mono border border-slate-800 rounded-lg cursor-pointer"
+                    title="Esvaziar todos os e-mails"
+                  >
+                    Limpar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowSimulatedInbox(false)}
+                    className="text-slate-400 hover:text-white font-mono text-[11px] font-black hover:bg-slate-850 w-6 h-6 rounded-lg flex items-center justify-center cursor-pointer transition"
+                  >
+                    ✕
+                  </button>
+                </div>
+              </div>
+
+              {/* Email list or selected email details */}
+              <div className="flex-1 overflow-y-auto p-3 space-y-2.5 max-h-[380px] min-h-[220px]">
+                {selectedSimulatedEmail ? (
+                  // VIEW EMAIL DETAILS
+                  <div className="space-y-3 font-mono text-[11px]">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedSimulatedEmail(null)}
+                      className="text-orange-400 hover:text-orange-350 cursor-pointer flex items-center gap-1 font-bold mb-2 text-[10px]"
+                    >
+                      ← Voltar para Caixa de Entrada
+                    </button>
+                    <div className="bg-slate-950/80 border border-slate-850 p-2.5 rounded-xl space-y-1 text-slate-300">
+                      <p><span className="text-slate-500">De:</span> <strong className="text-white">suporte@torquelog.com.br</strong></p>
+                      <p><span className="text-slate-500">Para:</span> <strong className="text-emerald-400 select-all">{selectedSimulatedEmail.para}</strong></p>
+                      <p><span className="text-slate-500">Data:</span> <strong className="text-slate-400">{selectedSimulatedEmail.data}</strong></p>
+                      <p className="border-t border-slate-900 pt-1.5 mt-1.5"><span className="text-slate-500">Assunto:</span> <strong className="text-white">{selectedSimulatedEmail.assunto}</strong></p>
+                    </div>
+                    
+                    <div className="bg-slate-950 p-3 rounded-xl border border-slate-850 text-xs text-slate-300 leading-relaxed whitespace-pre-wrap select-text">
+                      {selectedSimulatedEmail.corpo}
+                    </div>
+
+                    {selectedSimulatedEmail.codigo && (
+                      <div className="p-3 bg-slate-950 rounded-xl border border-orange-500/30 flex flex-col items-center gap-2">
+                        <p className="text-[10px] text-slate-400 tracking-wider text-center">🔐 CHAVE DE ATIVAÇÃO IDENTIFICADA</p>
+                        <strong className="text-base text-orange-400 select-all font-mono tracking-widest bg-slate-900 px-3 py-1 border border-orange-500/20 rounded-md">
+                          {selectedSimulatedEmail.codigo}
+                        </strong>
+                        <div className="flex gap-2 w-full pt-1">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              navigator.clipboard.writeText(selectedSimulatedEmail.codigo);
+                              setSupabaseSuccessMsg(`📋 Token ${selectedSimulatedEmail.codigo} copiado!`);
+                              setTimeout(() => setSupabaseSuccessMsg(''), 3000);
+                            }}
+                            className="flex-1 text-center py-1.5 bg-slate-800 hover:bg-slate-750 text-white font-bold rounded-lg cursor-pointer font-mono text-[10px] border border-slate-700 active:scale-95 transition-all"
+                          >
+                            📋 Copiar Token
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const cod = selectedSimulatedEmail.codigo;
+                              // Pre fill both types of confirmation inputs based on prefix/format
+                              if (cod.startsWith('temp-')) {
+                                // It is direct login temp senha, we copy it and show how to login!
+                                navigator.clipboard.writeText(cod);
+                                alert(`Seu token de Primeiro Acesso é ${cod} (copiado). Faça o login com o perfil "Cliente B2B", selecione seu nome e digite este token as senha!`);
+                              } else {
+                                // Put into active verification inputs
+                                setSelfRegVerificationCode(cod);
+                                setFirstAccessVerificationCode(cod);
+                                setSupabaseSuccessMsg("⚡ Token pré-preenchido nos formulários!");
+                                setTimeout(() => setSupabaseSuccessMsg(''), 3000);
+                              }
+                            }}
+                            className="flex-1 text-center py-1.5 bg-orange-500 hover:bg-orange-600 active:scale-95 text-white font-bold rounded-lg cursor-pointer font-mono text-[10px] shadow-sm transform transition-all"
+                          >
+                            ⚡ Usar Automático
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  // LIST DISPATCHED EMAILS
+                  <div className="space-y-2">
+                    <p className="text-[10px] text-slate-455 uppercase font-mono tracking-wider pl-1 font-bold">Mensagens Recebidas ({simulatedEmails.length})</p>
+                    
+                    {simulatedEmails.length === 0 ? (
+                      <div className="p-8 text-center text-slate-500 italic font-mono text-[11px]">
+                        Nenhum e-mail transitando no momento.
+                      </div>
+                    ) : (
+                      <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
+                        {simulatedEmails.map((eml) => (
+                          <div
+                            key={eml.id}
+                            onClick={() => {
+                              setSelectedSimulatedEmail(eml);
+                              eml.lido = true;
+                            }}
+                            className={`p-3 rounded-xl border border-slate-850 hover:border-slate-700 bg-slate-950/40 hover:bg-slate-950/90 transition-all cursor-pointer group text-left ${!eml.lido ? 'border-l-4 border-l-orange-500' : ''}`}
+                          >
+                            <div className="flex justify-between items-start">
+                              <span className="text-[10px] text-emerald-400 font-mono font-bold truncate max-w-[200px]">
+                                Para: {eml.para}
+                              </span>
+                              <span className="text-[9px] text-slate-505 font-mono font-medium shrink-0">
+                                {eml.data}
+                              </span>
+                            </div>
+                            <h5 className="text-[11px] font-bold text-white group-hover:text-orange-400 mt-1 truncate font-sans">
+                              {eml.assunto}
+                            </h5>
+                            <p className="text-[10px] text-slate-400 mt-0.5 line-clamp-2 leading-relaxed">
+                              {eml.corpo.replace(/\n/g, ' ')}
+                            </p>
+                            {eml.codigo && (
+                              <span className="inline-block mt-2 font-mono text-[9px] bg-slate-900 border border-slate-800 text-orange-400 px-1.5 py-0.5 rounded-md font-bold">
+                                Código: {eml.codigo}
+                              </span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    
+                    <div className="pt-2 border-t border-slate-800 mt-2 text-[10px] leading-relaxed text-slate-500 font-mono">
+                      💡 <strong>Testando Fluxo:</strong> Registre um cliente novo no painel Administrador. O e-mail de Primeiro Acesso chegará aqui imediatamente!
+                    </div>
+                  </div>
+                )}
+              </div>
+              
+              {/* Footer */}
+              <div className="bg-slate-950/80 border-t border-slate-850 px-3 py-2 flex items-center justify-between text-[9px] text-slate-500 font-mono">
+                <span>Sessão: Ativa e Conectada</span>
+                <span className="text-slate-400 hover:text-white transition cursor-pointer" onClick={() => setSelectedSimulatedEmail(null)}>Voltar</span>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Floating Supabase Live Status Toast */}
       {supabaseSuccessMsg && (
