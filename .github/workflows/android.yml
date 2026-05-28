@@ -34,7 +34,6 @@ jobs:
 
       - name: Add and Sync Capacitor Android
         run: |
-          npm install @capacitor/core @capacitor/cli @capacitor/android
           npx cap add android || true
           npx cap sync android
 
