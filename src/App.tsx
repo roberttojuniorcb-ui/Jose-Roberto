@@ -51,6 +51,7 @@ import {
   syncRotasToFirebase,
   deleteClienteFromFirebase,
   deleteMotoboyFromFirebase,
+  deleteOrdemFromFirebase,
   loadInitialDataFromFirebase
 } from './utils/firebaseClient';
 import { 
@@ -59,7 +60,8 @@ import {
   syncClientesToSupabase,
   syncOrdensToSupabase,
   syncMotoboysToSupabase,
-  syncRotasToSupabase
+  syncRotasToSupabase,
+  deleteOrdemFromSupabase
 } from './utils/supabaseClient';
 import { 
   analisarCubagemAutopeças, 
@@ -291,7 +293,7 @@ export default function App() {
   const [editMotoboyEmpresaExclusiva, setEditMotoboyEmpresaExclusiva] = useState<string>('');
 
   // --- STATES FOR EXCLUSION CONFIRMATION ---
-  const [deleteConfirmType, setDeleteConfirmType] = useState<'cliente' | 'motoboy' | 'multiple-clientes' | null>(null);
+  const [deleteConfirmType, setDeleteConfirmType] = useState<'cliente' | 'motoboy' | 'multiple-clientes' | 'ordem' | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [deleteConfirmName, setDeleteConfirmName] = useState<string>('');
   const [selectedClientIds, setSelectedClientIds] = useState<string[]>([]);
@@ -1418,6 +1420,15 @@ export default function App() {
     setDeleteConfirmName(targetMb.nome);
   };
 
+  // Cancel/delete delivery order - Open confirmation modal
+  const handleCancelarOrdem = (ordemId: string) => {
+    const targetO = ordens.find(o => o.id === ordemId);
+    if (!targetO) return;
+    setDeleteConfirmType('ordem');
+    setDeleteConfirmId(ordemId);
+    setDeleteConfirmName(`Ordem de Serviço ${ordemId} (${targetO.destinatarioNome || targetO.enderecoEntrega || 'Sem Oficina/Destino'})`);
+  };
+
   // Update motoboy credentials or situation (CRUD update)
   const handleUpdateMotoboy = (e: React.FormEvent) => {
     e.preventDefault();
@@ -1551,6 +1562,31 @@ export default function App() {
         }
 
         setSupabaseSuccessMsg(`❌ Motoboy "${targetMb.nome}" excluído com sucesso!`);
+        setTimeout(() => setSupabaseSuccessMsg(''), 4000);
+      }
+    } else if (deleteConfirmType === 'ordem') {
+      const ordemId = deleteConfirmId;
+      const targetO = ordens.find(o => o.id === ordemId);
+      if (targetO) {
+        setOrdens(prev => prev.filter(o => o.id !== ordemId));
+
+        if (isFirebaseConfigured) {
+          try {
+            await deleteOrdemFromFirebase(ordemId);
+          } catch (err) {
+            console.error("Erro ao deletar ordem no Firebase:", err);
+          }
+        }
+
+        if (supabase) {
+          try {
+            await deleteOrdemFromSupabase(ordemId);
+          } catch (err) {
+            console.error("Erro ao deletar ordem no Supabase:", err);
+          }
+        }
+
+        setSupabaseSuccessMsg(`❌ Entrega "${ordemId}" cancelada com sucesso!`);
         setTimeout(() => setSupabaseSuccessMsg(''), 4000);
       }
     }
@@ -4010,6 +4046,15 @@ export default function App() {
                         </div>
                         
                         <div className="flex gap-2.5">
+                          {o.status !== 'Entregue' && (
+                            <button
+                              type="button"
+                              onClick={() => handleCancelarOrdem(o.id)}
+                              className="bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 font-mono text-xs font-bold py-1.5 px-3 rounded-lg flex items-center gap-1 cursor-pointer shadow-sm transition-colors"
+                            >
+                              ✕ Cancelar
+                            </button>
+                          )}
                           {o.status === 'Buscando Parceiro' || o.status === 'Pendente' ? (
                             <button
                               type="button"
@@ -4670,7 +4715,6 @@ export default function App() {
                       </div>
 
                       <div className="flex sm:flex-col items-end gap-2 shrink-0 w-full sm:w-auto border-t sm:border-t-0 pt-2 sm:pt-0 mt-1 sm:mt-0">
-                        
                         {o.status !== 'Moto a Caminho' ? (
                           <button
                             onClick={() => handleAtualizarStatusOrdem(o.id, 'Moto a Caminho')}
@@ -4688,6 +4732,13 @@ export default function App() {
                             Entregar e Assinar ✍️
                           </button>
                         )}
+                        <button
+                          type="button"
+                          onClick={() => handleCancelarOrdem(o.id)}
+                          className="bg-red-50 hover:bg-red-100 text-red-600 border border-red-100 font-mono text-[10px] font-bold py-1.5 px-2.5 rounded-lg active:scale-95 transition cursor-pointer w-full sm:w-auto text-center justify-center flex items-center gap-1"
+                        >
+                          ✕ Cancelar Entrega
+                        </button>
                       </div>
                     </div>
                   ))
@@ -5387,12 +5438,21 @@ export default function App() {
                       )}
                     </div>
 
-                    <div className="text-right font-mono self-end sm:self-center pr-2 shrink-0 border-t sm:border-t-0 border-slate-100 sm:pt-0 pt-2 w-full sm:w-auto">
+                    <div className="text-right font-mono self-end sm:self-center pr-2 shrink-0 border-t sm:border-t-0 border-slate-100 sm:pt-0 pt-2 w-full sm:w-auto flex flex-col items-end gap-1.5">
                       <span className={`text-[10px] font-bold px-2.5 py-1 rounded ${o.status === 'Entregue' ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600'}`}>
                         {o.status === 'Entregue' ? '✓ Conclída com Sucesso' : '• Em Andamento'}
                       </span>
                       {o.retornoPeca && (
-                        <span className="text-[9px] text-rose-600 block font-bold mt-1">🔄 Coleta Reversa Ativa</span>
+                        <span className="text-[9px] text-rose-600 block font-bold">🔄 Coleta Reversa Ativa</span>
+                      )}
+                      {o.status !== 'Entregue' && (
+                        <button
+                          type="button"
+                          onClick={() => handleCancelarOrdem(o.id)}
+                          className="bg-red-50 hover:bg-red-100 text-red-600 border border-red-100 hover:border-red-200 text-[10px] font-bold py-1 px-2.5 rounded-lg active:scale-95 transition cursor-pointer text-center flex items-center justify-center gap-1 w-full sm:w-auto"
+                        >
+                          ✕ Cancelar
+                        </button>
                       )}
                     </div>
                   </div>

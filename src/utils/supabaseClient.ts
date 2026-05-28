@@ -148,3 +148,19 @@ export async function syncRotasToSupabase(rotas: any[]) {
     return null;
   }
 }
+
+export async function deleteOrdemFromSupabase(ordemId: string) {
+  if (!supabase) return null;
+  try {
+    const { error } = await supabase
+      .from('ordens_servico')
+      .delete()
+      .eq('id', ordemId);
+    if (error) throw error;
+    return true;
+  } catch (err) {
+    console.error("Failed to delete Ordem de Serviço from Supabase:", err);
+    return null;
+  }
+}
+
