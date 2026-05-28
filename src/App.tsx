@@ -86,8 +86,8 @@ export default function App() {
     return [
       {
         id: "OS-5041",
-        clienteId: "CLI-A-1002",
-        clienteNome: "Mecânica Moreira #2",
+        clienteId: "CLI-BARROS",
+        clienteNome: "BARROS AUTOPEÇAS",
         quadrante: "A",
         itensDescricao: "1x Jogo de Pastilhas de Freio Fras-le LD, 1x Cabo de Vela",
         itensAnalistas: [
@@ -104,17 +104,17 @@ export default function App() {
       },
       {
         id: "OS-4932",
-        clienteId: "CLI-C-1005",
-        clienteNome: "Auto Elétrica Oliveira #5",
-        quadrante: "C",
+        clienteId: "CLI-MARIA",
+        clienteNome: "MARIA ANDRADE",
+        quadrante: "B",
         itensDescricao: "4x Amortecedores Cofap (Kit Completo LD+LE)",
         itensAnalistas: [
           { descricao: "4x Amortecedores", quantidade: 4, tipo: "amortecedores", cubagemPesoScore: 140 }
         ],
         retornoPeca: true,
         taxaReversa: 18.50,
-        valorPagoMotoboy: 5.50,
-        valorCobradoCliente: 13.00,
+        valorPagoMotoboy: 4.00,
+        valorCobradoCliente: 10.00,
         criadoEm: new Date(Date.now() - 12 * 60 * 1000).toISOString(),
         status: "Buscando Parceiro",
         travaCubagemStatus: "Bloqueado - Excesso de Volume",
@@ -123,9 +123,9 @@ export default function App() {
       },
       {
         id: "OS-4801",
-        clienteId: "CLI-B-1011",
-        clienteNome: "Stop Car Pires #11",
-        quadrante: "B",
+        clienteId: "CLI-BARROS",
+        clienteNome: "BARROS AUTOPEÇAS",
+        quadrante: "A",
         itensDescricao: "2x Filtros de Óleo Tecfil cx",
         itensAnalistas: [
           { descricao: "2x Filtros", quantidade: 2, tipo: "filtros", cubagemPesoScore: 20 }
@@ -141,8 +141,8 @@ export default function App() {
       },
       {
         id: "OS-4700",
-        clienteId: "CLI-A-1002",
-        clienteNome: "Mecânica Moreira #2",
+        clienteId: "CLI-BARROS",
+        clienteNome: "BARROS AUTOPEÇAS",
         quadrante: "A",
         itensDescricao: "1x Disco de Freio MDS + Jogo Pastilhas",
         itensAnalistas: [
@@ -160,9 +160,9 @@ export default function App() {
       },
       {
         id: "OS-4699",
-        clienteId: "CLI-A-1002",
-        clienteNome: "Mecânica Moreira #2",
-        quadrante: "A",
+        clienteId: "CLI-MARIA",
+        clienteNome: "MARIA ANDRADE",
+        quadrante: "B",
         itensDescricao: "2x Amortecedores Nakata",
         itensAnalistas: [],
         retornoPeca: false,
@@ -228,7 +228,10 @@ export default function App() {
   const [firstAccessClientId, setFirstAccessClientId] = useState<string>('');
   const [firstAccessCNPJ, setFirstAccessCNPJ] = useState<string>('');
   const [firstAccessInscricaoEstadual, setFirstAccessInscricaoEstadual] = useState<string>('');
+  const [firstAccessCEP, setFirstAccessCEP] = useState<string>('');
+  const [isFetchingFirstAccessCEP, setIsFetchingFirstAccessCEP] = useState<boolean>(false);
   const [firstAccessEndereco, setFirstAccessEndereco] = useState<string>('');
+  const [firstAccessCidade, setFirstAccessCidade] = useState<string>('');
   const [firstAccessTelefone, setFirstAccessTelefone] = useState<string>('');
   const [firstAccessEmail, setFirstAccessEmail] = useState<string>('');
   const [firstAccessSenha, setFirstAccessSenha] = useState<string>('');
@@ -272,9 +275,10 @@ export default function App() {
   const [editMotoboyEmpresaExclusiva, setEditMotoboyEmpresaExclusiva] = useState<string>('');
 
   // --- STATES FOR EXCLUSION CONFIRMATION ---
-  const [deleteConfirmType, setDeleteConfirmType] = useState<'cliente' | 'motoboy' | null>(null);
+  const [deleteConfirmType, setDeleteConfirmType] = useState<'cliente' | 'motoboy' | 'multiple-clientes' | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [deleteConfirmName, setDeleteConfirmName] = useState<string>('');
+  const [selectedClientIds, setSelectedClientIds] = useState<string[]>([]);
 
   // Multi-session credentials portal states
   const [logoVariant, setLogoVariant] = useState<'esportivo' | 'premium'>('esportivo');
@@ -655,6 +659,21 @@ export default function App() {
   const [destinoQuadrante, setDestinoQuadrante] = useState<Quadrante>('A');
   const [destinoClienteId, setDestinoClienteId] = useState<string>('');
 
+  // Synchronize destinoClienteId state to avoid empty / invalid selections
+  useEffect(() => {
+    if (destinoTipo === 'cliente' && activeClienteUser) {
+      const validSubClients = clientes.filter(c => c.criadoPorClienteId === activeClienteUser.id && c.quadrante === destinoQuadrante);
+      if (validSubClients.length > 0) {
+        // If current selected ID is not in the valid sub clients, reset to the first one available
+        if (!validSubClients.some(c => c.id === destinoClienteId)) {
+          setDestinoClienteId(validSubClients[0].id);
+        }
+      } else {
+        setDestinoClienteId('');
+      }
+    }
+  }, [destinoTipo, destinoQuadrante, clientes, activeClienteUser, destinoClienteId]);
+
   // --- STATE FOR LIVE API EXPORTER & TERMINAL ---
   const [apiResponseLog, setApiResponseLog] = useState<APIResponse | null>(null);
   const [apiLogTimestamp, setApiLogTimestamp] = useState<string>('');
@@ -689,18 +708,41 @@ export default function App() {
     }
   }, [selectedQuadrant, filteredClientListForDispatch]);
 
-  // Synchronize login selector defaults when role changes
+  // Synchronize login selector defaults when role details or list changes
   useEffect(() => {
     setLoginError('');
     setLoginPasswordInput('');
-    if (loginRole === 'Motoboy' && motoboys.length > 0) {
-      setSelectedLoginUserId(motoboys[0].id);
-    } else if (loginRole === 'Cliente' && clientes.length > 0) {
-      setSelectedLoginUserId(clientes[0].id);
+    if (loginRole === 'Motoboy') {
+      if (motoboys.length > 0) {
+        if (!selectedLoginUserId || !motoboys.some(m => m.id === selectedLoginUserId)) {
+          setSelectedLoginUserId(motoboys[0].id);
+        }
+      } else {
+        setSelectedLoginUserId('');
+      }
+    } else if (loginRole === 'Cliente') {
+      const availableClientes = clientes.filter(c => 
+        (!c.criadoPorClienteId) && 
+        c.id !== 'CLI-BARROS' && 
+        c.id !== 'CLI-MARIA' &&
+        c.nome !== 'BARROS AUTOPEÇAS' &&
+        c.nome !== 'MARIA ANDRADE'
+      );
+      if (availableClientes.length > 0) {
+        if (!selectedLoginUserId || !availableClientes.some(c => c.id === selectedLoginUserId)) {
+          setSelectedLoginUserId(availableClientes[0].id);
+        }
+      } else if (clientes.length > 0) {
+        if (!selectedLoginUserId || !clientes.some(c => c.id === selectedLoginUserId)) {
+          setSelectedLoginUserId(clientes[0].id);
+        }
+      } else {
+        setSelectedLoginUserId('');
+      }
     } else {
       setSelectedLoginUserId('');
     }
-  }, [loginRole]);
+  }, [loginRole, clientes, motoboys]);
 
   // Analyze active draft cubage scoring in real-time
   const cubageAnalysis = useMemo(() => {
@@ -966,12 +1008,13 @@ export default function App() {
   // Filter clients to show on the visual directory panel filtered by selected admin city (Quadrants / Sectors removed as per user instruction and limited to 5 examples for testing)
   const directoryFilteredClients = useMemo(() => {
     return clientes.filter(c => {
+      if (c.criadoPor === 'Cliente') return false; // Hide sub-clients in directory list of distributors
       const matchCity = selectedAdminCity === 'Todas' || c.cidade === selectedAdminCity;
       const matchSearch = c.nome.toLowerCase().includes(clienteSearchTerm.toLowerCase()) || 
                           c.endereco.toLowerCase().includes(clienteSearchTerm.toLowerCase()) ||
                           c.id.toLowerCase().includes(clienteSearchTerm.toLowerCase());
       return matchCity && (clienteSearchTerm === '' || matchSearch);
-    }).slice(0, 5);
+    });
   }, [clientes, clienteSearchTerm, selectedAdminCity]);
 
   // Sector-wide totals of client faturamento filtered by selected city and quadrant
@@ -1289,7 +1332,48 @@ export default function App() {
 
   // Execute actual deletion from state-based confirmation modal
   const executeConfirmDelete = async () => {
-    if (!deleteConfirmType || !deleteConfirmId) return;
+    if (!deleteConfirmType) return;
+
+    if (deleteConfirmType === 'multiple-clientes') {
+      const idsToDelete = selectedClientIds;
+      if (idsToDelete.length > 0) {
+        setClientes(prev => prev.filter(c => !idsToDelete.includes(c.id)));
+
+        if (isFirebaseConfigured) {
+          for (const id of idsToDelete) {
+            try {
+              await deleteClienteFromFirebase(id);
+            } catch (err) {
+              console.error("Erro ao deletar cliente no Firebase:", err);
+            }
+          }
+        }
+
+        if (supabase) {
+          for (const id of idsToDelete) {
+            try {
+              const { error } = await supabase
+                .from('clientes')
+                .delete()
+                .eq('id', id);
+              if (error) console.error("Erro ao deletar cliente no Supabase:", error.message);
+            } catch (err) {
+              console.error("Falha ao deletar cliente no Supabase:", err);
+            }
+          }
+        }
+
+        setSupabaseSuccessMsg(`❌ ${idsToDelete.length} Distribuidora(s) excluída(s) com sucesso!`);
+        setTimeout(() => setSupabaseSuccessMsg(''), 4000);
+      }
+      setSelectedClientIds([]);
+      setDeleteConfirmType(null);
+      setDeleteConfirmId(null);
+      setDeleteConfirmName('');
+      return;
+    }
+
+    if (!deleteConfirmId) return;
 
     if (deleteConfirmType === 'cliente') {
       const clientId = deleteConfirmId;
@@ -1362,7 +1446,7 @@ export default function App() {
   };
 
   // --- INTEGRATED VIA CEP LOOKUP ENGINE (AUTO-RESOLVE ADRESS/CITY) ---
-  const handleFetchCEP = async (cep: string, target: 'selfReg' | 'newClient' | 'editClient' | 'clientNewClient') => {
+  const handleFetchCEP = async (cep: string, target: 'selfReg' | 'newClient' | 'editClient' | 'clientNewClient' | 'firstAccess') => {
     const cleanedCEP = cep.replace(/\D/g, '');
     if (cleanedCEP.length !== 8) return;
 
@@ -1370,6 +1454,7 @@ export default function App() {
     else if (target === 'newClient') setIsFetchingNewClientCEP(true);
     else if (target === 'editClient') setIsFetchingEditClientCEP(true);
     else if (target === 'clientNewClient') setIsClientFetchingNewClientCEP(true);
+    else if (target === 'firstAccess') setIsFetchingFirstAccessCEP(true);
 
     try {
       const response = await fetch(`https://viacep.com.br/ws/${cleanedCEP}/json/`);
@@ -1390,6 +1475,9 @@ export default function App() {
         } else if (target === 'clientNewClient') {
           setClientNewClientEndereco(fullAddress);
           setClientNewClientCidade(cityState);
+        } else if (target === 'firstAccess') {
+          setFirstAccessEndereco(fullAddress);
+          setFirstAccessCidade(cityState);
         }
       } else {
         console.warn("CEP não encontrado no ViaCEP.");
@@ -1401,10 +1489,11 @@ export default function App() {
       else if (target === 'newClient') setIsFetchingNewClientCEP(false);
       else if (target === 'editClient') setIsFetchingEditClientCEP(false);
       else if (target === 'clientNewClient') setIsClientFetchingNewClientCEP(false);
+      else if (target === 'firstAccess') setIsFetchingFirstAccessCEP(false);
     }
   };
 
-  const handleCEPChange = (val: string, target: 'selfReg' | 'newClient' | 'editClient' | 'clientNewClient') => {
+  const handleCEPChange = (val: string, target: 'selfReg' | 'newClient' | 'editClient' | 'clientNewClient' | 'firstAccess') => {
     let formatted = val.replace(/\D/g, '');
     if (formatted.length > 8) formatted = formatted.slice(0, 8);
     
@@ -1432,6 +1521,11 @@ export default function App() {
       setClientNewClientCEP(displayVal);
       if (formatted.length === 8) {
         handleFetchCEP(formatted, 'clientNewClient');
+      }
+    } else if (target === 'firstAccess') {
+      setFirstAccessCEP(displayVal);
+      if (formatted.length === 8) {
+        handleFetchCEP(formatted, 'firstAccess');
       }
     }
   };
@@ -1685,6 +1779,8 @@ export default function App() {
       ...target,
       cnpj: firstAccessCNPJ,
       inscricaoEstadual: firstAccessInscricaoEstadual || 'Isento',
+      cep: firstAccessCEP,
+      cidade: firstAccessCidade || target.cidade || 'Passos - MG',
       endereco: firstAccessEndereco,
       telefone: firstAccessTelefone,
       senha: firstAccessSenha,
@@ -1712,7 +1808,9 @@ export default function App() {
     setFirstAccessClientId('');
     setFirstAccessCNPJ('');
     setFirstAccessInscricaoEstadual('');
+    setFirstAccessCEP('');
     setFirstAccessEndereco('');
+    setFirstAccessCidade('');
     setFirstAccessTelefone('');
     setFirstAccessEmail('');
     setFirstAccessSenha('');
@@ -2255,7 +2353,13 @@ export default function App() {
                           onChange={(e) => setSelectedLoginUserId(e.target.value)}
                           className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 pr-8 text-sm text-slate-300 focus:outline-none focus:border-orange-500 appearance-none cursor-pointer"
                         >
-                          {clientes.slice(0, 40).map(c => (
+                          {clientes.filter(c => 
+                            (!c.criadoPorClienteId) && 
+                            c.id !== 'CLI-BARROS' && 
+                            c.id !== 'CLI-MARIA' &&
+                            c.nome !== 'BARROS AUTOPEÇAS' &&
+                            c.nome !== 'MARIA ANDRADE'
+                          ).map(c => (
                             <option key={c.id} value={c.id}>
                               {c.nome} ({c.cidade})
                             </option>
@@ -2420,7 +2524,13 @@ export default function App() {
                   <>
                     <span className="block text-[9px] text-slate-400 leading-none">Distribuidoras Cadastradas</span>
                     <span className="text-sm font-bold text-white">
-                      {clientes.filter(c => c.criadoPor !== 'Cliente').length}{' '}
+                      {clientes.filter(c => 
+                        (!c.criadoPorClienteId) && 
+                        c.id !== 'CLI-BARROS' && 
+                        c.id !== 'CLI-MARIA' &&
+                        c.nome !== 'BARROS AUTOPEÇAS' &&
+                        c.nome !== 'MARIA ANDRADE'
+                      ).length}{' '}
                       <span className="text-[10px] text-slate-400">ativas</span>
                     </span>
                   </>
@@ -3137,8 +3247,7 @@ export default function App() {
                 Nova Distribuidora
               </button>
             </div>
-
-            {/* Quick Search */}
+                         {/* Quick Search */}
             <div className="relative mb-3">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               <input
@@ -3148,6 +3257,46 @@ export default function App() {
                 onChange={(e) => setClienteSearchTerm(e.target.value)}
                 className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded-lg pl-8.5 pr-3 py-1.5 text-xs font-mono"
               />
+            </div>
+
+            {/* Multiselection Toolbar */}
+            <div className="flex items-center justify-between gap-2 mb-3.5 p-2 bg-slate-100 border border-slate-205 rounded-xl shadow-xs">
+              <div className="flex items-center gap-2 pl-1 select-none">
+                <input
+                  type="checkbox"
+                  id="checkbox-select-all-distributors"
+                  checked={directoryFilteredClients.length > 0 && directoryFilteredClients.every(c => selectedClientIds.includes(c.id))}
+                  onChange={(e) => {
+                    if (e.target.checked) {
+                      const allFilteredIds = directoryFilteredClients.map(c => c.id);
+                      setSelectedClientIds(prev => Array.from(new Set([...prev, ...allFilteredIds])));
+                    } else {
+                      const allFilteredIds = directoryFilteredClients.map(c => c.id);
+                      setSelectedClientIds(prev => prev.filter(id => !allFilteredIds.includes(id)));
+                    }
+                  }}
+                  className="w-4 h-4 rounded border-slate-300 text-orange-500 focus:ring-orange-500 cursor-pointer accent-orange-550"
+                />
+                <label htmlFor="checkbox-select-all-distributors" className="text-[11px] font-mono font-bold text-slate-700 cursor-pointer">
+                  {selectedClientIds.length > 0 ? `Selecionados: ${selectedClientIds.length}` : "Selecionar tudo"}
+                </label>
+              </div>
+              
+              {selectedClientIds.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDeleteConfirmType('multiple-clientes');
+                    setDeleteConfirmId('multiple');
+                    const selectedNames = clientes.filter(c => selectedClientIds.includes(c.id)).map(c => c.nome).join(', ');
+                    setDeleteConfirmName(selectedNames);
+                  }}
+                  className="bg-red-650 hover:bg-red-705 text-white font-mono text-[9.5px] font-bold py-1 px-2.5 rounded-lg border border-red-500 shadow-sm cursor-pointer active:scale-95 transition-all flex items-center gap-1 shrink-0"
+                >
+                  <Trash2 className="w-3 h-3 text-white" />
+                  Excluir Selecionados ({selectedClientIds.length})
+                </button>
+              )}
             </div>
 
             {/* List limit scroll */}
@@ -3160,69 +3309,85 @@ export default function App() {
                       ? 'bg-emerald-50/80 hover:bg-emerald-100/90 border-emerald-300 shadow-xs' 
                       : 'bg-slate-50/50 border-transparent hover:border-slate-200'
                   }`}>
-                    <div className="truncate flex-1 space-y-1">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-bold text-slate-900 truncate block text-xs">{cli.nome}</span>
-                        <span className="text-[9px] bg-slate-205 text-slate-705 px-1.5 rounded font-mono font-bold shrink-0">{cli.id}</span>
-                        {(cli.isSelfRegistered || cli.criadoPor === 'Cliente') && (
-                          <span className="text-[8.5px] bg-emerald-600 font-extrabold text-white px-2 py-0.5 rounded-md uppercase tracking-wider font-mono shrink-0 animate-pulse">
-                            🟢 CLIENTE NOVO
+                    <div className="flex gap-2.5 items-start flex-1 truncate">
+                      <div className="pt-0.5 shrink-0 select-none">
+                        <input
+                          type="checkbox"
+                          checked={selectedClientIds.includes(cli.id)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedClientIds(prev => [...prev, cli.id]);
+                            } else {
+                              setSelectedClientIds(prev => prev.filter(id => id !== cli.id));
+                            }
+                          }}
+                          className="w-3.5 h-3.5 rounded border-slate-300 text-orange-500 focus:ring-orange-500 cursor-pointer accent-orange-550"
+                        />
+                      </div>
+                      <div className="truncate flex-1 space-y-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-bold text-slate-900 truncate block text-xs">{cli.nome}</span>
+                          <span className="text-[9px] bg-slate-205 text-slate-705 px-1.5 rounded font-mono font-bold shrink-0">{cli.id}</span>
+                          {(cli.isSelfRegistered || cli.criadoPor === 'Cliente') && (
+                            <span className="text-[8.5px] bg-emerald-600 font-extrabold text-white px-2 py-0.5 rounded-md uppercase tracking-wider font-mono shrink-0 animate-pulse">
+                              🟢 CLIENTE NOVO
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-[10px] text-slate-500 font-mono block truncate">{cli.endereco}</span>
+                        
+                        <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[9px] font-mono text-slate-400">
+                          <span className="bg-slate-900 text-slate-300 font-black px-1 rounded-xs uppercase tracking-tight text-[8px]">{cli.cidade || 'Passos - MG'}</span>
+                          <span>Cobrança padrão: <strong className="text-emerald-700">R$ {(cli.valorCobradoCliente || 10.00).toFixed(2)}</strong></span>
+                          <span>•</span>
+                          <span>Repasse: <strong className="text-rose-600">R$ {(cli.valorPagoMotoboy || 4.00).toFixed(2)}</strong></span>
+                        </div>
+
+                        <div className="mt-1 flex items-center gap-1.5 bg-slate-200 px-2 py-0.5 rounded border border-slate-300 w-fit">
+                          <span className="w-1.5 h-1.5 rounded-full bg-orange-500 animate-pulse"></span>
+                          <span className="text-[9px] font-mono text-slate-700 uppercase font-bold">
+                            Motoboys Ativos: <span className="text-slate-950 font-extrabold">{cli.motoboysAtivos || 0}</span>
                           </span>
+                        </div>
+
+                        {/* Sync Email and Activation Status controls (Requested Supabase sync and email settings) */}
+                        {cli.email && (
+                          <div className="mt-1 ml-0.5 flex flex-wrap items-center gap-2 text-[9px] font-mono">
+                            <span className="text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">📧 {cli.email}</span>
+                            {cli.emailConfirmado ? (
+                              <span className="bg-emerald-100 text-emerald-800 font-black uppercase tracking-wider px-1.5 py-0.5 rounded text-[8px] border border-emerald-300 flex items-center gap-1">
+                                ● Ativo B2B
+                              </span>
+                            ) : (
+                              <span className="bg-amber-100 text-amber-800 font-black uppercase tracking-wider px-1.5 py-0.5 rounded text-[8px] border border-amber-350 animate-pulse">
+                                ⏳ Confirm. Pendente
+                              </span>
+                            )}
+                            {!cli.emailConfirmado && (
+                              <button
+                                type="button"
+                                onClick={() => handleConfirmarEmailCliente(cli.id)}
+                                className="bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold px-1.5 py-0.5 rounded text-[8.5px] uppercase tracking-wide cursor-pointer shadow-xs active:scale-95 transition-all"
+                                title="Simular ativação de e-mail recebida pelo cliente"
+                              >
+                                Simular Ativação Link ✉️
+                              </button>
+                            )}
+                          </div>
                         )}
-                      </div>
-                      <span className="text-[10px] text-slate-500 font-mono block truncate">{cli.endereco}</span>
-                      
-                      <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[9px] font-mono text-slate-400">
-                        <span className="bg-slate-900 text-slate-300 font-black px-1 rounded-xs uppercase tracking-tight text-[8px]">{cli.cidade || 'Passos - MG'}</span>
-                        <span>Cobrança padrão: <strong className="text-emerald-700">R$ {(cli.valorCobradoCliente || 10.00).toFixed(2)}</strong></span>
-                        <span>•</span>
-                        <span>Repasse: <strong className="text-rose-600">R$ {(cli.valorPagoMotoboy || 4.00).toFixed(2)}</strong></span>
-                      </div>
 
-                      <div className="mt-1 flex items-center gap-1.5 bg-slate-200 px-2 py-0.5 rounded border border-slate-300 w-fit">
-                        <span className="w-1.5 h-1.5 rounded-full bg-orange-500 animate-pulse"></span>
-                        <span className="text-[9px] font-mono text-slate-700 uppercase font-bold">
-                          Motoboys Ativos: <span className="text-slate-950 font-extrabold">{cli.motoboysAtivos || 0}</span>
-                        </span>
-                      </div>
-
-                      {/* Sync Email and Activation Status controls (Requested Supabase sync and email settings) */}
-                      {cli.email && (
-                        <div className="mt-1 ml-0.5 flex flex-wrap items-center gap-2 text-[9px] font-mono">
-                          <span className="text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">📧 {cli.email}</span>
-                          {cli.emailConfirmado ? (
-                            <span className="bg-emerald-100 text-emerald-800 font-black uppercase tracking-wider px-1.5 py-0.5 rounded text-[8px] border border-emerald-300 flex items-center gap-1">
-                              ● Ativo B2B
-                            </span>
-                          ) : (
-                            <span className="bg-amber-100 text-amber-800 font-black uppercase tracking-wider px-1.5 py-0.5 rounded text-[8px] border border-amber-350 animate-pulse">
-                              ⏳ Confirm. Pendente
-                            </span>
-                          )}
-                          {!cli.emailConfirmado && (
-                            <button
-                              type="button"
-                              onClick={() => handleConfirmarEmailCliente(cli.id)}
-                              className="bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold px-1.5 py-0.5 rounded text-[8.5px] uppercase tracking-wide cursor-pointer shadow-xs active:scale-95 transition-all"
-                              title="Simular ativação de e-mail recebida pelo cliente"
-                            >
-                              Simular Ativação Link ✉️
-                            </button>
-                          )}
-                        </div>
-                      )}
-
-                      {/* STATS DE FATURAMENTO DIÁRIO / MENSAL PARA CONTROLE DE NOTA FISCAL */}
-                      <div className="mt-2 pt-2 border-t border-slate-250/50 grid grid-cols-2 gap-2 text-[10px] font-mono">
-                        <div className="bg-orange-500/5 hover:bg-orange-500/10 border border-orange-500/10 p-1.5 rounded flex flex-col">
-                          <span className="text-[8px] text-orange-655 font-bold uppercase tracking-wider block">Faturamento Hoje</span>
-                          <span className="text-[11px] font-black text-orange-950 mt-0.5">R$ {stats.hojeBilling.toFixed(2)}</span>
-                          <span className="text-[8px] text-slate-500 block">({stats.hojeCount} OS finalizadas)</span>
-                        </div>
-                        <div className="bg-emerald-500/5 hover:bg-emerald-500/10 border border-emerald-500/10 p-1.5 rounded flex flex-col">
-                          <span className="text-[8px] text-emerald-700 font-bold uppercase tracking-wider block">Faturamento Mês</span>
-                          <span className="text-[11px] font-black text-emerald-950 mt-0.5">R$ {stats.mesBilling.toFixed(2)}</span>
-                          <span className="text-[8px] text-slate-500 block">({stats.mesCount} OS para Nota Fiscal)</span>
+                        {/* STATS DE FATURAMENTO DIÁRIO / MENSAL PARA CONTROLE DE NOTA FISCAL */}
+                        <div className="mt-2 pt-2 border-t border-slate-250/50 grid grid-cols-2 gap-2 text-[10px] font-mono">
+                          <div className="bg-orange-500/5 hover:bg-orange-500/10 border border-orange-500/10 p-1.5 rounded flex flex-col">
+                            <span className="text-[8px] text-orange-655 font-bold uppercase tracking-wider block">Faturamento Hoje</span>
+                            <span className="text-[11px] font-black text-orange-950 mt-0.5">R$ {stats.hojeBilling.toFixed(2)}</span>
+                            <span className="text-[8px] text-slate-500 block">({stats.hojeCount} OS finalizadas)</span>
+                          </div>
+                          <div className="bg-emerald-500/5 hover:bg-emerald-500/10 border border-emerald-500/10 p-1.5 rounded flex flex-col">
+                            <span className="text-[8px] text-emerald-700 font-bold uppercase tracking-wider block">Faturamento Mês</span>
+                            <span className="text-[11px] font-black text-emerald-950 mt-0.5">R$ {stats.mesBilling.toFixed(2)}</span>
+                            <span className="text-[8px] text-slate-500 block">({stats.mesCount} OS para Nota Fiscal)</span>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -4378,7 +4543,7 @@ export default function App() {
                 </div>
               </div>
 
-              <form onSubmit={(e) => {
+              <form onSubmit={async (e) => {
                 e.preventDefault();
                 if (!activeClienteUser) return;
                 
@@ -4386,15 +4551,62 @@ export default function App() {
                 let finalQuadrante = destinoQuadrante;
                 let finalEndereco = destinoEndereco;
                 let finalDestName = "Entrega Direta B2B";
+                let finalClienteId = destinoClienteId;
 
                 if (!isAddress) {
-                  const targetC = clientes.find(c => c.id === destinoClienteId);
+                  // If we're currently quick-registering, finalize it automatically
+                  if (isQuickRegisteringDestinatario) {
+                    if (!quickClientNome.trim() || !quickClientEndereco.trim()) {
+                      alert("Por favor, informe o Nome e o Endereço do destinatário rápido ou cancele o preenchimento.");
+                      return;
+                    }
+                    const randId = Math.floor(1000 + Math.random() * 9000);
+                    const newId = `CLI-${destinoQuadrante}-${randId}`;
+                    const novoCli: Cliente = {
+                      id: newId,
+                      nome: quickClientNome,
+                      quadrante: destinoQuadrante,
+                      endereco: quickClientEndereco,
+                      telefone: 'Não informado',
+                      cidade: activeClienteUser?.cidade || 'Passos - MG',
+                      valorPagoMotoboy: 4.00,
+                      valorCobradoCliente: 10.00,
+                      senha: `cli-${randId}`,
+                      email: `contato-${newId.toLowerCase()}@torque-log-b2b.com`,
+                      emailConfirmado: true,
+                      cadastroCompleto: true,
+                      criadoPor: 'Cliente',
+                      criadoPorClienteId: activeClienteUser?.id,
+                      criadoEm: new Date().toISOString()
+                    };
+
+                    setClientes(prev => [novoCli, ...prev]);
+                    clientes.unshift(novoCli);
+                    finalClienteId = newId;
+                    setDestinoClienteId(newId);
+
+                    setQuickClientNome('');
+                    setQuickClientEndereco('');
+                    setIsQuickRegisteringDestinatario(false);
+                  }
+
+                  let targetC = clientes.find(c => c.id === finalClienteId);
+                  
+                  // Auto fallback if selection is empty but matching options exist
+                  if (!targetC) {
+                    const availableOptions = clientes.filter(c => c.criadoPorClienteId === activeClienteUser.id && c.quadrante === destinoQuadrante);
+                    if (availableOptions.length > 0) {
+                      targetC = availableOptions[0];
+                      setDestinoClienteId(targetC.id);
+                    }
+                  }
+
                   if (targetC) {
                     finalQuadrante = targetC.quadrante;
                     finalEndereco = targetC.endereco;
                     finalDestName = targetC.nome;
                   } else {
-                    alert("Por favor, selecione um cliente destinatário válido.");
+                    alert("Por favor, selecione ou cadastre um destinatário credenciado para o setor escolhido.");
                     return;
                   }
                 } else {
@@ -4417,8 +4629,8 @@ export default function App() {
                   destinatarioNome: finalDestName,
                   retornoPeca,
                   taxaReversa: retornoPeca ? 15 : undefined,
-                  valorPagoMotoboy: activeClienteUser.valorPagoMotoboy,
-                  valorCobradoCliente: activeClienteUser.valorCobradoCliente,
+                  valorPagoMotoboy: activeClienteUser.valorPagoMotoboy || 4.00,
+                  valorCobradoCliente: activeClienteUser.valorCobradoCliente || 10.00,
                   criadoEm: new Date().toISOString(),
                   status: statusFinal,
                   travaCubagemStatus: 'Liberado - Cabe no Baú',
@@ -4470,16 +4682,7 @@ export default function App() {
                       <label className="block text-xs font-bold text-slate-700 uppercase font-mono">Filtrar Setor do Destinatário</label>
                       <select
                         value={destinoQuadrante}
-                        onChange={(e) => {
-                          const nextQuad = e.target.value as Quadrante;
-                          setDestinoQuadrante(nextQuad);
-                          const filtered = clientes.filter(c => c.quadrante === nextQuad && c.id !== activeClienteUser?.id);
-                          if (filtered.length > 0) {
-                            setDestinoClienteId(filtered[0].id);
-                          } else {
-                            setDestinoClienteId('');
-                          }
-                        }}
+                        onChange={(e) => setDestinoQuadrante(e.target.value as Quadrante)}
                         className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded-lg p-2 text-xs font-mono"
                       >
                         {(['A', 'B', 'C', 'D', 'E', 'F'] as Quadrante[]).map(q => (
@@ -4651,7 +4854,7 @@ export default function App() {
                   type="submit"
                   className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-mono font-bold text-xs py-2.5 rounded-lg transition shadow shadow-emerald-600/10 cursor-pointer uppercase"
                 >
-                  DESPACHAR ENTRADA 🚀
+                  DESPACHAR ENTREGA 🚀
                 </button>
               </form>
             </div>
@@ -4878,16 +5081,24 @@ export default function App() {
                 <div><strong>Oficina Destinatária:</strong> {activeSignOrder.clienteNome}</div>
                 <div><strong>Peças Entregues:</strong> {activeSignOrder.itensDescricao}</div>
                 <div className="border-t border-slate-200 mt-2 pt-1.5 text-[11px]">
-                  {activeMotoboyUser ? (
-                    // Within courier / driver session: ONLY show the freight price
+                  {effectiveRole === 'Motoboy' ? (
+                    // Within courier / driver session: ONLY show the freight price (repasse)
                     <div className="flex justify-between items-center py-1 bg-amber-50 px-2 rounded border border-amber-100">
                       <span className="font-bold text-amber-800 font-mono">🏍️ VALOR DO FRETE (REPASSE ACORDADO):</span>
                       <span className="font-extrabold text-amber-955 text-xs font-mono">
                         R$ {((activeSignOrder.valorPagoMotoboy || 4.00) + (activeSignOrder.retornoPeca ? (activeSignOrder.taxaReversa || 15) : 0)).toFixed(2)}
                       </span>
                     </div>
+                  ) : effectiveRole === 'Cliente' ? (
+                    // Within distributor / client session: ONLY show their cost (Cobrança Cliente B2B), hide repasse entirely
+                    <div className="flex justify-between items-center py-1 bg-emerald-50 px-2 rounded border border-emerald-100">
+                      <span className="font-bold text-emerald-800 font-mono">💵 VALOR DO ENVIO (FABRIL B2B):</span>
+                      <span className="font-extrabold text-emerald-955 text-xs font-mono">
+                        R$ {((activeSignOrder.valorCobradoCliente || 10.00) + (activeSignOrder.retornoPeca ? (activeSignOrder.taxaReversa || 15) : 0)).toFixed(2)}
+                      </span>
+                    </div>
                   ) : (
-                    // Admin view or other view context: show the full breakdown
+                    // Admin (Empresa) view: show the full breakdown
                     <>
                       <div className="flex justify-between">
                         <span>💵 Cobrança Cliente B2B:</span>
@@ -6151,6 +6362,8 @@ export default function App() {
                             setFirstAccessTelefone(cli.telefone && !cli.telefone.startsWith('Pendente') ? cli.telefone : '');
                             setFirstAccessCNPJ(cli.cnpj || '');
                             setFirstAccessInscricaoEstadual(cli.inscricaoEstadual || '');
+                            setFirstAccessCEP(cli.cep || '');
+                            setFirstAccessCidade(cli.cidade || 'Passos - MG');
                           }
                         }}
                         className="w-full bg-slate-950 text-white border border-slate-800 rounded-lg p-2.5 text-xs font-mono focus:outline-none focus:border-orange-500 cursor-pointer"
@@ -6290,6 +6503,36 @@ export default function App() {
                           placeholder="Ex: Isento ou Nº"
                           value={firstAccessInscricaoEstadual}
                           onChange={(e) => setFirstAccessInscricaoEstadual(e.target.value)}
+                          className="w-full bg-slate-100/10 text-white placeholder-slate-600 border border-slate-800 rounded-lg p-2.5 text-xs font-mono focus:outline-none focus:border-orange-500"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 text-left">
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-300 uppercase mb-1 font-mono text-left flex items-center justify-between">
+                          <span>CEP *</span>
+                          {isFetchingFirstAccessCEP && (
+                            <span className="text-emerald-400 animate-pulse text-[9px] font-mono leading-none">🔍 BUSCANDO...</span>
+                          )}
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="Ex: 37900-124"
+                          value={firstAccessCEP}
+                          onChange={(e) => handleCEPChange(e.target.value, 'firstAccess')}
+                          className="w-full bg-slate-100/10 text-white placeholder-slate-600 border border-slate-800 rounded-lg p-2.5 text-xs font-mono focus:outline-none focus:border-orange-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-300 uppercase mb-1 font-mono text-left">Cidade / UF *</label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="Ex: Passos - MG"
+                          value={firstAccessCidade}
+                          onChange={(e) => setFirstAccessCidade(e.target.value)}
                           className="w-full bg-slate-100/10 text-white placeholder-slate-600 border border-slate-800 rounded-lg p-2.5 text-xs font-mono focus:outline-none focus:border-orange-500"
                         />
                       </div>
