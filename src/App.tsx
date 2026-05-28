@@ -1002,7 +1002,6 @@ export default function App() {
   // Filter clients to show on the visual directory panel filtered by selected admin city (Quadrants / Sectors removed as per user instruction and limited to 5 examples for testing)
   const directoryFilteredClients = useMemo(() => {
     return clientes.filter(c => {
-      if (c.criadoPor === 'Cliente') return false; // Hide sub-clients in directory list of distributors
       const matchCity = selectedAdminCity === 'Todas' || c.cidade === selectedAdminCity;
       const matchSearch = c.nome.toLowerCase().includes(clienteSearchTerm.toLowerCase()) || 
                           c.endereco.toLowerCase().includes(clienteSearchTerm.toLowerCase()) ||
@@ -3338,6 +3337,7 @@ export default function App() {
             <div className="max-h-[365px] overflow-y-auto divide-y divide-slate-150 border border-slate-200 rounded-lg p-1.5 space-y-1 bg-slate-50 shadow-inner">
               {directoryFilteredClients.map((cli, index) => {
                 const stats = clientBillingStats[cli.id] || { hojeBilling: 0, hojeCount: 0, mesBilling: 0, mesCount: 0 };
+                const parentDistributor = cli.criadoPorClienteId ? clientes.find(parent => parent.id === cli.criadoPorClienteId) : null;
                 return (
                   <div key={cli.id} className={`text-xs p-3 hover:bg-white rounded-lg transition duration-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 border ${
                     cli.isSelfRegistered || cli.criadoPor === 'Cliente'
@@ -3366,6 +3366,11 @@ export default function App() {
                           {(cli.isSelfRegistered || cli.criadoPor === 'Cliente') && (
                             <span className="text-[8.5px] bg-emerald-600 font-extrabold text-white px-2 py-0.5 rounded-md uppercase tracking-wider font-mono shrink-0 animate-pulse">
                               🟢 CLIENTE NOVO
+                            </span>
+                          )}
+                          {parentDistributor && (
+                            <span className="text-[8.5px] bg-sky-100 text-sky-850 border border-sky-305 px-2 py-0.5 rounded-md uppercase font-extrabold font-mono shrink-0">
+                              🏢 Base de: {parentDistributor.nome}
                             </span>
                           )}
                         </div>
@@ -3428,14 +3433,16 @@ export default function App() {
                     </div>
                     
                     <div className="shrink-0 text-right font-mono flex sm:flex-col justify-between items-center sm:items-end border-t sm:border-t-0 border-slate-100 pt-1.5 sm:pt-0 gap-2">
-                      <span className={`text-[8.5px] px-2 py-0.5 rounded font-extrabold uppercase tracking-wide inline-block ${
+                      <span className={`text-[8.5px] px-1.5 py-0.5 rounded font-extrabold uppercase tracking-wide inline-block ${
                         cli.criadoPor === 'Entregador' 
                           ? 'bg-amber-100 text-amber-900 border border-amber-200' 
-                          : cli.isSelfRegistered || cli.criadoPor === 'Cliente'
+                          : cli.isSelfRegistered
                           ? 'bg-emerald-600 text-white border border-emerald-500'
-                          : 'bg-slate-205 text-slate-700 border border-slate-300'
+                          : cli.criadoPor === 'Cliente'
+                          ? 'bg-sky-600 text-white border border-sky-500'
+                          : 'bg-slate-205 text-slate-705 border border-slate-300'
                       }`}>
-                        {cli.criadoPor === 'Entregador' ? 'Rua (Rider)' : cli.isSelfRegistered || cli.criadoPor === 'Cliente' ? 'Auto-Cadastro' : 'Expedição'}
+                        {cli.criadoPor === 'Entregador' ? 'Rua (Rider)' : cli.isSelfRegistered ? 'Auto-Cadastro' : cli.criadoPor === 'Cliente' ? 'Sub-Cliente B2B' : 'Expedição'}
                       </span>
                       
                       {/* CRUD Actions Buttons for Edit and Delete */}
