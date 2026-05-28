@@ -189,6 +189,7 @@ export default function App() {
   const [clienteSearchTerm, setClienteSearchTerm] = useState<string>('');
 
   // --- STATE FOR MOTOBOY REGISTRATION DIALOG ---
+  const [adminClientFilterTab, setAdminClientFilterTab] = useState<'all' | 'distributors' | 'subclients'>('distributors');
   const [isAddingNewClient, setIsAddingNewClient] = useState<boolean>(false);
   const [newClientNome, setNewClientNome] = useState<string>('');
   const [newClientQuadrante, setNewClientQuadrante] = useState<Quadrante>('A');
@@ -1083,16 +1084,21 @@ export default function App() {
     });
   }, [clientes, ordens, calendarViewMonth, calendarViewYear, selectedCalendarDate, getDistributorIdForOrder]);
 
-  // Filter clients to show on the visual directory panel filtered by selected admin city (Quadrants / Sectors removed as per user instruction and limited to 5 examples for testing)
+  // Filter clients to show on the visual directory panel filtered by selected admin city (with clean classification tabs)
   const directoryFilteredClients = useMemo(() => {
     return clientes.filter(c => {
       const matchCity = selectedAdminCity === 'Todas' || c.cidade === selectedAdminCity;
+      
+      const isSubClient = !!c.criadoPorClienteId;
+      if (adminClientFilterTab === 'distributors' && isSubClient) return false;
+      if (adminClientFilterTab === 'subclients' && !isSubClient) return false;
+
       const matchSearch = c.nome.toLowerCase().includes(clienteSearchTerm.toLowerCase()) || 
                           c.endereco.toLowerCase().includes(clienteSearchTerm.toLowerCase()) ||
                           c.id.toLowerCase().includes(clienteSearchTerm.toLowerCase());
       return matchCity && (clienteSearchTerm === '' || matchSearch);
     });
-  }, [clientes, clienteSearchTerm, selectedAdminCity]);
+  }, [clientes, clienteSearchTerm, selectedAdminCity, adminClientFilterTab]);
 
   // Sector-wide totals of client faturamento filtered by selected city and quadrant
   const sectorBillingTotal = useMemo(() => {
@@ -2455,7 +2461,7 @@ export default function App() {
                       onClick={() => { setLoginRole('Motoboy'); setIsSelfRegistering(false); }}
                       className={`py-2 text-xs font-bold rounded-lg transition-all ${loginRole === 'Motoboy' ? 'bg-orange-500 text-white shadow' : 'text-slate-400 hover:text-white'}`}
                     >
-                      🏍️ Motoboy
+                      🏍️ Entregador
                     </button>
                     <button
                       type="button"
@@ -3375,8 +3381,8 @@ export default function App() {
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
             <div className="flex items-center justify-between mb-3.5">
               <div>
-                <h3 className="text-sm font-bold text-slate-800 uppercase font-mono tracking-tight">Distribuidoras Credenciadas B2B</h3>
-                <p className="text-xs text-slate-400">Exibindo distribuidoras ativas cadastradas em Passos - MG</p>
+                <h3 className="text-sm font-bold text-slate-800 uppercase font-mono tracking-tight">Catálogo de Clientes Separados</h3>
+                <p className="text-xs text-slate-400">Classificação: as Distribuidoras (clientes da TorqueLog) vs Clientes (oficinas) delas</p>
               </div>
               <button
                 onClick={() => {
@@ -3387,15 +3393,53 @@ export default function App() {
                 id="btn-add-client-distributor"
               >
                 <Plus className="w-3.5 h-3.5 text-orange-400" />
-                Nova Distribuidora
+                Nova Distribuidora (Cliente Torque)
               </button>
             </div>
+
+            {/* Classification Tabs: Separation of Roles as requested */}
+            <div className="flex bg-slate-100 p-1 rounded-lg gap-1 border border-slate-200 mb-3.5">
+              <button
+                type="button"
+                onClick={() => setAdminClientFilterTab('distributors')}
+                className={`flex-1 py-1.5 text-center text-xs font-mono font-bold rounded-md transition ${
+                  adminClientFilterTab === 'distributors'
+                    ? 'bg-orange-500 text-white shadow-sm'
+                    : 'text-slate-650 hover:bg-slate-200 hover:text-slate-900'
+                }`}
+              >
+                🏢 Distribuidoras ({clientes.filter(c => !c.criadoPorClienteId).length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setAdminClientFilterTab('subclients')}
+                className={`flex-1 py-1.5 text-center text-xs font-mono font-bold rounded-md transition ${
+                  adminClientFilterTab === 'subclients'
+                    ? 'bg-emerald-600 text-white shadow-sm'
+                    : 'text-slate-650 hover:bg-slate-200 hover:text-slate-900'
+                }`}
+              >
+                📍 Clientes Delas ({clientes.filter(c => !!c.criadoPorClienteId).length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setAdminClientFilterTab('all')}
+                className={`flex-1 py-1.5 text-center text-xs font-mono font-bold rounded-md transition ${
+                  adminClientFilterTab === 'all'
+                    ? 'bg-slate-950 text-white shadow-sm'
+                    : 'text-slate-650 hover:bg-slate-200 hover:text-slate-900'
+                }`}
+              >
+                📋 Todos ({clientes.length})
+              </button>
+            </div>
+
                          {/* Quick Search */}
             <div className="relative mb-3">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               <input
                 type="text"
-                placeholder="Pesquisar distribuidora..."
+                placeholder={adminClientFilterTab === 'distributors' ? "Pesquisar distribuidora TorqueLog..." : adminClientFilterTab === 'subclients' ? "Pesquisar clientes / oficinas registradas..." : "Pesquisar distribuidora ou oficina..."}
                 value={clienteSearchTerm}
                 onChange={(e) => setClienteSearchTerm(e.target.value)}
                 className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded-lg pl-8.5 pr-3 py-1.5 text-xs font-mono"
@@ -4609,7 +4653,7 @@ export default function App() {
                         
                         <div className="text-xs text-slate-750 font-mono space-y-0.5 leading-normal mt-1.5">
                           <p>🏢 <strong>Ponto de Retirada (Coleta):</strong> {o.clienteNome}</p>
-                          <p>🎯 <strong>Ponto de Destino:</strong> {o.enderecoEntrega || `${o.destinatarioNome || 'Oficina / Destinatário Final'} - Setor ${o.quadrante}`}</p>
+                          <p>🎯 <strong>Ponto de Destino:</strong> <span className="text-orange-600 font-extrabold">{o.destinatarioNome || 'Oficina / Destinatário Final'}</span> • {o.enderecoEntrega || `Setor ${o.quadrante}`}</p>
                         </div>
                         
                         {o.retornoPeca && (
@@ -4693,7 +4737,7 @@ export default function App() {
                         </div>
                         <div className="text-[10px] text-slate-500 mt-1 space-y-0.5">
                           <p>🏢 <strong>Origem:</strong> {o.clienteNome}</p>
-                          <p>📍 <strong>Destino:</strong> {o.enderecoEntrega || `${o.destinatarioNome || 'Oficina'} - Setor ${o.quadrante}`}</p>
+                          <p>📍 <strong>Destino:</strong> <span className="text-orange-600 font-bold">{o.destinatarioNome || 'Oficina'}</span> • {o.enderecoEntrega || `Setor ${o.quadrante}`}</p>
                         </div>
                       </div>
                     </div>
@@ -4776,7 +4820,7 @@ export default function App() {
           </div>
 
           {/* Column A (lg:col-span-4) - Dispatch form */}
-          <div className="lg:col-span-4 bg-white rounded-xl shadow-sm border border-slate-200 p-5 flex flex-col justify-between">
+          <div className="lg:col-span-4 bg-white rounded-xl shadow-sm border border-slate-200 p-5 flex flex-col justify-between" id="portal-cliente-form-solicitacao">
             <div>
               <div className="border-b border-slate-100 pb-3 mb-4">
                 <h2 className="text-sm font-black text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
@@ -4825,6 +4869,7 @@ export default function App() {
                 let finalClienteId = destinoClienteId;
 
                 if (!isAddress) {
+                  let updatedClientes = [...clientes];
                   // If we're currently quick-registering, finalize it automatically
                   if (isQuickRegisteringDestinatario) {
                     if (!quickClientNome.trim() || !quickClientEndereco.trim()) {
@@ -4851,8 +4896,16 @@ export default function App() {
                       criadoEm: new Date().toISOString()
                     };
 
-                    setClientes(prev => [novoCli, ...prev]);
-                    clientes.unshift(novoCli);
+                    updatedClientes = [novoCli, ...clientes];
+                    setClientes(updatedClientes);
+                    
+                    if (isFirebaseConfigured) {
+                      await syncClientesToFirebase(updatedClientes).catch(err => console.error("Erro Firebase:", err));
+                    }
+                    if (supabase) {
+                      await syncClientesToSupabase(updatedClientes).catch(err => console.error("Erro Supabase:", err));
+                    }
+
                     finalClienteId = newId;
                     setDestinoClienteId(newId);
 
@@ -4861,11 +4914,11 @@ export default function App() {
                     setIsQuickRegisteringDestinatario(false);
                   }
 
-                  let targetC = clientes.find(c => c.id === finalClienteId);
+                  let targetC = updatedClientes.find(c => c.id === finalClienteId);
                   
                   // Auto fallback if selection is empty but matching options exist
                   if (!targetC) {
-                    const availableOptions = clientes.filter(c => c.criadoPorClienteId === activeClienteUser.id && c.quadrante === destinoQuadrante);
+                    const availableOptions = updatedClientes.filter(c => c.criadoPorClienteId === activeClienteUser.id && c.quadrante === destinoQuadrante);
                     if (availableOptions.length > 0) {
                       targetC = availableOptions[0];
                       setDestinoClienteId(targetC.id);
@@ -5101,14 +5154,23 @@ export default function App() {
                                   criadoEm: new Date().toISOString()
                                 };
 
-                                setClientes(prev => [novoCli, ...prev]);
+                                const updatedList = [novoCli, ...clientes];
+                                setClientes(updatedList);
+                                
+                                if (isFirebaseConfigured) {
+                                  await syncClientesToFirebase(updatedList).catch(err => console.error("Firebase Sync error:", err));
+                                }
+                                if (supabase) {
+                                  await syncClientesToSupabase(updatedList).catch(err => console.error("Supabase Sync error:", err));
+                                }
+
                                 setDestinoClienteId(novoCli.id);
 
                                 setQuickClientNome('');
                                 setQuickClientEndereco('');
                                 setIsQuickRegisteringDestinatario(false);
 
-                                setSupabaseSuccessMsg(`✅ Destinatário "${novoCli.nome}" cadastrado e selecionado!`);
+                                setSupabaseSuccessMsg(`✅ Destinatário "${novoCli.nome}" cadastrado, SALVO NO BANCO e selecionado!`);
                                 setTimeout(() => setSupabaseSuccessMsg(''), 5000);
                               }}
                               className="flex-1 bg-orange-500 hover:bg-orange-600 text-white py-1 px-2 rounded text-[10px] font-bold font-mono shadow-sm transition cursor-pointer"
@@ -5303,6 +5365,82 @@ export default function App() {
                 ))
               )}
             </div>
+          </div>
+
+          {/* Row 3 (lg:col-span-12) - CUSTOMER'S OWN CLIENTS BASE DATABASE / SUB-CLIENTS */}
+          <div className="lg:col-span-12 bg-white rounded-xl shadow-sm border border-slate-200 p-5" id="carteira-clientes-distribuidora">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-slate-100 pb-3 mb-4">
+              <div>
+                <h2 className="text-sm font-black text-slate-900 uppercase tracking-wider flex items-center gap-1.5 font-mono">
+                  <Briefcase className="w-4 h-4 text-orange-500" />
+                  Sua Carteira Privada de Clientes (Destinatários Cadastrados)
+                </h2>
+                <p className="text-xs text-slate-450 font-mono">Consulte, selecione para envio ou pré-registre novas oficinas parceiras em sua base persistente.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setClientNewClientNome('');
+                  setClientNewClientEndereco('');
+                  setClientNewClientQuadrante('A');
+                  setIsClientAddingNewClient(true);
+                }}
+                className="bg-orange-500 text-white font-mono text-xs font-bold py-1.5 px-3 rounded-lg hover:bg-orange-600 flex items-center gap-1 cursor-pointer transition shadow-xs self-stretch sm:self-auto text-center justify-center"
+              >
+                <Plus className="w-3.5 h-3.5 text-white" />
+                Cadastrar Novo Cliente B2B (Oficina)
+              </button>
+            </div>
+
+            {clientes.filter(c => c.criadoPorClienteId === activeClienteUser?.id).length === 0 ? (
+              <div className="text-center py-10 border border-dashed border-slate-200 rounded-xl space-y-2 bg-slate-50/50">
+                <p className="text-xs text-slate-500 font-mono">Nenhum cliente/oficina destinatária cadastrada na sua base de dados ainda.</p>
+                <p className="text-[10px] text-slate-450 font-mono">Use o botão acima ou o cadastro rápido no formulário de despacho para começar.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                {clientes.filter(c => c.criadoPorClienteId === activeClienteUser?.id).map(c => (
+                  <div key={c.id} className="p-3 bg-slate-50 border border-slate-150 rounded-lg flex flex-col justify-between hover:border-orange-200 hover:bg-slate-50/60 transition duration-155">
+                    <div className="space-y-1">
+                      <div className="flex justify-between items-start gap-1">
+                        <span className="text-xs font-bold text-slate-900 font-mono truncate max-w-[180px] block">{c.nome}</span>
+                        <span className="text-[9px] font-mono bg-orange-100 text-orange-800 font-bold px-1.5 py-0.2 rounded shrink-0">
+                          Setor {c.quadrante}
+                        </span>
+                      </div>
+                      <span className="text-[9.5px] text-slate-400 font-mono block">Código: {c.id}</span>
+                      <p className="text-[10.5px] text-slate-650 font-mono leading-relaxed line-clamp-2">📍 {c.endereco}</p>
+                    </div>
+
+                    <div className="border-t border-slate-100 mt-3 pt-2.5 flex items-center justify-between gap-2">
+                      <span className="text-[9px] font-mono text-emerald-600 bg-emerald-50 px-1 py-0.5 rounded border border-emerald-100">
+                        ✓ Banco Sincronizado
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDestinoTipo('cliente');
+                          setDestinoClienteId(c.id);
+                          setDestinoQuadrante(c.quadrante);
+                          
+                          setSupabaseSuccessMsg(`🎯 "${c.nome}" selecionado com sucesso! Preencha a descrição de itens.`);
+                          setTimeout(() => setSupabaseSuccessMsg(''), 4500);
+
+                          // Scroll back smoothly to form focus
+                          const dispatchFormSec = document.getElementById("portal-cliente-form-solicitacao");
+                          if (dispatchFormSec) {
+                            dispatchFormSec.scrollIntoView({ behavior: 'smooth' });
+                          }
+                        }}
+                        className="bg-white hover:bg-orange-500 hover:text-white text-orange-600 border border-orange-200 hover:border-orange-500 text-[10px] font-bold font-mono py-1 px-2.5 rounded-md transition cursor-pointer"
+                      >
+                        🚚 Selecionar p/ Entrega
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
         </main>
@@ -5945,6 +6083,15 @@ export default function App() {
                     await syncClientesToFirebase(updatedClientesList);
                   } catch (err) {
                     console.error("Erro ao sincronizar novo cliente com o Firebase:", err);
+                  }
+                }
+
+                // Sync with Supabase if active
+                if (supabase) {
+                  try {
+                    await syncClientesToSupabase(updatedClientesList);
+                  } catch (err) {
+                    console.error("Erro ao sincronizar novo cliente com o Supabase:", err);
                   }
                 }
 
