@@ -46,6 +46,7 @@ export async function syncClientesToSupabase(clientes: any[]) {
       cnpj: c.cnpj || null,
       inscricao_estadual: c.inscricaoEstadual || null,
       criado_por: c.criadoPor,
+      criado_por_cliente_id: c.criadoPorClienteId || null,
       criado_em: c.criadoEm
     }));
 

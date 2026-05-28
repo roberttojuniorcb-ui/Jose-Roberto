@@ -498,6 +498,7 @@ export default function App() {
                 cnpj: c.cnpj || undefined,
                 inscricaoEstadual: c.inscricao_estadual || undefined,
                 criadoPor: c.criado_por as 'Empresa' | 'Entregador',
+                criadoPorClienteId: c.criado_por_cliente_id || undefined,
                 criadoEm: c.criado_em
               }));
               setClientes(mappedCli);

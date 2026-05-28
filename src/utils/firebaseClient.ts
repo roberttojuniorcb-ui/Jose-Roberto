@@ -114,7 +114,8 @@ export async function syncClientesToFirebase(clientes: any[]) {
         cnpj: c.cnpj || null,
         inscricaoEstadual: c.inscricaoEstadual || null,
         criadoPor: c.criadoPor,
-        criadoEm: c.criadoEm
+        criadoEm: c.criadoEm,
+        criadoPorClienteId: c.criadoPorClienteId || null
       };
       batch.set(docRef, payload, { merge: true });
     });
