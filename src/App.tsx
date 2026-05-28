@@ -2714,13 +2714,15 @@ export default function App() {
               </div>
             </div>
 
-            <div className="bg-slate-800/80 px-3 py-1.5 rounded border border-slate-700 font-mono text-xs flex items-center gap-2">
-              <Coins className="w-4 h-4 text-emerald-400" />
-              <div>
-                <span className="block text-[9px] text-emerald-400 leading-none">Lucro TorqueLog</span>
-                <span className="text-sm font-bold text-emerald-400">R$ {stats.lucroTotal.toFixed(2)}</span>
+            {activeSessionRole === 'Empresa' && (
+              <div className="bg-slate-800/80 px-3 py-1.5 rounded border border-slate-700 font-mono text-xs flex items-center gap-2">
+                <Coins className="w-4 h-4 text-emerald-400" />
+                <div>
+                  <span className="block text-[9px] text-emerald-400 leading-none">Lucro TorqueLog</span>
+                  <span className="text-sm font-bold text-emerald-400">R$ {stats.lucroTotal.toFixed(2)}</span>
+                </div>
               </div>
-            </div>
+            )}
 
             <div className="bg-slate-800/80 px-3 py-1.5 rounded border border-slate-700 font-mono text-xs flex items-center gap-2">
               <Clock className="w-4 h-4 text-orange-400" />
