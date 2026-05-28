@@ -683,6 +683,9 @@ export default function App() {
   const [selectedCalendarDate, setSelectedCalendarDate] = useState<Date>(new Date());
   const [calendarViewMonth, setCalendarViewMonth] = useState<number>(new Date().getMonth());
   const [calendarViewYear, setCalendarViewYear] = useState<number>(new Date().getFullYear());
+  const [calendarSelectedDistributorId, setCalendarSelectedDistributorId] = useState<string>('Todas');
+  const [activeClosingDistributorId, setActiveClosingDistributorId] = useState<string | null>(null);
+  const [isCopiedClosingReport, setIsCopiedClosingReport] = useState<boolean>(false);
   const [copiedDay, setCopiedDay] = useState<boolean>(false);
 
   // Helper to obtain a client's city in real-time
@@ -938,9 +941,25 @@ export default function App() {
   }, [clientes, ordens]);
 
   // --- MEMOIZED CALENDAR SELECTION HELPERS ---
+  const getDistributorIdForOrder = useCallback((oClienteId: string) => {
+    const cli = clientes.find(c => c.id === oClienteId);
+    if (!cli) return oClienteId;
+    if (cli.criadoPorClienteId) {
+      return cli.criadoPorClienteId;
+    }
+    return cli.id;
+  }, [clientes]);
+
+  const calendarFilteredOrdens = useMemo(() => {
+    if (calendarSelectedDistributorId === 'Todas') {
+      return ordens;
+    }
+    return ordens.filter(o => getDistributorIdForOrder(o.clienteId) === calendarSelectedDistributorId);
+  }, [ordens, calendarSelectedDistributorId, getDistributorIdForOrder]);
+
   const deliveredOrdersByDateString = useMemo(() => {
     const mapping: Record<string, OrdemServico[]> = {};
-    ordens.forEach(o => {
+    calendarFilteredOrdens.forEach(o => {
       if (o.status === 'Entregue') {
         const dateObj = new Date(o.criadoEm);
         const yyyy = dateObj.getFullYear();
@@ -954,11 +973,11 @@ export default function App() {
       }
     });
     return mapping;
-  }, [ordens]);
+  }, [calendarFilteredOrdens]);
 
   const allOrdersByDateString = useMemo(() => {
     const mapping: Record<string, OrdemServico[]> = {};
-    ordens.forEach(o => {
+    calendarFilteredOrdens.forEach(o => {
       const dateObj = new Date(o.criadoEm);
       const yyyy = dateObj.getFullYear();
       const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
@@ -970,7 +989,7 @@ export default function App() {
       mapping[dateKey].push(o);
     });
     return mapping;
-  }, [ordens]);
+  }, [calendarFilteredOrdens]);
 
   const selectedDateKey = useMemo(() => {
     const yyyy = selectedCalendarDate.getFullYear();
@@ -998,6 +1017,57 @@ export default function App() {
     });
     return { billing, repasse, count };
   }, [selectedDayOrders]);
+
+  // Calculate monthly stats by distributor for the currently viewed month (calendarViewMonth / calendarViewYear)
+  const monthlyDistributorStats = useMemo(() => {
+    const distributorsList = clientes.filter(c => c.criadoPor !== 'Cliente' && !c.criadoPorClienteId);
+    
+    return distributorsList.map(dist => {
+      const completedOrdersThisMonth = ordens.filter(o => {
+        if (o.status !== 'Entregue') return false;
+        const belongsToThisDist = getDistributorIdForOrder(o.clienteId) === dist.id;
+        if (!belongsToThisDist) return false;
+        
+        const orderDate = new Date(o.criadoEm);
+        return orderDate.getMonth() === calendarViewMonth && orderDate.getFullYear() === calendarViewYear;
+      });
+
+      const completedOrdersThisDay = ordens.filter(o => {
+        if (o.status !== 'Entregue') return false;
+        const belongsToThisDist = getDistributorIdForOrder(o.clienteId) === dist.id;
+        if (!belongsToThisDist) return false;
+        
+        const orderDate = new Date(o.criadoEm);
+        return orderDate.getDate() === selectedCalendarDate.getDate() &&
+               orderDate.getMonth() === selectedCalendarDate.getMonth() &&
+               orderDate.getFullYear() === selectedCalendarDate.getFullYear();
+      });
+
+      let monthlyBilling = 0;
+      let monthlyRepasse = 0;
+      completedOrdersThisMonth.forEach(o => {
+        monthlyBilling += (o.valorCobradoCliente || 10.00) + (o.retornoPeca ? (o.taxaReversa || 15) : 0);
+        monthlyRepasse += (o.valorPagoMotoboy || 4.00) + (o.retornoPeca ? (o.taxaReversa || 15) : 0);
+      });
+
+      let dailyBilling = 0;
+      completedOrdersThisDay.forEach(o => {
+        dailyBilling += (o.valorCobradoCliente || 10.00) + (o.retornoPeca ? (o.taxaReversa || 15) : 0);
+      });
+
+      const monthlyMargin = monthlyBilling - monthlyRepasse;
+
+      return {
+        distributor: dist,
+        completedMonthCount: completedOrdersThisMonth.length,
+        monthlyBilling,
+        monthlyRepasse,
+        monthlyMargin,
+        dailyBilling,
+        completedDayCount: completedOrdersThisDay.length,
+      };
+    });
+  }, [clientes, ordens, calendarViewMonth, calendarViewYear, selectedCalendarDate, getDistributorIdForOrder]);
 
   // Filter clients to show on the visual directory panel filtered by selected admin city (Quadrants / Sectors removed as per user instruction and limited to 5 examples for testing)
   const directoryFilteredClients = useMemo(() => {
@@ -3980,6 +4050,30 @@ export default function App() {
               {/* LEFT/TOP WIDGET: THE CALENDAR MODULE */}
               <div className="lg:col-span-5 bg-slate-50 rounded-xl border border-slate-200 p-4 space-y-4 shadow-inner">
                 
+                {/* Distributor Selection Filter */}
+                <div className="bg-white border border-slate-200 rounded-lg p-3 space-y-2 shadow-xs">
+                  <label className="block text-[10px] font-mono font-black text-slate-500 uppercase tracking-widest flex items-center gap-1.5">
+                    🏢 Filtrar por Distribuidora B2B
+                  </label>
+                  <select
+                    value={calendarSelectedDistributorId}
+                    onChange={(e) => setCalendarSelectedDistributorId(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-250 text-slate-850 rounded-md p-1.5 text-xs font-bold focus:outline-none focus:border-orange-505 cursor-pointer"
+                  >
+                    <option value="Todas">📊 Todas as Distribuidoras (Geral)</option>
+                    {clientes.filter(c => c.criadoPor !== 'Cliente' && !c.criadoPorClienteId).map(dist => (
+                      <option key={dist.id} value={dist.id}>
+                        🏢 {dist.nome} ({dist.cidade})
+                      </option>
+                    ))}
+                  </select>
+                  {calendarSelectedDistributorId !== 'Todas' && (
+                    <p className="text-[9.5px] text-orange-600 font-mono font-semibold">
+                      ⚡ Exibindo apenas a base histórica para esta distribuidora.
+                    </p>
+                  )}
+                </div>
+
                 {/* Calendar Navigation header */}
                 <div className="flex items-center justify-between bg-white border border-slate-200 rounded-lg p-2.5">
                   <button
@@ -4287,6 +4381,102 @@ export default function App() {
 
               </div>
 
+            </div>
+
+            {/* RELATÓRIO CONSOLIDADO POR DISTRIBUIDORA & FECHAMENTO MENSAL */}
+            <div className="mt-8 pt-6 border-t border-slate-200" id="distribuidores-fechamento-b2b">
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-5 gap-3">
+                <div>
+                  <h4 className="text-sm font-black text-slate-800 uppercase font-mono tracking-wider flex items-center gap-2">
+                    <FileText className="w-4 h-4 text-orange-505 animate-pulse" />
+                    Balanço por Distribuidora & Emissão de Nota Fiscal (B2B)
+                  </h4>
+                  <p className="text-xs text-slate-450 mt-0.5">Valores apurados em tempo real para as entregas de status <strong className="text-emerald-700 font-mono">"Entregue"</strong> na competência selecionada.</p>
+                </div>
+                <div className="bg-slate-100/80 border border-slate-200 px-3 py-1.5 rounded-lg text-[10.5px] font-mono text-slate-650 font-black uppercase shadow-xs">
+                  Mês de Referência: <span className="text-slate-900">{MONTHS_PT[calendarViewMonth]} de {calendarViewYear}</span>
+                </div>
+              </div>
+
+              <div className="overflow-x-auto border border-slate-200 rounded-xl bg-slate-50/25 shadow-inner">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr className="bg-slate-100/90 border-b border-slate-250 text-slate-600 font-mono text-[9px] uppercase font-extrabold tracking-wider">
+                      <th className="p-3">🏢 Distribuidora</th>
+                      <th className="p-3 text-center">Setor</th>
+                      <th className="p-3 text-center">Faturamento Hoje</th>
+                      <th className="p-3 text-center">Entregas no Mês</th>
+                      <th className="p-3 text-center">Faturamento no Mês</th>
+                      <th className="p-3 text-center">Repasse aos Motoboys</th>
+                      <th className="p-3 text-center">Net TorqueLog (Margem)</th>
+                      <th className="p-3 text-right">Ações de Conciliação</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-150 bg-white text-slate-700">
+                    {monthlyDistributorStats.map((stat) => {
+                      const dist = stat.distributor;
+                      return (
+                        <tr key={dist.id} className="hover:bg-slate-50 border-b border-slate-100 transition-colors">
+                          <td className="p-3 border-r border-slate-100">
+                            <div className="flex flex-col">
+                              <span className="font-bold text-slate-900">{dist.nome}</span>
+                              <span className="text-[9px] text-slate-400 font-mono font-medium">{dist.cnpj || 'Inscrição de CNPJ Isenta'}</span>
+                            </div>
+                          </td>
+                          <td className="p-3 text-center border-r border-slate-100">
+                            <span className="bg-slate-100 text-slate-700 border border-slate-200 font-mono font-extrabold text-[9px] py-0.5 px-2 rounded">
+                              Setor {dist.quadrante}
+                            </span>
+                          </td>
+                          <td className="p-3 text-center border-r border-slate-100">
+                            <strong className="font-mono text-emerald-700 block text-[11px]">
+                              R$ {stat.dailyBilling.toFixed(2)}
+                            </strong>
+                            <span className="text-[9px] text-slate-450 font-mono">({stat.completedDayCount} OS completas)</span>
+                          </td>
+                          <td className="p-3 text-center border-r border-slate-100">
+                            <span className="bg-blue-50 text-blue-800 border border-blue-200 font-mono font-black text-[10px] py-1 px-2.5 rounded-lg inline-block">
+                              {stat.completedMonthCount} OS
+                            </span>
+                          </td>
+                          <td className="p-3 text-center border-r border-slate-100">
+                            <strong className="font-mono font-black text-slate-850 text-[11px]">R$ {stat.monthlyBilling.toFixed(2)}</strong>
+                          </td>
+                          <td className="p-3 text-center border-r border-slate-100">
+                            <span className="font-mono font-bold text-rose-600">R$ {stat.monthlyRepasse.toFixed(2)}</span>
+                          </td>
+                          <td className="p-3 text-center border-r border-slate-100">
+                            <span className="bg-emerald-50 text-emerald-800 border border-emerald-200 font-mono font-black text-[11px] px-2.5 py-1 rounded inline-block shadow-xs">
+                              + R$ {stat.monthlyMargin.toFixed(2)}
+                            </span>
+                          </td>
+                          <td className="p-3 text-right">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setActiveClosingDistributorId(dist.id);
+                                setIsCopiedClosingReport(false);
+                              }}
+                              className="bg-slate-900 hover:bg-slate-950 text-white text-[9.5px] font-black uppercase font-mono py-1.5 px-3 rounded-lg flex items-center gap-1.5 ml-auto cursor-pointer shadow-sm hover:scale-102 active:scale-98 transition-all border border-slate-950"
+                            >
+                              <FileText className="w-3.5 h-3.5 text-orange-450 shrink-0" />
+                              📄 Gerar Fechamento
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+
+                    {monthlyDistributorStats.length === 0 && (
+                      <tr>
+                        <td colSpan={8} className="p-8 text-center text-slate-455 italic font-mono uppercase">
+                          Nenhuma distribuidora parceira cadastrada na base.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
 
           </div>
@@ -5241,6 +5431,136 @@ export default function App() {
             </motion.div>
           </div>
         )}
+      </AnimatePresence>
+
+      {/* ==========================================
+          MODAL: DETALHAMENTO DE FECHAMENTO MENSAL E NOTA FISCAL (B2B DISTRIBUIDORA)
+          ========================================== */}
+      <AnimatePresence>
+        {activeClosingDistributorId && (() => {
+          const closingDist = clientes.find(c => c.id === activeClosingDistributorId);
+          const closingStats = monthlyDistributorStats.find(s => s.distributor.id === activeClosingDistributorId);
+          if (!closingDist || !closingStats) return null;
+
+          const closingOrdersList = ordens.filter(o => {
+            if (o.status !== 'Entregue') return false;
+            const belongsToThisDist = getDistributorIdForOrder(o.clienteId) === closingDist.id;
+            if (!belongsToThisDist) return false;
+            const orderDate = new Date(o.criadoEm);
+            return orderDate.getMonth() === calendarViewMonth && orderDate.getFullYear() === calendarViewYear;
+          });
+
+          const copyClosingReportToClipboard = () => {
+            let text = `========= FECHAMENTO MENSAL B2B TORQUELOG =========\n`;
+            text += `DISTRIBUIDORA DEVEDORA: ${closingDist.nome}\n`;
+            text += `CNPJ: ${closingDist.cnpj || 'Isento / Não informado'}\n`;
+            text += `CIDADE: ${closingDist.cidade}\n`;
+            text += `MÊS DE REFERÊNCIA: ${MONTHS_PT[calendarViewMonth]} / ${calendarViewYear}\n`;
+            text += `TOTAL DE ENTREGAS COMPLETADAS: ${closingStats.completedMonthCount} OS\n`;
+            text += `VALOR TOTAL DA COBRANÇA (FATURAMENTO DE ENTREGAS): R$ ${closingStats.monthlyBilling.toFixed(2)}\n`;
+            text += `----------------------------------------------------\n`;
+            text += `RELAÇÃO DETALHADA DE ORDENS DE SERVIÇO (OS):\n`;
+            closingOrdersList.forEach((ord, index) => {
+              const val = (ord.valorCobradoCliente || 10.00) + (ord.retornoPeca ? (ord.taxaReversa || 15) : 0);
+              text += `${index + 1}. OS ID: ${ord.id} | Data: ${new Date(ord.criadoEm).toLocaleDateString()} | Oficina: ${ord.destinatarioNome || 'Prefeitura / Balcão'} | Valor: R$ ${val.toFixed(2)}${ord.retornoPeca ? ' (Reversa inclusa)' : ''}\n`;
+            });
+            text += `----------------------------------------------------\n`;
+            text += `Instrução de Pagamento: Emitir boleto ou realizar transferência de R$ ${closingStats.monthlyBilling.toFixed(2)} para chave Pix da TorqueLog.\n`;
+            text += `====================================================`;
+
+            navigator.clipboard.writeText(text);
+            setIsCopiedClosingReport(true);
+            setTimeout(() => setIsCopiedClosingReport(false), 2500);
+          };
+
+          return (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs" id="modal-fechamento-b2b">
+              <motion.div
+                initial={{ scale: 0.95, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.95, opacity: 0 }}
+                className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-2xl w-full p-5 max-h-[90vh] overflow-y-auto"
+              >
+                <div className="flex justify-between items-start mb-4 border-b border-slate-100 pb-3">
+                  <div>
+                    <h3 className="text-sm font-black text-slate-900 uppercase font-mono tracking-tight flex items-center gap-1.5">
+                      🧾 Fechamento Consolidado & Demonstrativo (B2B)
+                    </h3>
+                    <p className="text-[11px] text-slate-405 font-mono">Competência: {MONTHS_PT[calendarViewMonth]} / {calendarViewYear}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setActiveClosingDistributorId(null)}
+                    className="text-slate-400 hover:text-slate-650 font-bold py-1 px-2.5 rounded hover:bg-slate-100 cursor-pointer text-xs"
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+                  <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-1">
+                    <span className="text-[9px] font-mono text-slate-400 block uppercase font-bold">🏢 Distribuidora Devedora</span>
+                    <strong className="text-xs text-slate-800 block truncate">{closingDist.nome}</strong>
+                    <span className="text-[9.5px] font-mono text-slate-500 block">CNPJ: {closingDist.cnpj || 'CPF/CNPJ Isento'}</span>
+                    <span className="text-[9.5px] font-mono text-slate-500 block">Cidade: {closingDist.cidade}</span>
+                  </div>
+
+                  <div className="p-3 bg-emerald-500/5 border border-emerald-250 rounded-xl space-y-1">
+                    <span className="text-[9px] font-mono text-emerald-800 block uppercase font-bold">💵 Cobrança Consolidada</span>
+                    <strong className="text-lg font-mono text-emerald-950 block">R$ {closingStats.monthlyBilling.toFixed(2)}</strong>
+                    <span className="text-[9.5px] font-mono text-emerald-700 block">Total de Entregas: <strong>{closingStats.completedMonthCount} OS</strong></span>
+                    <span className="text-[9.5px] font-mono text-slate-500 block">Repasse do Mês: R$ {closingStats.monthlyRepasse.toFixed(2)}</span>
+                  </div>
+                </div>
+
+                <div className="space-y-2 mb-4">
+                  <h4 className="text-[10px] font-black text-slate-600 uppercase font-mono tracking-wider">
+                    Relação Detalhada de Encomendas no Período
+                  </h4>
+                  
+                  <div className="border border-slate-200 rounded-lg max-h-[180px] overflow-y-auto divide-y divide-slate-150 bg-slate-50 font-mono text-[10px] shadow-xs">
+                    {closingOrdersList.length === 0 ? (
+                      <div className="p-8 text-center text-slate-400 italic">
+                        Nenhuma entrega registrada para faturamento neste período.
+                      </div>
+                    ) : (
+                      closingOrdersList.map((ord, idx) => {
+                        const val = (ord.valorCobradoCliente || 10.00) + (ord.retornoPeca ? (ord.taxaReversa || 15) : 0);
+                        return (
+                          <div key={ord.id} className="p-2 flex justify-between items-center bg-white hover:bg-slate-50 transition-colors">
+                            <div className="space-y-0.5">
+                              <span className="bg-slate-900 text-orange-450 px-1 font-bold rounded text-[8.5px] mr-1">{ord.id}</span>
+                              <span className="text-slate-450">{new Date(ord.criadoEm).toLocaleDateString()}</span>
+                              <span className="text-slate-500 block max-w-sm truncate text-[9px]">Oficina: {ord.destinatarioNome || 'Balcão/Peças'}</span>
+                            </div>
+                            <div className="text-right">
+                              <strong className="text-slate-800 block">R$ {val.toFixed(2)}</strong>
+                              {ord.retornoPeca && <span className="text-[8px] bg-rose-100 text-rose-800 px-1 rounded-sm uppercase tracking-tight font-extrabold">Reversa</span>}
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+
+                <div className="bg-slate-900 rounded-xl p-3 border border-slate-850 space-y-2.5 text-[11px] font-mono text-slate-300">
+                  <p>🛠️ <strong>Guia de Conciliação B2B:</strong> Emita a nota fiscal baseada no resumo acima e fature diretamente para a distribuidora parceira utilizando a chave cadastrada: <strong>{closingDist.email || 'financeiro@b2bservice.com'}</strong>.</p>
+                  
+                  <button
+                    type="button"
+                    onClick={copyClosingReportToClipboard}
+                    className="w-full text-center py-2 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 active:scale-98 text-white font-bold uppercase rounded-lg shadow-md font-mono tracking-wider transition-all duration-150 flex items-center justify-center gap-1.5 cursor-pointer text-xs"
+                  >
+                    <FileText className="w-4 h-4 shrink-0" />
+                    {isCopiedClosingReport ? "📋 DEMONSTRATIVO FINANCEIRO COPIADO! ✓" : "📋 COPIAR DEMONSTRATIVO FINANCEIRO"}
+                  </button>
+                </div>
+
+              </motion.div>
+            </div>
+          );
+        })()}
       </AnimatePresence>
 
       {/* ==========================================
