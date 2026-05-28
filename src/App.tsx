@@ -208,6 +208,7 @@ export default function App() {
   const [isQuickRegisteringDestinatario, setIsQuickRegisteringDestinatario] = useState<boolean>(false);
   const [quickClientNome, setQuickClientNome] = useState<string>('');
   const [quickClientEndereco, setQuickClientEndereco] = useState<string>('');
+  const [lastDispatchedOrder, setLastDispatchedOrder] = useState<{ id: string; destName: string } | null>(null);
 
   // --- STATE FOR CLIENT EDITING (CRUD) ---
   const [clienteParaEditar, setClienteParaEditar] = useState<Cliente | null>(null);
@@ -4831,6 +4832,29 @@ export default function App() {
                 <p className="text-xs text-slate-400">Esqueça cubagens pesadas. Escolha entre Endereço ou Cliente Cadastrado</p>
               </div>
 
+              {/* High-visibility inline dispatch notification banner */}
+              {lastDispatchedOrder && (
+                <div id="inline-dispatch-success-toast" className="mb-4 bg-emerald-50 border border-emerald-200 text-emerald-900 rounded-xl p-3.5 relative transition-all animate-fade-in shadow-xs flex gap-2.5">
+                  <div className="text-base select-none shrink-0">✨</div>
+                  <div className="pr-5">
+                    <h4 className="text-xs font-black text-emerald-800 uppercase tracking-wider font-mono">
+                      Despachado com Sucesso!
+                    </h4>
+                    <p className="text-[10.5px] text-emerald-700 font-mono mt-1 leading-normal">
+                      A ordem <strong className="text-slate-950 font-extrabold">{lastDispatchedOrder.id}</strong> para <strong className="text-slate-950 font-extrabold">{lastDispatchedOrder.destName}</strong> foi enviada em tempo real para os entregadores ativos de Passos - MG.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setLastDispatchedOrder(null)}
+                    className="absolute top-2.5 right-2.5 text-emerald-400 hover:text-emerald-700 font-bold transition p-0.5"
+                    title="Fechar aviso"
+                  >
+                    <span className="text-xs block leading-none font-sans">✕</span>
+                  </button>
+                </div>
+              )}
+
               <div className="mb-4">
                 <label className="block text-xs font-bold text-slate-700 uppercase font-mono">Tipo de Destino para Entrega</label>
                 <div className="grid grid-cols-2 gap-2 mt-1">
@@ -4994,7 +5018,14 @@ export default function App() {
                 setQuickClientEndereco('');
                 setIsQuickRegisteringDestinatario(false);
 
-                alert(`Entrega ${novaOrdemId} despachada com sucesso para ${finalDestName}! Já está disponível para os entregadores aceitarem em tempo real.`);
+                // Set local reactive dispatch confirmation card details
+                setLastDispatchedOrder({ id: novaOrdemId, destName: finalDestName });
+                
+                // Trigger floating real-time synchronized status toast
+                setSupabaseSuccessMsg(`🚀 Entrega ${novaOrdemId} despachada com sucesso para "${finalDestName}"! Disponível para os entregadores.`);
+                setTimeout(() => {
+                  setSupabaseSuccessMsg('');
+                }, 10000);
               }} className="space-y-4">
                 
                 {destinoTipo === 'endereco' ? (
