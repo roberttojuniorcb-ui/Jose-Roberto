@@ -1,0 +1,8 @@
+{
+	"appId": "com.torquelog.app",
+	"appName": "TorqueLog",
+	"webDir": "dist",
+	"server": {
+		"androidScheme": "https"
+	}
+}
