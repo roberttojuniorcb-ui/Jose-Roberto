@@ -2617,207 +2617,47 @@ export default function App() {
                 </button>
               </form>
 
-              {/* SECTION: DOWNLOAD MOBILE APP (CAPACITOR HYBRID BUILD) */}
-              <div className="border-t border-slate-800/80 pt-5 mt-5 space-y-4" id="mobile-download-section">
-                <div className="text-center">
-                  <span className="text-[9px] font-mono font-black text-orange-400 bg-orange-500/10 px-1.5 py-0.5 rounded tracking-widest uppercase inline-block mb-1">CAPACITOR HYBRID BUILD</span>
-                  <h3 className="text-xs font-bold text-slate-200 uppercase tracking-tight font-sans flex items-center justify-center gap-1.5">
-                    <Smartphone className="w-4 h-4 text-orange-400 shrink-0" />
+              {/* SECTION: DOWNLOAD MOBILE APP (MINIMALIST GRAPHICS) */}
+              <div className="border-t border-slate-800/80 pt-5 mt-5 space-y-3 text-center" id="mobile-download-section">
+                <div>
+                  <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider font-sans flex items-center justify-center gap-1.5">
+                    <Smartphone className="w-3.5 h-3.5 text-orange-500 shrink-0" />
                     Instalar TorqueLog no Celular
                   </h3>
-                  <p className="text-[10px] text-slate-400 font-sans mt-0.5">Baixe o aplicativo nativo oficial no celular</p>
-                  
-                  {/* Repo Config Toggle Button */}
-                  <button
-                    type="button"
-                    onClick={() => setShowGithubConfig(!showGithubConfig)}
-                    className="text-[9px] text-orange-400/80 hover:text-orange-300 font-mono underline mt-1.5 inline-block focus:outline-none transition cursor-pointer"
+                  <p className="text-[9px] text-slate-400 font-sans mt-0.5">Clique no ícone para baixar diretamente o arquivo executável</p>
+                </div>
+
+                <div className="flex items-center justify-center gap-8 py-2.5">
+                  {/* Android Link / Figure */}
+                  <a
+                    href="/downloads/app-debug.apk"
+                    download="TorqueLog-Android.apk"
+                    className="flex flex-col items-center gap-2 group cursor-pointer"
+                    title="Baixar para Android (APK)"
                   >
-                    ⚙️ Configurar Links do Repositório
-                  </button>
+                    <div className="w-16 h-16 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-center group-hover:bg-emerald-950/20 group-hover:border-emerald-500/50 group-active:scale-95 transition-all duration-200 shadow-lg shadow-emerald-500/2">
+                      <svg className="w-9 h-9 text-slate-400 group-hover:text-emerald-400 transition-colors duration-200 fill-current" viewBox="0 0 24 24" referrerPolicy="no-referrer">
+                        <path d="M17.523 15.3l-1.85-3.197a1.03 1.03 0 0 0-.895-.503h-.136V5.448A4.148 4.148 0 0 0 10.493 1.3a4.148 4.148 0 0 0-4.149 4.148v6.152h-.136c-.37 0-.71.196-.895.503L3.463 15.3a1.035 1.035 0 0 0 .515 1.408l2.12.983c.31.144.673.1.944-.122l2.368-1.928a.513.513 0 0 1 .655 0l2.367 1.928a1.035 1.035 0 0 0 .945.122l2.12-.983a1.034 1.034 0 0 0 .515-1.408zm-8.875-5.45c-.426 0-.776-.35-.776-.777 0-.427.35-.776.776-.776s.777.349.777.776c0 .428-.35.777-.777.777zm3.696 0c-.427 0-.776-.35-.777-.777s.35-.776.777-.776c.427 0 .776.349.776.776-.001.428-.35.777-.776.777z"/>
+                      </svg>
+                    </div>
+                    <span className="text-[10px] uppercase tracking-widest font-mono font-bold text-slate-400 group-hover:text-emerald-400 transition-colors duration-200">Android (APK)</span>
+                  </a>
+
+                  {/* iOS Link / Figure */}
+                  <a
+                    href="/downloads/TorqueLog-Unsigned.ipa"
+                    download="TorqueLog-iOS.ipa"
+                    className="flex flex-col items-center gap-2 group cursor-pointer"
+                    title="Baixar para iOS (IPA)"
+                  >
+                    <div className="w-16 h-16 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-center group-hover:bg-cyan-950/20 group-hover:border-cyan-500/50 group-active:scale-95 transition-all duration-200 shadow-lg shadow-cyan-500/2">
+                      <svg className="w-8 h-8 text-slate-400 group-hover:text-white transition-colors duration-200 fill-current" viewBox="0 0 24 24" referrerPolicy="no-referrer">
+                        <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M15.97 4.17c.66-.81 1.11-1.93.99-3.06-.96.04-2.13.64-2.82 1.45-.6.7-1.13 1.84-.99 2.94.1.08.2.12.3.12.87 0 1.96-.54 2.52-1.45z"/>
+                      </svg>
+                    </div>
+                    <span className="text-[10px] uppercase tracking-widest font-mono font-bold text-slate-400 group-hover:text-white transition-colors duration-200">iOS (IPA)</span>
+                  </a>
                 </div>
-
-                {/* GitHub Config Panel */}
-                {showGithubConfig && (
-                  <div className="bg-slate-900 border border-slate-800 p-3 rounded-xl space-y-2 font-sans text-xs animate-[fadeIn_0.15s_ease-out]">
-                    <p className="text-slate-300 font-bold text-[10px] uppercase tracking-wider text-orange-400">Repositório do GitHub do Motor do TorqueLog</p>
-                    <p className="text-slate-400 text-[10px]">Configure abaixo o seu repositório do GitHub para disponibilizar os downloads automáticos gerados pelo GitHub Actions.</p>
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        placeholder="usuario/repositorio (ex: roberttojuniorcb/torquelog)"
-                        value={githubRepoPath}
-                        onChange={(e) => {
-                          setGithubRepoPath(e.target.value);
-                          localStorage.setItem('torquelog_github_repo_path', e.target.value);
-                        }}
-                        className="flex-1 bg-slate-950 border border-slate-800 text-xs text-white rounded p-1.5 focus:outline-none focus:border-orange-500 font-mono text-center"
-                      />
-                    </div>
-                    <div className="flex items-center justify-between text-[10px] text-slate-500">
-                      <span>Usando Tags GitHub Releases "latest"</span>
-                      <button
-                        type="button"
-                        onClick={() => setShowGithubConfig(false)}
-                        className="text-orange-400 font-bold hover:underline cursor-pointer font-mono"
-                      >
-                        Pronto
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {/* Direct & Interactive Download Grid */}
-                <div className="space-y-3" id="download-cards-container">
-                  {/* Android Direct Download Card */}
-                  <div className="bg-slate-950/80 border border-slate-800/85 rounded-xl p-3 space-y-2.5">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <svg className="w-5 h-5 text-emerald-400 shrink-0 fill-current" viewBox="0 0 24 24" referrerPolicy="no-referrer">
-                          <path d="M17.523 15.3l-1.85-3.197a1.03 1.03 0 0 0-.895-.503h-.136V5.448A4.148 4.148 0 0 0 10.493 1.3a4.148 4.148 0 0 0-4.149 4.148v6.152h-.136c-.37 0-.71.196-.895.503L3.463 15.3a1.035 1.035 0 0 0 .515 1.408l2.12.983c.31.144.673.1.944-.122l2.368-1.928a.513.513 0 0 1 .655 0l2.367 1.928a1.035 1.035 0 0 0 .945.122l2.12-.983a1.034 1.034 0 0 0 .515-1.408zm-8.875-5.45c-.426 0-.776-.35-.776-.777 0-.427.35-.776.776-.776s.777.349.777.776c0 .428-.35.777-.777.777zm3.696 0c-.427 0-.776-.35-.777-.777s.35-.776.777-.776c.427 0 .776.349.776.776-.001.428-.35.777-.776.777z"/>
-                        </svg>
-                        <span className="text-xs font-bold text-slate-100 font-sans">Aplicativo Android (APK)</span>
-                      </div>
-                      <span className="text-[8px] font-mono text-emerald-400 bg-emerald-400/10 px-1 py-0.2 rounded font-black tracking-wider uppercase">Downloads Disponíveis</span>
-                    </div>
-
-                    <div className="space-y-1.5 font-mono">
-                      {/* Direct Portal Link */}
-                      <a
-                        href="/downloads/app-debug.apk"
-                        download="TorqueLog-Android.apk"
-                        className="w-full bg-emerald-600 hover:bg-emerald-500 active:transform active:scale-95 text-white py-2 px-3 rounded-lg text-[11px] font-bold transition duration-150 flex items-center justify-center gap-1.5 shadow-sm shadow-emerald-600/15 cursor-pointer text-center"
-                      >
-                        <span className="text-sm">⬇️</span> Baixar APK Direto do Portal (Fácil)
-                      </a>
-
-                      <div className="grid grid-cols-5 gap-1.5 font-mono">
-                        {/* GitHub Release Option */}
-                        <a
-                          href={`https://github.com/${githubRepoPath}/releases/download/latest/app-debug.apk`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="col-span-3 bg-slate-900 border border-slate-800 hover:bg-slate-850 hover:border-slate-700 text-slate-300 py-1.5 px-2.5 rounded-lg text-[9.5px] font-bold transition duration-150 flex items-center justify-center gap-1 cursor-pointer text-center"
-                        >
-                          🐈 GitHub Action (Latest)
-                        </a>
-
-                        {/* Info Toggle Button */}
-                        <button
-                          type="button"
-                          onClick={() => setMobileInstallPrompt(mobileInstallPrompt === 'android' ? null : 'android')}
-                          className={`col-span-2 border transition duration-150 rounded-lg text-[9.5px] font-sans font-medium flex items-center justify-center gap-1 cursor-pointer ${mobileInstallPrompt === 'android' ? 'bg-orange-500/10 border-orange-500 text-orange-300' : 'bg-slate-900 border-slate-800 hover:border-slate-700 text-slate-300'}`}
-                        >
-                          ℹ️ Como Instalar
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* iOS Direct Download Card */}
-                  <div className="bg-slate-950/80 border border-slate-800/85 rounded-xl p-3 space-y-2.5">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <svg className="w-5 h-5 text-white shrink-0 fill-current" viewBox="0 0 24 24" referrerPolicy="no-referrer">
-                          <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M15.97 4.17c.66-.81 1.11-1.93.99-3.06-.96.04-2.13.64-2.82 1.45-.6.7-1.13 1.84-.99 2.94.1.08.2.12.3.12.87 0 1.96-.54 2.52-1.45z"/>
-                        </svg>
-                        <span className="text-xs font-bold text-slate-100 font-sans">Aplicativo iOS (IPA)</span>
-                      </div>
-                      <span className="text-[8px] font-mono text-cyan-400 bg-cyan-400/10 px-1 py-0.2 rounded font-black tracking-wider uppercase">Sideload Disponível</span>
-                    </div>
-
-                    <div className="space-y-1.5 font-mono">
-                      {/* Direct Portal Link */}
-                      <a
-                        href="/downloads/TorqueLog-Unsigned.ipa"
-                        download="TorqueLog-iOS.ipa"
-                        className="w-full bg-orange-600 hover:bg-orange-500 active:transform active:scale-95 text-white py-2 px-3 rounded-lg text-[11px] font-bold transition duration-150 flex items-center justify-center gap-1.5 shadow-sm shadow-orange-600/15 cursor-pointer text-center"
-                      >
-                        <span className="text-sm">⬇️</span> Baixar IPA Direto do Portal (Fácil)
-                      </a>
-
-                      <div className="grid grid-cols-5 gap-1.5 font-mono">
-                        {/* GitHub Option */}
-                        <a
-                          href={`https://github.com/${githubRepoPath}/releases/download/latest/TorqueLog-Unsigned.ipa`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="col-span-3 bg-slate-900 border border-slate-800 hover:bg-slate-850 hover:border-slate-700 text-slate-300 py-1.5 px-2.5 rounded-lg text-[9.5px] font-bold transition duration-150 flex items-center justify-center gap-1 cursor-pointer text-center"
-                        >
-                          🐈 GitHub Release
-                        </a>
-
-                        {/* Info Toggle Button */}
-                        <button
-                          type="button"
-                          onClick={() => setMobileInstallPrompt(mobileInstallPrompt === 'ios' ? null : 'ios')}
-                          className={`col-span-2 border transition duration-150 rounded-lg text-[9.5px] font-sans font-medium flex items-center justify-center gap-1 cursor-pointer ${mobileInstallPrompt === 'ios' ? 'bg-orange-500/10 border-orange-500 text-orange-300' : 'bg-slate-900 border-slate-800 hover:border-slate-700 text-slate-300'}`}
-                        >
-                          ℹ️ Como Instalar
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Animated Interactive Guide Subpanel */}
-                <AnimatePresence mode="wait">
-                  {mobileInstallPrompt && (
-                    <motion.div
-                      key={mobileInstallPrompt}
-                      initial={{ opacity: 0, y: -10, height: 0 }}
-                      animate={{ opacity: 1, y: 0, height: 'auto' }}
-                      exit={{ opacity: 0, y: -10, height: 0 }}
-                      transition={{ duration: 0.2 }}
-                      className="bg-slate-950 border border-slate-800 p-3.5 rounded-xl text-xs leading-relaxed space-y-2.5 font-mono overflow-hidden"
-                      id="installation-prompt-panel"
-                    >
-                      {mobileInstallPrompt === 'ios' ? (
-                        <>
-                          <div className="flex items-center gap-1.5 text-orange-400 font-bold uppercase text-[10px]">
-                            <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24" referrerPolicy="no-referrer">
-                              <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M15.97 4.17c.66-.81 1.11-1.93.99-3.06-.96.04-2.13.64-2.82 1.45-.6.7-1.13 1.84-.99 2.94.1.08.2.12.3.12.87 0 1.96-.54 2.52-1.45z"/>
-                            </svg>
-                            <span>Como usar o IPA (iOS)</span>
-                          </div>
-                          <p className="text-[10px] text-slate-350 leading-relaxed font-sans mt-1">
-                            Atualmente, o arquivo no servidor padrão é apenas um marcador (placeholder). Para distribuir o app nativo real iOS aos seus clientes:
-                          </p>
-                          <ul className="list-disc pl-4 text-[10px] text-slate-300 space-y-1 font-sans mt-1.5">
-                            <li><strong>Upload do IPA Real</strong>: Use o Editor de Código do AI Studio e envie o arquivo <code className="text-orange-400">TorqueLog-Unsigned.ipa</code> real para a pasta <code className="text-orange-350">public/downloads/</code> de seu projeto para substituir o marcador temporário.</li>
-                            <li><strong>Instalação Sideload</strong>: Seus clientes podem assinar e rodar o arquivo IPA em qualquer iPhone com serviços como AltStore, Sideloadly, TrollStore ou Scarlet diretamente.</li>
-                            <li><strong>Erro com link do GitHub?</strong>: O botão do GitHub só funcionará se você configurar o seu repositório no GitHub como <strong>Público</strong> e publicar uma release oficial com a tag <code className="text-orange-400">latest</code> contendo o arquivo compilado lá.</li>
-                          </ul>
-                        </>
-                      ) : (
-                        <>
-                          <div className="flex items-center gap-1.5 text-emerald-400 font-bold uppercase text-[10px]">
-                            <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24" referrerPolicy="no-referrer">
-                              <path d="M17.523 15.3l-1.85-3.197a1.03 1.03 0 0 0-.895-.503h-.136V5.448A4.148 4.148 0 0 0 10.493 1.3a4.148 4.148 0 0 0-4.149 4.148v6.152h-.136c-.37 0-.71.196-.895.503L3.463 15.3a1.035 1.035 0 0 0 .515 1.408l2.12.983c.31.144.673.1.944-.122l2.368-1.928a.513.513 0 0 1 .655 0l2.367 1.928a1.035 1.035 0 0 0 .945.122l2.12-.983a1.034 1.034 0 0 0 .515-1.408zm-8.875-5.45c-.426 0-.776-.35-.776-.777 0-.427.35-.776.776-.776s.777.349.777.776c0 .428-.35.777-.777.777zm3.696 0c-.427 0-.776-.35-.777-.777s.35-.776.777-.776c.427 0 .776.349.776.776-.001.428-.35.777-.776.777z"/>
-                            </svg>
-                            <span>Como instalar o APK (Android)</span>
-                          </div>
-                          <p className="text-[10px] text-slate-350 leading-relaxed font-sans mt-1">
-                            Atualmente, o arquivo padrão hospedado no servidor é apenas um marcador (placeholder) temporário de texto. Para que funcione perfeitamente para todos os usuários:
-                          </p>
-                          <ul className="list-disc pl-4 text-[10px] text-slate-300 space-y-1 font-sans mt-1.5">
-                            <li><strong>Passo Único (Fácil e Direto)</strong>: Baixe o arquivo <code className="text-emerald-400">app-debug.apk</code> real gerado pelo GitHub Actions (ou buildado em seu PC). Abra o Editor de Código do AI Studio e envie ele diretamente para a pasta <code className="text-emerald-450">public/downloads/</code> substituindo o existente do site.</li>
-                            <li><strong>Instalação sem erro</strong>: Enviando o arquivo de 15MB~20MB executável para a pasta mencionada, qualquer cliente ou motoboy poderá baixar pelo botão verde e instalar na hora!</li>
-                            <li><strong>Sobre o Erro 520 / 404 do GitHub</strong>: Se o botão do GitHub falhar, indica que o seu repositório está configurado como <strong>Privado</strong> (o que impede downloads públicos pela internet) ou que a Release com a tag <code className="text-orange-400">latest</code> ainda não foi criada.</li>
-                          </ul>
-                        </>
-                      )}
-                      
-                      <button
-                        type="button"
-                        onClick={() => setMobileInstallPrompt(null)}
-                        className="w-full bg-slate-900 hover:bg-slate-850 text-slate-400 font-bold py-1 px-2.5 rounded text-[10px] border border-slate-800 hover:text-white transition cursor-pointer"
-                      >
-                        Fechar Guia
-                      </button>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
               </div>
 
               {/* Proposal Link, Whatsapp Support Button & Email Container */}
