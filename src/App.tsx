@@ -326,7 +326,19 @@ export default function App() {
   // --- STATES FOR FECHAMENTO / RELATORIOS ---
   const [isReportModalOpen, setIsReportModalOpen] = useState<boolean>(false);
   const [reportRole, setReportRole] = useState<'Empresa' | 'Cliente' | 'Motoboy' | null>(null);
-  const [reportPeriod, setReportPeriod] = useState<'Semana' | 'Mes'>('Semana');
+  const [reportPeriod, setReportPeriod] = useState<'Semana' | 'Mes' | 'Personalizado'>('Semana');
+  const [reportFilterStartDate, setReportFilterStartDate] = useState<string>(() => {
+    const d = new Date();
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    return `${year}-${month}-01`;
+  });
+  const [reportFilterEndDate, setReportFilterEndDate] = useState<string>(() => {
+    const d = new Date();
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    return `${year}-${month}-${String(new Date(year, d.getMonth() + 1, 0).getDate()).padStart(2, '0')}`;
+  });
   const [reportFilterClienteId, setReportFilterClienteId] = useState<string>('Todos');
   const [reportFilterMotoboyId, setReportFilterMotoboyId] = useState<string>('Todos');
   const [selfRegSenha, setSelfRegSenha] = useState<string>('');
@@ -1805,6 +1817,11 @@ export default function App() {
         const diffTime = Math.abs(today.getTime() - orderDate.getTime());
         const diffDays = diffTime / (1000 * 60 * 60 * 24);
         if (diffDays > 7) return false;
+      } else if (reportPeriod === 'Personalizado') {
+        const orderDateStr = o.criadoEm.slice(0, 10); // "YYYY-MM-DD"
+        if (orderDateStr < reportFilterStartDate || orderDateStr > reportFilterEndDate) {
+          return false;
+        }
       } else {
         if (orderDate.getMonth() !== today.getMonth() || orderDate.getFullYear() !== today.getFullYear()) {
           return false;
@@ -6075,7 +6092,7 @@ export default function App() {
               {/* Selector for Period & Filters */}
               <div className="bg-slate-50 border border-slate-150 p-4 rounded-xl mb-5 space-y-4">
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                  <div className="flex items-center gap-2 font-mono text-xs">
+                  <div className="flex flex-wrap items-center gap-2 font-mono text-xs">
                     <span className="font-bold text-slate-650">📅 Período de Conferência:</span>
                     <div className="inline-flex rounded-lg border border-slate-200 bg-white p-0.5">
                       <button
@@ -6092,6 +6109,13 @@ export default function App() {
                       >
                         Mês Atual
                       </button>
+                      <button
+                        type="button"
+                        onClick={() => setReportPeriod('Personalizado')}
+                        className={`px-3 py-1 text-[11px] font-bold rounded-md transition ${reportPeriod === 'Personalizado' ? 'bg-orange-500 text-white shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}
+                      >
+                        Fechamento Customizado 📅
+                      </button>
                     </div>
                   </div>
 
@@ -6099,13 +6123,101 @@ export default function App() {
                   <button
                     type="button"
                     onClick={() => {
-                      window.print();
+                      const list = getFilteredReportOrders();
+                      let billed = 0;
+                      let owed = 0;
+                      list.forEach(o => {
+                        billed += (o.valorCobradoCliente || 10.00) + (o.retornoPeca ? (o.taxaReversa || 15.00) : 0);
+                        owed += (o.valorPagoMotoboy || 4.00) + (o.retornoPeca ? (o.taxaReversa || 15.00) : 0);
+                      });
+                      const count = list.length;
+                      const profit = billed - owed;
+
+                      let periodText = '';
+                      if (reportPeriod === 'Semana') {
+                        periodText = 'Últimos 7 dias (Semana Atual)';
+                      } else if (reportPeriod === 'Mes') {
+                        periodText = 'Este Mês';
+                      } else {
+                        periodText = `${reportFilterStartDate.split('-').reverse().join('/')} até ${reportFilterEndDate.split('-').reverse().join('/')}`;
+                      }
+
+                      let profile = '';
+                      let details = '';
+                      if (reportRole === 'Motoboy') {
+                        profile = `Entregador MEI: ${activeMotoboyUser?.nome || 'Motoboy Parceiro'}`;
+                        details = `• Quantidade de Corridas: ${count}\n• Total de Comissão a receber: R$ ${owed.toFixed(2)}`;
+                      } else if (reportRole === 'Cliente') {
+                        profile = `Cliente / Oficina B2B: ${activeClienteUser?.nome || 'Cliente Parceiro'}`;
+                        details = `• Quantidade de Corridas: ${count}\n• Custo total de faturamento: R$ ${billed.toFixed(2)}`;
+                      } else {
+                        profile = `Administração torqueLog (Geral)`;
+                        details = `• Qtd Corridas: ${count}\n• Total Clientes B2B: R$ ${billed.toFixed(2)}\n• Pago aos Motoboys: R$ ${owed.toFixed(2)}\n• Lucro Líquido: R$ ${profit.toFixed(2)}`;
+                      }
+
+                      let orderBreakdown = list.slice(0, 40).map(o => {
+                        const val = reportRole === 'Cliente' 
+                          ? ((o.valorCobradoCliente || 10.00) + (o.retornoPeca ? (o.taxaReversa || 15.00) : 0))
+                          : ((o.valorPagoMotoboy || 4.00) + (o.retornoPeca ? (o.taxaReversa || 15.00) : 0));
+                        return `✅ OS #${o.id} | ${new Date(o.criadoEm).toLocaleDateString('pt-BR')} | ${o.clienteNome.slice(0, 15)} | R$ ${val.toFixed(2)}`;
+                      }).join('\n');
+
+                      if (list.length > 40) {
+                        orderBreakdown += `\n_...e outras ${list.length - 40} ordens no período._`;
+                      }
+
+                      const textMsg = `*🧾 COMPROVANTE DE FECHAMENTO - TORQUELOG*\n` +
+                        `-----------------------------------------\n` +
+                        `📅 *Período:* ${periodText}\n` +
+                        `👤 *Titular:* ${profile}\n` +
+                        `-----------------------------------------\n` +
+                        `💰 *RESUMO DO FECHAMENTO:* \n${details}\n\n` +
+                        `*📦 DETALHE DAS ENTREGAS:*\n` +
+                        `${orderBreakdown || 'Nenhuma ordem no período selecionado.'}\n\n` +
+                        `-----------------------------------------\n` +
+                        `📲 *DICA:* Para salvar ou imprimir em formato PDF, utilize a tela de impressão do dispositivo que se abrirá em seguida.\n` +
+                        `🌐 Gerado via painel TorqueLog em: ${new Date().toLocaleDateString('pt-BR')} ${new Date().toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'})}`;
+
+                      // Open WhatsApp
+                      const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(textMsg)}`;
+                      window.open(waUrl, '_blank');
+
+                      // Open Print
+                      setTimeout(() => {
+                        window.print();
+                      }, 1200);
                     }}
-                    className="bg-slate-900 hover:bg-slate-850 text-white text-[11px] font-bold font-mono py-1.5 px-3 rounded-lg flex items-center gap-1.5 shadow transition-all cursor-pointer"
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold font-mono py-1.5 px-3 rounded-lg flex items-center gap-1.5 shadow transition-all cursor-pointer"
                   >
-                    🖨️ Imprimir Fechamento (Imprimir/PDF)
+                    📄 Enviar em PDF o Fechamento
                   </button>
                 </div>
+
+                {reportPeriod === 'Personalizado' && (
+                  <div className="bg-white border border-slate-200 p-4 rounded-xl flex flex-col sm:flex-row flex-wrap items-end gap-4 animate-fade-in">
+                    <div className="flex flex-col">
+                      <label className="text-[10px] font-bold uppercase text-slate-500 mb-1 font-mono">📅 Data de Início</label>
+                      <input
+                        type="date"
+                        value={reportFilterStartDate}
+                        onChange={(e) => setReportFilterStartDate(e.target.value)}
+                        className="bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs font-mono font-bold text-slate-800 focus:bg-white focus:outline-none focus:ring-1 focus:ring-orange-500 cursor-pointer"
+                      />
+                    </div>
+                    <div className="flex flex-col">
+                      <label className="text-[10px] font-bold uppercase text-slate-500 mb-1 font-mono">📅 Data de Término</label>
+                      <input
+                        type="date"
+                        value={reportFilterEndDate}
+                        onChange={(e) => setReportFilterEndDate(e.target.value)}
+                        className="bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs font-mono font-bold text-slate-800 focus:bg-white focus:outline-none focus:ring-1 focus:ring-orange-500 cursor-pointer"
+                      />
+                    </div>
+                    <div className="text-xs text-slate-500 font-mono pb-1">
+                      Filtrado: <span className="font-bold text-orange-650">{reportFilterStartDate.split('-').reverse().join('/')}</span> a <span className="font-bold text-orange-650">{reportFilterEndDate.split('-').reverse().join('/')}</span>
+                    </div>
+                  </div>
+                )}
 
                 {/* Filters specifically for torqueLog Admin (Empresa role) */}
                 {reportRole === 'Empresa' && (
