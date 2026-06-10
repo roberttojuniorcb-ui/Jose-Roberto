@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
+  Navigation,
   Bike, 
   Building2, 
   Users, 
@@ -73,6 +74,7 @@ import {
   BAÚ_CAPACIDADE_MAXIMA 
 } from './utils/logisticsEngine';
 import MapaDaCidade from './components/MapaDaCidade';
+import GpsNavigator from './components/GpsNavigator';
 import TorqueLogLogoIcon from './components/TorqueLogLogoIcon';
 
 const MONTHS_PT = [
@@ -340,6 +342,7 @@ export default function App() {
   const [selectedMotoboyIdForTracking, setSelectedMotoboyIdForTracking] = useState<string | null>(null);
   const [animationTick, setAnimationTick] = useState<number>(0);
   const [mobileInstallPrompt, setMobileInstallPrompt] = useState<'ios' | 'android' | null>(null);
+  const [activeGpsOrder, setActiveGpsOrder] = useState<OrdemServico | null>(null);
   // Safe storage helper to prevent crash in sandboxed iframes when cookies/storage are denied
   const safeGetLocalStorage = (key: string, defaultValue: string): string => {
     try {
@@ -2201,6 +2204,13 @@ export default function App() {
     });
 
     setOrdens(nextOrdens);
+
+    if (novoStatus === 'Moto a Caminho') {
+      const updatedOrder = nextOrdens.find(o => o.id === ordemId);
+      if (updatedOrder) {
+        setActiveGpsOrder(updatedOrder);
+      }
+    }
 
     if (isFirebaseConfigured) {
       try {
@@ -4720,9 +4730,20 @@ export default function App() {
           PORTAL PERSPECTIVE: MOTOBOY DASHBOARD
           ========================================== */}
       {effectiveRole === 'Motoboy' && (
-        <main className="max-w-7xl mx-auto p-4 lg:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 flex-1 w-full" id="motoboy-main">
-          
-          {/* Active Audio/Visual Driver Alerts Banner */}
+        <main className="max-w-7xl mx-auto p-4 lg:p-6 flex flex-col gap-6 flex-1 w-full animate-fade-in" id="motoboy-main">
+          {activeGpsOrder ? (
+            <GpsNavigator 
+              order={activeGpsOrder}
+              client={clientes.find(c => c.id === activeGpsOrder.clienteId) || null}
+              onBack={() => setActiveGpsOrder(null)}
+              onDelivered={() => {
+                setActiveSignOrder(activeGpsOrder);
+                setActiveGpsOrder(null);
+              }}
+            />
+          ) : (
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full">
+              {/* Active Audio/Visual Driver Alerts Banner */}
           {activeDriverAlerts.length > 0 && (
             <div className="lg:col-span-12 space-y-3" id="driver-live-alerts-container">
               <AnimatePresence>
@@ -4886,23 +4907,34 @@ export default function App() {
 
                       </div>
 
-                      <div className="flex sm:flex-col items-end gap-2 shrink-0 w-full sm:w-auto border-t sm:border-t-0 pt-2 sm:pt-0 mt-1 sm:mt-0">
+                      <div className="flex sm:flex-col items-stretch sm:items-end gap-2 shrink-0 w-full sm:w-auto border-t sm:border-t-0 pt-2 sm:pt-0 mt-1 sm:mt-0">
                         {o.status !== 'Moto a Caminho' ? (
                           <button
                             onClick={() => handleAtualizarStatusOrdem(o.id, 'Moto a Caminho')}
-                            className="bg-orange-500 hover:bg-orange-600 active:scale-95 text-white font-mono font-bold text-xs px-3 py-2 rounded-lg transition shadow shadow-orange-500/10 cursor-pointer flex items-center gap-1.5 w-full sm:w-auto text-center justify-center"
+                            className="bg-orange-500 hover:bg-orange-600 active:scale-95 text-white font-mono font-bold text-xs px-3 py-2 rounded-lg transition shadow shadow-orange-500/10 cursor-pointer flex items-center gap-1.5 w-full sm:w-auto text-center justify-center font-mono font-black"
                           >
-                            <TorqueLogLogoIcon size={16} className="text-white" variant={logoVariant} />
+                            <TorqueLogLogoIcon size={16} className="text-white animate-spin-slow" variant={logoVariant} />
                             Aceitar Corrida 🏍️
                           </button>
                         ) : (
-                          <button
-                            onClick={() => setActiveSignOrder(o)}
-                            className="bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-mono font-bold text-xs px-3 py-2 rounded-lg transition shadow shadow-emerald-500/10 cursor-pointer flex items-center gap-1 w-full sm:w-auto text-center justify-center"
-                          >
-                            <FileText className="w-3.5 h-3.5" />
-                            Entregar e Assinar ✍️
-                          </button>
+                          <div className="flex flex-col gap-1.5 w-full">
+                            <button
+                              type="button"
+                              onClick={() => setActiveGpsOrder(o)}
+                              className="bg-orange-500 hover:bg-orange-600 active:scale-95 text-white font-mono font-bold text-xs px-3 py-2 rounded-lg transition shadow shadow-orange-500/10 cursor-pointer flex items-center gap-1.5 justify-center w-full grow font-black"
+                            >
+                              <Navigation className="w-3.5 h-3.5 animate-pulse" />
+                              Seguir no GPS 🗺️
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setActiveSignOrder(o)}
+                              className="bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-mono font-bold text-xs px-3 py-2 rounded-lg transition shadow shadow-emerald-500/20 cursor-pointer flex items-center gap-1.5 justify-center w-full grow font-black"
+                            >
+                              <FileText className="w-3.5 h-3.5" />
+                              Entregar e Assinar ✍️
+                            </button>
+                          </div>
                         )}
                         <button
                           type="button"
@@ -4983,6 +5015,8 @@ export default function App() {
               </ul>
             </div>
           </div>
+          </div>
+          )}
 
         </main>
       )}
