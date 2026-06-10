@@ -32,12 +32,16 @@ async function testConnection() {
   try {
     await getDocFromServer(doc(db, 'test', 'connection'));
   } catch (error) {
-    if (error instanceof Error && error.message.includes('the client is offline')) {
-      console.error("Please check your Firebase configuration or network.");
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    if (errorMsg.includes('the client is offline') || errorMsg.includes('Could not reach Cloud Firestore')) {
+      console.warn("Firebase client is currently operating in offline mode. Please check network connectivity.");
     }
   }
 }
-testConnection();
+// Run asynchronously after initial load to avoid blocking startup
+setTimeout(() => {
+  testConnection();
+}, 2000);
 
 // --- Error Handling as required by the Eight Pillars ---
 export enum OperationType {

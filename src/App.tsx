@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Bike, 
@@ -32,7 +32,9 @@ import {
   UserCheck,
   RefreshCw,
   Edit,
-  Trash2
+  Trash2,
+  Bell,
+  Volume2
 } from 'lucide-react';
 import { Cliente, OrdemServico, Quadrante, APIResponse, Motoboy } from './types';
 import { getInitialClientes, AUTO_PECA_SUGESTOES, INITIAL_MOTOBOYS } from './mockData';
@@ -338,7 +340,17 @@ export default function App() {
   const [selectedMotoboyIdForTracking, setSelectedMotoboyIdForTracking] = useState<string | null>(null);
   const [animationTick, setAnimationTick] = useState<number>(0);
   const [mobileInstallPrompt, setMobileInstallPrompt] = useState<'ios' | 'android' | null>(null);
-  const [githubRepoPath, setGithubRepoPath] = useState<string>(() => localStorage.getItem('torquelog_github_repo_path') || 'roberttojuniorcb/torquelog');
+  // Safe storage helper to prevent crash in sandboxed iframes when cookies/storage are denied
+  const safeGetLocalStorage = (key: string, defaultValue: string): string => {
+    try {
+      return localStorage.getItem(key) || defaultValue;
+    } catch (e) {
+      console.warn("Cookies or storage are blocked in this iframe. Operating in transient memory mode:", e);
+      return defaultValue;
+    }
+  };
+
+  const [githubRepoPath, setGithubRepoPath] = useState<string>(() => safeGetLocalStorage('torquelog_github_repo_path', 'roberttojuniorcb/torquelog'));
   const [showGithubConfig, setShowGithubConfig] = useState<boolean>(false);
 
   useEffect(() => {
@@ -347,6 +359,92 @@ export default function App() {
     }, 150);
     return () => clearInterval(interval);
   }, []);
+
+  // --- REAL-TIME VISUAL AND SONAR DRIVER NOTIFICATIONS ENGINE ---
+  const seenOrderIdsRef = useRef<Set<string>>(new Set());
+  const [activeDriverAlerts, setActiveDriverAlerts] = useState<OrdemServico[]>([]);
+
+  // Web Audio synth double beep/chime generator for browser safety & speed
+  const playNotificationSound = () => {
+    try {
+      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioContextClass) return;
+      const ctx = new AudioContextClass();
+      const now = ctx.currentTime;
+      
+      // Note 1: E5 (659.25 Hz)
+      const osc1 = ctx.createOscillator();
+      const gain1 = ctx.createGain();
+      osc1.type = 'sine';
+      osc1.frequency.setValueAtTime(659.25, now);
+      gain1.gain.setValueAtTime(0, now);
+      gain1.gain.linearRampToValueAtTime(0.15, now + 0.05);
+      gain1.gain.exponentialRampToValueAtTime(0.0001, now + 0.35);
+      osc1.connect(gain1);
+      gain1.connect(ctx.destination);
+      osc1.start(now);
+      osc1.stop(now + 0.4);
+
+      // Note 2: A5 (880.00 Hz)
+      const osc2 = ctx.createOscillator();
+      const gain2 = ctx.createGain();
+      osc2.type = 'sine';
+      osc2.frequency.setValueAtTime(880.00, now + 0.12);
+      gain2.gain.setValueAtTime(0, now + 0.12);
+      gain2.gain.linearRampToValueAtTime(0.20, now + 0.17);
+      gain2.gain.exponentialRampToValueAtTime(0.0001, now + 0.5);
+      osc2.connect(gain2);
+      gain2.connect(ctx.destination);
+      osc2.start(now + 0.12);
+      osc2.stop(now + 0.6);
+    } catch (error) {
+      console.error("Erro ao gerar som de notificação:", error);
+    }
+  };
+
+  useEffect(() => {
+    // If not in Motoboy portal or no active driver logged in, clear lists
+    if (activeSessionRole !== 'Motoboy' || !activeMotoboyUser) {
+      if (activeDriverAlerts.length > 0) setActiveDriverAlerts([]);
+      seenOrderIdsRef.current.clear();
+      return;
+    }
+
+    const driverCity = activeMotoboyUser.cidade || 'Passos - MG';
+
+    // To prevent immediate sound spam of historical entries upon driver login,
+    // we populate the seen block with existing orders in the system.
+    if (seenOrderIdsRef.current.size === 0) {
+      ordens.forEach(o => {
+        seenOrderIdsRef.current.add(o.id);
+      });
+      return;
+    }
+
+    // Filter incoming real-time synchronized orders available for this specific driver and base city
+    const newAvailableOrders = ordens.filter(o => {
+      const isAvailable = o.status === 'Pendente' || o.status === 'Buscando Parceiro';
+      const isSameCity = (o.cidade || 'Passos - MG').trim().toLowerCase() === driverCity.trim().toLowerCase();
+      const isUnclaimed = !o.motoboyId;
+      const isNewlyDispatched = !seenOrderIdsRef.current.has(o.id);
+      return isAvailable && isSameCity && isUnclaimed && isNewlyDispatched;
+    });
+
+    if (newAvailableOrders.length > 0) {
+      // Memorize that we have addressed or seen this order to shield against infinite loops
+      newAvailableOrders.forEach(o => seenOrderIdsRef.current.add(o.id));
+
+      // Merge into live active notifications UI state
+      setActiveDriverAlerts(prev => {
+        const existingIds = new Set(prev.map(p => p.id));
+        const nonDuplicated = newAvailableOrders.filter(o => !existingIds.has(o.id));
+        return [...nonDuplicated, ...prev];
+      });
+
+      // Play the chime beep alert!
+      playNotificationSound();
+    }
+  }, [ordens, activeSessionRole, activeMotoboyUser]);
 
   // --- DATABASE SYNCHRONIZATION AND PRE-POPULATION (FIREBASE & SUPABASE) ---
   const [supabaseLoading, setSupabaseLoading] = useState<boolean>(false);
@@ -2236,10 +2334,10 @@ export default function App() {
             </div>
             <div>
               <div className="flex items-center gap-3">
-                <span className="text-4.5xl font-black tracking-tighter font-mono text-orange-400 drop-shadow-md">TorqueLog</span>
+                <span className="text-[46px] font-black tracking-tighter font-mono text-orange-400 drop-shadow-md">TorqueLog</span>
                 <span className="text-[10px] bg-slate-900 border border-orange-500/30 text-orange-400 px-2.5 py-0.5 rounded font-black font-mono animate-pulse">B2B PORTAL</span>
               </div>
-              <p className="text-[10.5px] text-slate-400 font-mono tracking-wider uppercase mt-1">SISTEMA INTEGRADO DE AUTOPEÇAS & DISTRIBUIDORAS</p>
+              <p className="text-[10.5px] text-slate-400 font-mono tracking-wider uppercase mt-1">PLATAFORMA INTEGRADA DE DISTRIBUIÇÃO DE MERCADORIAS</p>
             </div>
           </div>
           <span className="text-xs font-mono text-slate-500 tracking-widest hidden lg:inline">ROTEIRIZAÇÃO AUTOMOTIVA INTELIGENTE</span>
@@ -2617,49 +2715,6 @@ export default function App() {
                 </button>
               </form>
 
-              {/* SECTION: DOWNLOAD MOBILE APP (MINIMALIST GRAPHICS) */}
-              <div className="border-t border-slate-800/80 pt-5 mt-5 space-y-3 text-center" id="mobile-download-section">
-                <div>
-                  <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider font-sans flex items-center justify-center gap-1.5">
-                    <Smartphone className="w-3.5 h-3.5 text-orange-500 shrink-0" />
-                    Instalar TorqueLog no Celular
-                  </h3>
-                  <p className="text-[9px] text-slate-400 font-sans mt-0.5">Clique no ícone para baixar diretamente o arquivo executável</p>
-                </div>
-
-                <div className="flex items-center justify-center gap-8 py-2.5">
-                  {/* Android Link / Figure */}
-                  <a
-                    href="/downloads/app-debug.apk"
-                    download="TorqueLog-Android.apk"
-                    className="flex flex-col items-center gap-2 group cursor-pointer"
-                    title="Baixar para Android (APK)"
-                  >
-                    <div className="w-16 h-16 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-center group-hover:bg-emerald-950/20 group-hover:border-emerald-500/50 group-active:scale-95 transition-all duration-200 shadow-lg shadow-emerald-500/2">
-                      <svg className="w-9 h-9 text-slate-400 group-hover:text-emerald-400 transition-colors duration-200 fill-current" viewBox="0 0 24 24" referrerPolicy="no-referrer">
-                        <path d="M17.523 15.3l-1.85-3.197a1.03 1.03 0 0 0-.895-.503h-.136V5.448A4.148 4.148 0 0 0 10.493 1.3a4.148 4.148 0 0 0-4.149 4.148v6.152h-.136c-.37 0-.71.196-.895.503L3.463 15.3a1.035 1.035 0 0 0 .515 1.408l2.12.983c.31.144.673.1.944-.122l2.368-1.928a.513.513 0 0 1 .655 0l2.367 1.928a1.035 1.035 0 0 0 .945.122l2.12-.983a1.034 1.034 0 0 0 .515-1.408zm-8.875-5.45c-.426 0-.776-.35-.776-.777 0-.427.35-.776.776-.776s.777.349.777.776c0 .428-.35.777-.777.777zm3.696 0c-.427 0-.776-.35-.777-.777s.35-.776.777-.776c.427 0 .776.349.776.776-.001.428-.35.777-.776.777z"/>
-                      </svg>
-                    </div>
-                    <span className="text-[10px] uppercase tracking-widest font-mono font-bold text-slate-400 group-hover:text-emerald-400 transition-colors duration-200">Android (APK)</span>
-                  </a>
-
-                  {/* iOS Link / Figure */}
-                  <a
-                    href="/downloads/TorqueLog-Unsigned.ipa"
-                    download="TorqueLog-iOS.ipa"
-                    className="flex flex-col items-center gap-2 group cursor-pointer"
-                    title="Baixar para iOS (IPA)"
-                  >
-                    <div className="w-16 h-16 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-center group-hover:bg-cyan-950/20 group-hover:border-cyan-500/50 group-active:scale-95 transition-all duration-200 shadow-lg shadow-cyan-500/2">
-                      <svg className="w-8 h-8 text-slate-400 group-hover:text-white transition-colors duration-200 fill-current" viewBox="0 0 24 24" referrerPolicy="no-referrer">
-                        <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M15.97 4.17c.66-.81 1.11-1.93.99-3.06-.96.04-2.13.64-2.82 1.45-.6.7-1.13 1.84-.99 2.94.1.08.2.12.3.12.87 0 1.96-.54 2.52-1.45z"/>
-                      </svg>
-                    </div>
-                    <span className="text-[10px] uppercase tracking-widest font-mono font-bold text-slate-400 group-hover:text-white transition-colors duration-200">iOS (IPA)</span>
-                  </a>
-                </div>
-              </div>
-
               {/* Proposal Link, Whatsapp Support Button & Email Container */}
               <div className="border-t border-slate-930 pt-4 mt-5 space-y-3.5">
                 <div className="p-3 bg-slate-900 border border-orange-500/30 rounded-xl relative overflow-hidden group">
@@ -2703,7 +2758,7 @@ export default function App() {
 
         <footer className="text-center text-[10px] text-slate-600 font-mono tracking-wider max-w-xl mx-auto py-4">
           <p>TORQUELOG LOGÍSTICA B2B • MODELO TRABALHISTA COMPLIANCE MEI ZERO RISCO ACT</p>
-          <p className="mt-1 opacity-50">Distribuição automatizada de autopeças e balcões com otimização volumétrica por baús de moto.</p>
+          <p className="mt-1 opacity-50">Distribuição automatizada de mercadorias com otimização volumétrica por baús de moto.</p>
           <p className="mt-2 text-orange-400 font-bold select-all flex items-center justify-center gap-1">
             <span>Contacte-nos por e-mail:</span>
             <a href="mailto:administracao@torquelog.com.br" className="underline hover:text-orange-300">administracao@torquelog.com.br</a>
@@ -2730,7 +2785,7 @@ export default function App() {
                   <span className="text-5xl font-black tracking-tighter font-mono text-orange-400 drop-shadow-md select-none uppercase">TorqueLog</span>
                   <span className="text-[10px] bg-amber-500 text-slate-950 font-black px-2 py-0.5 rounded shadow-sm border border-amber-400 animate-pulse">LOGÍSTICA B2B EXPRESS</span>
                 </div>
-                <p className="text-[10.5px] text-orange-100 font-mono tracking-widest font-extrabold uppercase mt-1">PLATAFORMA INTEGRADA DE AUTOPEÇAS & DISTRIBUIDORAS</p>
+                <p className="text-[10.5px] text-orange-100 font-mono tracking-widest font-extrabold uppercase mt-1">PLATAFORMA INTEGRADA DE DISTRIBUIÇÃO DE MERCADORIAS</p>
               </div>
             </div>
  
@@ -4666,6 +4721,77 @@ export default function App() {
           ========================================== */}
       {effectiveRole === 'Motoboy' && (
         <main className="max-w-7xl mx-auto p-4 lg:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 flex-1 w-full" id="motoboy-main">
+          
+          {/* Active Audio/Visual Driver Alerts Banner */}
+          {activeDriverAlerts.length > 0 && (
+            <div className="lg:col-span-12 space-y-3" id="driver-live-alerts-container">
+              <AnimatePresence>
+                {activeDriverAlerts.map(alertOrder => (
+                  <motion.div
+                    key={alertOrder.id}
+                    initial={{ opacity: 0, y: -20, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.95 }}
+                    transition={{ type: "spring", stiffness: 300, damping: 25 }}
+                    className="relative bg-gradient-to-r from-orange-600 via-orange-550 to-amber-600 text-white rounded-2xl border-2 border-orange-400 p-5 shadow-xl shadow-orange-500/10 animate-pulse-slow overflow-hidden flex flex-col md:flex-row md:items-center justify-between gap-5"
+                    style={{ animationDuration: '4s' }}
+                  >
+                    {/* Glowing highlight aura */}
+                    <div className="absolute inset-0 bg-white/5 opacity-20 pointer-events-none" />
+                    
+                    <div className="flex items-start gap-4 z-10">
+                      <div className="bg-white text-orange-600 p-3 rounded-xl shrink-0 flex items-center justify-center shadow">
+                        <Bell className="w-6 h-6 animate-bounce" />
+                      </div>
+                      <div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="bg-white/20 text-white text-[10px] uppercase font-black tracking-widest px-2.5 py-0.5 rounded-full font-mono flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping inline-block" />
+                            Nova Entrega Disponível ({alertOrder.cidade})
+                          </span>
+                          <span className="bg-slate-900/35 text-white font-mono text-[10px] font-bold px-2 py-0.5 rounded">
+                            {alertOrder.id}
+                          </span>
+                        </div>
+                        <h4 className="text-base font-black tracking-tight mt-1">
+                          Retirada em: {alertOrder.clienteNome}
+                        </h4>
+                        <p className="text-xs text-white/90 font-mono mt-1">
+                          🎯 Destino: <strong className="text-white underline">{alertOrder.destinatarioNome || 'Oficina'}</strong> • {alertOrder.enderecoEntrega || `Setor ${alertOrder.quadrante}`}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2.5 shrink-0 z-10 w-full md:w-auto mt-2 md:mt-0 justify-end">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          playNotificationSound();
+                          handleAtualizarStatusOrdem(alertOrder.id, 'Moto a Caminho');
+                          setActiveDriverAlerts(prev => prev.filter(o => o.id !== alertOrder.id));
+                        }}
+                        className="bg-white hover:bg-slate-50 text-orange-600 hover:scale-103 font-mono font-black text-xs px-5 py-3 rounded-xl transition shadow shadow-black/10 cursor-pointer flex items-center justify-center gap-1.5 flex-1 md:flex-none uppercase tracking-wider"
+                      >
+                        <Volume2 className="w-4 h-4 text-orange-500 animate-pulse" />
+                        Aceitar Corrida 🏍️
+                      </button>
+                      
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActiveDriverAlerts(prev => prev.filter(o => o.id !== alertOrder.id));
+                        }}
+                        className="bg-slate-900/20 hover:bg-slate-900/40 border border-white/20 text-white font-mono text-xs font-bold py-3 px-4 rounded-xl hover:scale-102 active:scale-98 transition cursor-pointer"
+                        title="Dispensar aviso"
+                      >
+                        Dispensar ✕
+                      </button>
+                    </div>
+                  </motion.div>
+                ))}
+              </AnimatePresence>
+            </div>
+          )}
           
           {/* Welcome section & Quick stats */}
           <div className="lg:col-span-12 bg-slate-900 text-white rounded-2xl border border-slate-800 p-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 shadow-md shadow-orange-500/5">
