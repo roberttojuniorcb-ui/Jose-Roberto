@@ -1295,6 +1295,30 @@ export default function App() {
     return () => clearInterval(timer);
   }, []);
 
+  const isExclusiveNow = checkIsExclusiveTime(activeMotoboyUser?.empresaExclusiva);
+  
+  const motoboyVisibleOrders = useMemo(() => {
+    if (!activeMotoboyUser) return [];
+    return ordens.filter(o => {
+      if (o.status === 'Entregue') return false;
+      // Se a ordem já pertence ao motoboy logado, ele vê e controla ela
+      if (o.motoboyId && o.motoboyId === activeMotoboyUser.id) return true;
+      // Se pertence a outro motoboy, ele não deve ver
+      if (o.motoboyId && o.motoboyId !== activeMotoboyUser.id) return false;
+      
+      // Se é uma ordem disponível
+      const isAvailable = o.status === 'Pendente' || o.status === 'Buscando Parceiro' || o.status === 'Rota Agrupada';
+      if (!isAvailable) return false;
+
+      // Se o motoboy é exclusivo e está no horário de exclusividade
+      if (isExclusiveNow && activeMotoboyUser.empresaExclusiva) {
+        const isMyDistributor = o.clienteNome.toLowerCase() === activeMotoboyUser.empresaExclusiva.toLowerCase() || o.clienteId === activeMotoboyUser.empresaExclusiva;
+        return isMyDistributor;
+      }
+      return true;
+    });
+  }, [ordens, activeMotoboyUser, isExclusiveNow]);
+
   // --- CONTROLLER FUNCTIONS ---
 
   // Dispatch a new Order from the distributor
@@ -2827,30 +2851,6 @@ export default function App() {
       </div>
     );
   }
-
-  const isExclusiveNow = checkIsExclusiveTime(activeMotoboyUser?.empresaExclusiva);
-  
-  const motoboyVisibleOrders = useMemo(() => {
-    if (!activeMotoboyUser) return [];
-    return ordens.filter(o => {
-      if (o.status === 'Entregue') return false;
-      // Se a ordem já pertence ao motoboy logado, ele vê e controla ela
-      if (o.motoboyId && o.motoboyId === activeMotoboyUser.id) return true;
-      // Se pertence a outro motoboy, ele não deve ver
-      if (o.motoboyId && o.motoboyId !== activeMotoboyUser.id) return false;
-      
-      // Se é uma ordem disponível
-      const isAvailable = o.status === 'Pendente' || o.status === 'Buscando Parceiro' || o.status === 'Rota Agrupada';
-      if (!isAvailable) return false;
-
-      // Se o motoboy é exclusivo e está no horário de exclusividade
-      if (isExclusiveNow && activeMotoboyUser.empresaExclusiva) {
-        const isMyDistributor = o.clienteNome.toLowerCase() === activeMotoboyUser.empresaExclusiva.toLowerCase() || o.clienteId === activeMotoboyUser.empresaExclusiva;
-        return isMyDistributor;
-      }
-      return true;
-    });
-  }, [ordens, activeMotoboyUser, isExclusiveNow]);
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 font-sans flex flex-col selection:bg-orange-500 selection:text-white" id="torquelog-app">
@@ -4893,7 +4893,14 @@ export default function App() {
             <div className="flex-1">
               <span className="text-xs bg-orange-550/20 text-orange-400 font-bold px-3 py-1 rounded-full uppercase tracking-widest font-mono">DASHBOARD DO ENTREGADOR</span>
               <h1 className="text-2xl font-black mt-2">Olá, {activeMotoboyUser?.nome}!</h1>
-              <p className="text-xs text-slate-400 font-mono mt-1">Região de atuação contratual: Passos - MG • Tarifa Local: R$ {(activeMotoboyUser?.valorRepasseFixo || 4.00).toFixed(2)} por entrega</p>
+              <p className="text-xs text-slate-400 font-mono mt-1">
+                Região de atuação contratual: <strong className="text-orange-400">{activeMotoboyUser?.cidade || 'Passos - MG'}</strong> • {' '}
+                {isExclusiveNow && activeMotoboyUser?.empresaExclusiva ? (
+                  <span>Tarifa Fixa Exclusiva B2B: <strong className="text-emerald-400">R$ {(activeMotoboyUser?.valorRepasseFixo || 4.00).toFixed(2)}</strong> por entrega</span>
+                ) : (
+                  <span>Tarifa Freelancer: <strong className="text-emerald-400">Variável por cliente</strong> (ou R$ {(activeMotoboyUser?.valorRepasseFixo || 4.00).toFixed(2)} se fixado com a distribuidora)</span>
+                )}
+              </p>
               
               {activeMotoboyUser?.empresaExclusiva && (
                 <div className="mt-3.5 p-3 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-[11px] font-mono font-bold transition-all shadow-inner bg-slate-950/80 border-slate-800">
@@ -4906,15 +4913,21 @@ export default function App() {
                   </div>
                   <div>
                     {isExclusiveNow ? (
-                      <span className="inline-flex items-center gap-1.5 bg-amber-500/15 text-amber-400 border border-amber-500/30 px-2.5 py-1 rounded-lg text-[10px] tracking-wider">
-                        <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping" />
-                        EXCLUSIVO (Até 18h Seg-Sex | Até 12h Sáb)
-                      </span>
+                      <div className="flex flex-col items-end gap-1">
+                        <span className="inline-flex items-center gap-1.5 bg-amber-500/15 text-amber-400 border border-amber-500/30 px-2.5 py-1 rounded-lg text-[10px] tracking-wider font-extrabold">
+                          <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping" />
+                          EXCLUSIVO (Até 18h Seg-Sex | Até 12h Sáb)
+                        </span>
+                        <span className="text-[9px] text-slate-400 font-mono">Valor da entrega: R$ {(activeMotoboyUser.valorRepasseFixo || 4.00).toFixed(2)}</span>
+                      </div>
                     ) : (
-                      <span className="inline-flex items-center gap-1.5 bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 px-2.5 py-1 rounded-lg text-[10px] tracking-wider">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                        FREELANCER LIBERADO PODEMOS PEGAR OUTROS!
-                      </span>
+                      <div className="flex flex-col items-end gap-1">
+                        <span className="inline-flex items-center gap-1.5 bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 px-2.5 py-1 rounded-lg text-[10px] tracking-wider font-extrabold animate-pulse">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                          FREELANCER LIBERADO PODEMOS PEGAR OUTROS!
+                        </span>
+                        <span className="text-[9px] text-slate-400 font-mono">Exibindo valores negociados de outros clientes</span>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -4959,7 +4972,7 @@ export default function App() {
                 <div>
                   <h2 className="text-sm font-black text-slate-900 uppercase tracking-wider flex items-center gap-2">
                     <TorqueLogLogoIcon size={18} className="text-orange-500 animate-pulse" variant={logoVariant} />
-                    Demandas Disponíveis na Região (Passos - MG)
+                    Demandas Disponíveis na Região ({activeMotoboyUser?.cidade || 'Passos - MG'})
                   </h2>
                   <p className="text-xs text-slate-400">Clique para aceitar uma corrida e realizar entrega expressa</p>
                 </div>
@@ -4980,7 +4993,7 @@ export default function App() {
                   motoboyVisibleOrders.map(o => (
                     <div key={o.id} className="border border-slate-150 rounded-xl p-4 bg-slate-50/50 hover:bg-slate-50 transition flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                       <div className="space-y-1">
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
                           <span className="text-[10px] bg-slate-200 text-slate-800 font-bold px-1.5 py-0.5 rounded font-mono">{o.id}</span>
                           <span className={`text-[10px] font-mono px-2 py-0.5 rounded font-bold ${
                             o.status === 'Pendente' ? 'bg-amber-100 text-amber-800 border border-amber-200' :
@@ -4991,6 +5004,16 @@ export default function App() {
                             {o.status === 'Rota Agrupada' ? 'Roteiro Coletivo' : o.status}
                           </span>
                           <span className="text-[10px] font-bold text-slate-500 font-mono">📍 Setor {o.quadrante}</span>
+                          
+                          {/* Dynamic payout rates on each run card */}
+                          <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 border border-emerald-200/60 px-2 py-0.5 rounded text-[10px] font-bold font-mono">
+                            💰 Ganho: R$ {((o.valorPagoMotoboy || 4.00) + (o.retornoPeca ? (o.taxaReversa || 15.00) : 0)).toFixed(2)}
+                            {isExclusiveNow && activeMotoboyUser?.empresaExclusiva && (o.clienteNome.toLowerCase() === activeMotoboyUser.empresaExclusiva.toLowerCase() || o.clienteId === activeMotoboyUser.empresaExclusiva) ? (
+                              <span className="text-[8px] text-emerald-600/90 font-normal font-sans ml-0.5">(Fixo Distribuidora)</span>
+                            ) : (
+                              <span className="text-[8px] text-emerald-600/90 font-normal font-sans ml-0.5">(TorqueLog Freelancer)</span>
+                            )}
+                          </span>
                         </div>
                         
                         <div className="text-xs text-slate-750 font-mono space-y-0.5 leading-normal mt-1.5">
@@ -5057,7 +5080,7 @@ export default function App() {
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
               <h3 className="text-xs font-black text-slate-900 uppercase font-mono tracking-widest mb-3 flex items-center gap-1.5 border-b border-slate-100 pb-2">
                 <TorqueLogLogoIcon size={18} className="text-orange-500 animate-[pulse_2s_infinite]" variant={logoVariant} />
-                Seu GPS Setorial: Passos - MG
+                Seu GPS Setorial: {activeMotoboyUser?.cidade || 'Passos - MG'}
               </h3>
               <div className="h-56 rounded-lg overflow-hidden border border-slate-200">
                 <MapaDaCidade 
@@ -5098,6 +5121,11 @@ export default function App() {
                           <p>🏢 <strong>Origem:</strong> {o.clienteNome}</p>
                           <p>📍 <strong>Destino:</strong> <span className="text-orange-600 font-bold">{o.destinatarioNome || 'Oficina'}</span> • {o.enderecoEntrega || `Setor ${o.quadrante}`}</p>
                         </div>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <span className="text-emerald-700 font-bold font-mono">
+                          + R$ {((o.valorPagoMotoboy || 4.00) + (o.retornoPeca ? (o.taxaReversa || 15) : 0)).toFixed(2)}
+                        </span>
                       </div>
                     </div>
                   ))
