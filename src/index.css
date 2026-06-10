@@ -1,1 +1,48 @@
 @import "tailwindcss";
+
+@media print {
+  body {
+    background-color: white !important;
+    color: black !important;
+  }
+  
+  /* Ocultar toda a interface de fundo de forma recursiva */
+  body > *:not(#modal-report):not(#modal-fechamento-b2b) {
+    display: none !important;
+    visibility: hidden !important;
+  }
+  
+  body #modal-report,
+  body #modal-fechamento-b2b {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 100% !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 10px !important;
+    margin: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+    visibility: visible !important;
+    display: block !important;
+  }
+
+  body #modal-report *,
+  body #modal-fechamento-b2b * {
+    visibility: visible !important;
+  }
+
+  /* Ocultar botões, cabeçalhos de fechar e elementos interativos durante a impressão */
+  button, 
+  .no-print,
+  #modal-report button,
+  #modal-fechamento-b2b button,
+  #modal-report .inline-flex {
+    display: none !important;
+    visibility: hidden !important;
+  }
+}
+

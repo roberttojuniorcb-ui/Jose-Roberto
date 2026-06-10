@@ -6044,11 +6044,60 @@ export default function App() {
                   <button
                     type="button"
                     onClick={copyClosingReportToClipboard}
-                    className="w-full text-center py-2 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 active:scale-98 text-white font-bold uppercase rounded-lg shadow-md font-mono tracking-wider transition-all duration-150 flex items-center justify-center gap-1.5 cursor-pointer text-xs"
+                    className="w-full text-center py-2 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 active:scale-98 text-white font-bold uppercase rounded-lg shadow-md font-mono tracking-wider transition-all duration-150 flex items-center justify-center gap-1.5 cursor-pointer text-xs"
                   >
                     <FileText className="w-4 h-4 shrink-0" />
-                    {isCopiedClosingReport ? "📋 DEMONSTRATIVO FINANCEIRO COPIADO! ✓" : "📋 COPIAR DEMONSTRATIVO FINANCEIRO"}
+                    {isCopiedClosingReport ? "📋 DEMONSTRATIVO COPIADO! ✓" : "📋 COPIAR DEMONSTRATIVO FINANCEIRO"}
                   </button>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2 no-print">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        let text = `========= FECHAMENTO MENSAL B2B TORQUELOG =========\n`;
+                        text += `🏢 DISTRIBUIDORA DEVEDORA: ${closingDist.nome}\n`;
+                        text += `📄 CNPJ: ${closingDist.cnpj || 'Isento / Não informado'}\n`;
+                        text += `📍 CIDADE: ${closingDist.cidade}\n`;
+                        text += `📅 MÊS DE REFERÊNCIA: ${MONTHS_PT[calendarViewMonth]} / ${calendarViewYear}\n`;
+                        text += `📦 TOTAL DE ENTREGAS COMPLETADAS: ${closingStats.completedMonthCount} OS\n`;
+                        text += `💰 VALOR TOTAL DA COBRANÇA (FATURAMENTO DETALHADO): R$ ${closingStats.monthlyBilling.toFixed(2)}\n`;
+                        text += `----------------------------------------------------\n`;
+                        text += `RELAÇÃO DETALHADA DE ORDENS DE SERVIÇO (OS):\n`;
+                        closingOrdersList.slice(0, 40).forEach((ord, index) => {
+                          const val = (ord.valorCobradoCliente || 10.00) + (ord.retornoPeca ? (ord.taxaReversa || 15) : 0);
+                          text += `${index + 1}. OS ID: ${ord.id} | Data: ${new Date(ord.criadoEm).toLocaleDateString()} | Oficina: ${ord.destinatarioNome || 'Prefeitura / Balcão'} | Valor: R$ ${val.toFixed(2)}${ord.retornoPeca ? ' (Reversa inclusa)' : ''}\n`;
+                        });
+                        if (closingOrdersList.length > 40) {
+                          text += `...e outras ${closingOrdersList.length - 40} ordens no faturamento.\n`;
+                        }
+                        text += `----------------------------------------------------\n`;
+                        text += `📲 Instrução de Pagamento: Favor transferir R$ ${closingStats.monthlyBilling.toFixed(2)} para a conta cadastrada da TorqueLog.\n`;
+                        text += `====================================================`;
+
+                        const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`;
+                        const link = document.createElement('a');
+                        link.href = waUrl;
+                        link.target = '_blank';
+                        link.rel = 'noopener noreferrer';
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                      }}
+                      className="bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold py-2 rounded-lg shadow font-mono text-center flex items-center justify-center gap-1.5 cursor-pointer text-xs transition-colors"
+                    >
+                      💬 Enviar WhatsApp
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        window.print();
+                      }}
+                      className="bg-slate-800 hover:bg-slate-700 active:scale-95 text-white font-bold py-2 rounded-lg shadow font-mono text-center flex items-center justify-center gap-1.5 cursor-pointer text-xs transition-colors"
+                    >
+                      🖨️ Gravar em PDF
+                    </button>
+                  </div>
                 </div>
 
               </motion.div>
@@ -6120,77 +6169,90 @@ export default function App() {
                   </div>
 
                   {/* Print / Export Action button */}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const list = getFilteredReportOrders();
-                      let billed = 0;
-                      let owed = 0;
-                      list.forEach(o => {
-                        billed += (o.valorCobradoCliente || 10.00) + (o.retornoPeca ? (o.taxaReversa || 15.00) : 0);
-                        owed += (o.valorPagoMotoboy || 4.00) + (o.retornoPeca ? (o.taxaReversa || 15.00) : 0);
-                      });
-                      const count = list.length;
-                      const profit = billed - owed;
+                  <div className="flex flex-wrap items-center gap-2 no-print">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const list = getFilteredReportOrders();
+                        let billed = 0;
+                        let owed = 0;
+                        list.forEach(o => {
+                          billed += (o.valorCobradoCliente || 10.00) + (o.retornoPeca ? (o.taxaReversa || 15.00) : 0);
+                          owed += (o.valorPagoMotoboy || 4.00) + (o.retornoPeca ? (o.taxaReversa || 15.00) : 0);
+                        });
+                        const count = list.length;
+                        const profit = billed - owed;
 
-                      let periodText = '';
-                      if (reportPeriod === 'Semana') {
-                        periodText = 'Últimos 7 dias (Semana Atual)';
-                      } else if (reportPeriod === 'Mes') {
-                        periodText = 'Este Mês';
-                      } else {
-                        periodText = `${reportFilterStartDate.split('-').reverse().join('/')} até ${reportFilterEndDate.split('-').reverse().join('/')}`;
-                      }
+                        let periodText = '';
+                        if (reportPeriod === 'Semana') {
+                          periodText = 'Últimos 7 dias (Semana Atual)';
+                        } else if (reportPeriod === 'Mes') {
+                          periodText = 'Este Mês';
+                        } else {
+                          periodText = `${reportFilterStartDate.split('-').reverse().join('/')} até ${reportFilterEndDate.split('-').reverse().join('/')}`;
+                        }
 
-                      let profile = '';
-                      let details = '';
-                      if (reportRole === 'Motoboy') {
-                        profile = `Entregador MEI: ${activeMotoboyUser?.nome || 'Motoboy Parceiro'}`;
-                        details = `• Quantidade de Corridas: ${count}\n• Total de Comissão a receber: R$ ${owed.toFixed(2)}`;
-                      } else if (reportRole === 'Cliente') {
-                        profile = `Cliente / Oficina B2B: ${activeClienteUser?.nome || 'Cliente Parceiro'}`;
-                        details = `• Quantidade de Corridas: ${count}\n• Custo total de faturamento: R$ ${billed.toFixed(2)}`;
-                      } else {
-                        profile = `Administração torqueLog (Geral)`;
-                        details = `• Qtd Corridas: ${count}\n• Total Clientes B2B: R$ ${billed.toFixed(2)}\n• Pago aos Motoboys: R$ ${owed.toFixed(2)}\n• Lucro Líquido: R$ ${profit.toFixed(2)}`;
-                      }
+                        let profile = '';
+                        let details = '';
+                        if (reportRole === 'Motoboy') {
+                          profile = `Entregador MEI: ${activeMotoboyUser?.nome || 'Motoboy Parceiro'}`;
+                          details = `• Quantidade de Corridas: ${count}\n• Total de Comissão a receber: R$ ${owed.toFixed(2)}`;
+                        } else if (reportRole === 'Cliente') {
+                          profile = `Cliente / Oficina B2B: ${activeClienteUser?.nome || 'Cliente Parceiro'}`;
+                          details = `• Quantidade de Corridas: ${count}\n• Custo total de faturamento: R$ ${billed.toFixed(2)}`;
+                        } else {
+                          profile = `Administração torqueLog (Geral)`;
+                          details = `• Qtd Corridas: ${count}\n• Total Clientes B2B: R$ ${billed.toFixed(2)}\n• Pago aos Motoboys: R$ ${owed.toFixed(2)}\n• Lucro Líquido: R$ ${profit.toFixed(2)}`;
+                        }
 
-                      let orderBreakdown = list.slice(0, 40).map(o => {
-                        const val = reportRole === 'Cliente' 
-                          ? ((o.valorCobradoCliente || 10.00) + (o.retornoPeca ? (o.taxaReversa || 15.00) : 0))
-                          : ((o.valorPagoMotoboy || 4.00) + (o.retornoPeca ? (o.taxaReversa || 15.00) : 0));
-                        return `✅ OS #${o.id} | ${new Date(o.criadoEm).toLocaleDateString('pt-BR')} | ${o.clienteNome.slice(0, 15)} | R$ ${val.toFixed(2)}`;
-                      }).join('\n');
+                        let orderBreakdown = list.slice(0, 40).map(o => {
+                          const val = reportRole === 'Cliente' 
+                            ? ((o.valorCobradoCliente || 10.00) + (o.retornoPeca ? (o.taxaReversa || 15.00) : 0))
+                            : ((o.valorPagoMotoboy || 4.00) + (o.retornoPeca ? (o.taxaReversa || 15.00) : 0));
+                          return `✅ OS #${o.id} | ${new Date(o.criadoEm).toLocaleDateString('pt-BR')} | ${o.clienteNome.slice(0, 15)} | R$ ${val.toFixed(2)}`;
+                        }).join('\n');
 
-                      if (list.length > 40) {
-                        orderBreakdown += `\n_...e outras ${list.length - 40} ordens no período._`;
-                      }
+                        if (list.length > 40) {
+                          orderBreakdown += `\n_...e outras ${list.length - 40} ordens no período._`;
+                        }
 
-                      const textMsg = `*🧾 COMPROVANTE DE FECHAMENTO - TORQUELOG*\n` +
-                        `-----------------------------------------\n` +
-                        `📅 *Período:* ${periodText}\n` +
-                        `👤 *Titular:* ${profile}\n` +
-                        `-----------------------------------------\n` +
-                        `💰 *RESUMO DO FECHAMENTO:* \n${details}\n\n` +
-                        `*📦 DETALHE DAS ENTREGAS:*\n` +
-                        `${orderBreakdown || 'Nenhuma ordem no período selecionado.'}\n\n` +
-                        `-----------------------------------------\n` +
-                        `📲 *DICA:* Para salvar ou imprimir em formato PDF, utilize a tela de impressão do dispositivo que se abrirá em seguida.\n` +
-                        `🌐 Gerado via painel TorqueLog em: ${new Date().toLocaleDateString('pt-BR')} ${new Date().toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'})}`;
+                        const textMsg = `*🧾 COMPROVANTE DE FECHAMENTO - TORQUELOG*\n` +
+                          `-----------------------------------------\n` +
+                          `📅 *Período:* ${periodText}\n` +
+                          `👤 *Titular:* ${profile}\n` +
+                          `-----------------------------------------\n` +
+                          `💰 *RESUMO DO FECHAMENTO:* \n${details}\n\n` +
+                          `*📦 DETALHE DAS ENTREGAS:*\n` +
+                          `${orderBreakdown || 'Nenhuma ordem no período selecionado.'}\n\n` +
+                          `-----------------------------------------\n` +
+                          `📲 *DICA:* Para salvar o relatório em formato PDF, utilize o botão "Salvar como PDF / Imprimir" do painel.\n` +
+                          `🌐 Gerado via painel TorqueLog em: ${new Date().toLocaleDateString('pt-BR')} ${new Date().toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'})}`;
 
-                      // Open WhatsApp
-                      const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(textMsg)}`;
-                      window.open(waUrl, '_blank');
+                        // Open WhatsApp securely to bypass popup-blockers:
+                        const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(textMsg)}`;
+                        const link = document.createElement('a');
+                        link.href = waUrl;
+                        link.target = '_blank';
+                        link.rel = 'noopener noreferrer';
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                      }}
+                      className="bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-[11px] font-bold font-mono py-1.5 px-3 rounded-lg flex items-center gap-1.5 shadow transition-all cursor-pointer hover:scale-102 active:scale-98"
+                    >
+                      💬 Enviar WhatsApp Fechamento
+                    </button>
 
-                      // Open Print
-                      setTimeout(() => {
+                    <button
+                      type="button"
+                      onClick={() => {
                         window.print();
-                      }, 1200);
-                    }}
-                    className="bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold font-mono py-1.5 px-3 rounded-lg flex items-center gap-1.5 shadow transition-all cursor-pointer"
-                  >
-                    📄 Enviar em PDF o Fechamento
-                  </button>
+                      }}
+                      className="bg-slate-900 hover:bg-slate-800 active:scale-95 text-white text-[11px] font-bold font-mono py-1.5 px-3 rounded-lg flex items-center gap-1.5 shadow transition-all cursor-pointer hover:scale-102 active:scale-98"
+                    >
+                      🖨️ Salvar como PDF / Imprimir
+                    </button>
+                  </div>
                 </div>
 
                 {reportPeriod === 'Personalizado' && (
@@ -6646,7 +6708,7 @@ export default function App() {
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-white rounded-xl shadow-2xl border border-slate-200 max-w-sm w-full p-5"
+              className="bg-white rounded-xl shadow-2xl border border-slate-200 max-w-sm w-full p-5 max-h-[90vh] overflow-y-auto"
             >
               <div className="flex justify-between items-start mb-4 border-b border-slate-100 pb-2">
                 <div>
