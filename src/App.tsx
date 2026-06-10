@@ -84,6 +84,29 @@ const MONTHS_PT = [
 
 const WEEKDAYS_PT = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 
+const checkIsExclusiveTime = (empresaExclusiva: string | undefined): boolean => {
+  if (!empresaExclusiva) return false;
+
+  const now = new Date();
+  const day = now.getDay(); // 0 = Domingo, 1 = Segunda, ..., 6 = Sábado
+  const hours = now.getHours();
+  const minutes = now.getMinutes();
+  const timeInMinutes = hours * 60 + minutes;
+
+  // Segunda (1) a Sexta (5): Exclusivo até as 18:00
+  if (day >= 1 && day <= 5) {
+    return timeInMinutes < 18 * 60;
+  }
+
+  // Sábado (6): Exclusivo até as 12:00
+  if (day === 6) {
+    return timeInMinutes < 12 * 60;
+  }
+
+  // Domingo (0): Nunca é exclusivo, sempre livre
+  return false;
+};
+
 export default function App() {
   // --- STATE MANAGEMENT ---
   const [clientes, setClientes] = useState<Cliente[]>(() => getInitialClientes());
@@ -436,13 +459,23 @@ export default function App() {
       return;
     }
 
+    const isExclusiveNow = checkIsExclusiveTime(activeMotoboyUser?.empresaExclusiva);
+
     // Filter incoming real-time synchronized orders available for this specific driver and base city
     const newAvailableOrders = ordens.filter(o => {
       const isAvailable = o.status === 'Pendente' || o.status === 'Buscando Parceiro';
       const isSameCity = (o.cidade || 'Passos - MG').trim().toLowerCase() === driverCity.trim().toLowerCase();
       const isUnclaimed = !o.motoboyId;
       const isNewlyDispatched = !seenOrderIdsRef.current.has(o.id);
-      return isAvailable && isSameCity && isUnclaimed && isNewlyDispatched;
+      
+      if (isAvailable && isSameCity && isUnclaimed && isNewlyDispatched) {
+        if (isExclusiveNow && activeMotoboyUser?.empresaExclusiva) {
+          const isMyDistributor = o.clienteNome.toLowerCase() === activeMotoboyUser.empresaExclusiva.toLowerCase() || o.clienteId === activeMotoboyUser.empresaExclusiva;
+          return isMyDistributor;
+        }
+        return true;
+      }
+      return false;
     });
 
     if (newAvailableOrders.length > 0) {
@@ -2795,6 +2828,30 @@ export default function App() {
     );
   }
 
+  const isExclusiveNow = checkIsExclusiveTime(activeMotoboyUser?.empresaExclusiva);
+  
+  const motoboyVisibleOrders = useMemo(() => {
+    if (!activeMotoboyUser) return [];
+    return ordens.filter(o => {
+      if (o.status === 'Entregue') return false;
+      // Se a ordem já pertence ao motoboy logado, ele vê e controla ela
+      if (o.motoboyId && o.motoboyId === activeMotoboyUser.id) return true;
+      // Se pertence a outro motoboy, ele não deve ver
+      if (o.motoboyId && o.motoboyId !== activeMotoboyUser.id) return false;
+      
+      // Se é uma ordem disponível
+      const isAvailable = o.status === 'Pendente' || o.status === 'Buscando Parceiro' || o.status === 'Rota Agrupada';
+      if (!isAvailable) return false;
+
+      // Se o motoboy é exclusivo e está no horário de exclusividade
+      if (isExclusiveNow && activeMotoboyUser.empresaExclusiva) {
+        const isMyDistributor = o.clienteNome.toLowerCase() === activeMotoboyUser.empresaExclusiva.toLowerCase() || o.clienteId === activeMotoboyUser.empresaExclusiva;
+        return isMyDistributor;
+      }
+      return true;
+    });
+  }, [ordens, activeMotoboyUser, isExclusiveNow]);
+
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 font-sans flex flex-col selection:bg-orange-500 selection:text-white" id="torquelog-app">
       
@@ -4837,6 +4894,32 @@ export default function App() {
               <span className="text-xs bg-orange-550/20 text-orange-400 font-bold px-3 py-1 rounded-full uppercase tracking-widest font-mono">DASHBOARD DO ENTREGADOR</span>
               <h1 className="text-2xl font-black mt-2">Olá, {activeMotoboyUser?.nome}!</h1>
               <p className="text-xs text-slate-400 font-mono mt-1">Região de atuação contratual: Passos - MG • Tarifa Local: R$ {(activeMotoboyUser?.valorRepasseFixo || 4.00).toFixed(2)} por entrega</p>
+              
+              {activeMotoboyUser?.empresaExclusiva && (
+                <div className="mt-3.5 p-3 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-[11px] font-mono font-bold transition-all shadow-inner bg-slate-950/80 border-slate-800">
+                  <div className="flex items-center gap-2">
+                    <span className="text-base">🏢</span>
+                    <div>
+                      <span className="text-slate-400">Distribuidora Exclusiva:</span>{' '}
+                      <span className="text-orange-400 font-black">{activeMotoboyUser.empresaExclusiva}</span>
+                    </div>
+                  </div>
+                  <div>
+                    {isExclusiveNow ? (
+                      <span className="inline-flex items-center gap-1.5 bg-amber-500/15 text-amber-400 border border-amber-500/30 px-2.5 py-1 rounded-lg text-[10px] tracking-wider">
+                        <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping" />
+                        EXCLUSIVO (Até 18h Seg-Sex | Até 12h Sáb)
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5 bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 px-2.5 py-1 rounded-lg text-[10px] tracking-wider">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                        FREELANCER LIBERADO PODEMOS PEGAR OUTROS!
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
+
               <div className="mt-4">
                 <button
                   type="button"
@@ -4881,20 +4964,20 @@ export default function App() {
                   <p className="text-xs text-slate-400">Clique para aceitar uma corrida e realizar entrega expressa</p>
                 </div>
                 <span className="text-xs font-mono font-bold bg-orange-100 text-orange-700 px-2 py-1 rounded">
-                  {ordens.filter(o => o.status !== 'Entregue').length} disponíveis
+                  {motoboyVisibleOrders.length} disponíveis
                 </span>
               </div>
 
               {/* List of orders */}
               <div className="space-y-4">
-                {ordens.filter(o => o.status !== 'Entregue').length === 0 ? (
+                {motoboyVisibleOrders.length === 0 ? (
                   <div className="text-center py-10 bg-slate-50 border border-dashed border-slate-200 rounded-lg">
                     <Check className="w-10 h-10 text-emerald-500 mx-auto mb-2" />
                     <p className="text-xs text-slate-500 font-mono">Nenhum frete disponível no momento.</p>
                     <p className="text-[10px] text-slate-400 mt-1">Novas ordens surgirão assim que os clientes despacharem pelo faturamento.</p>
                   </div>
                 ) : (
-                  ordens.filter(o => o.status !== 'Entregue').map(o => (
+                  motoboyVisibleOrders.map(o => (
                     <div key={o.id} className="border border-slate-150 rounded-xl p-4 bg-slate-50/50 hover:bg-slate-50 transition flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                       <div className="space-y-1">
                         <div className="flex items-center gap-2">
