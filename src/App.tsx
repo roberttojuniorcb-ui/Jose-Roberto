@@ -2325,6 +2325,21 @@ export default function App() {
     window.open(url, '_blank', 'noopener,noreferrer');
   };
 
+  const handleRastrearMotoboyNoGoogleMaps = (mb: Motoboy) => {
+    const activeOrder = ordens.find(o => o.status === 'Moto a Caminho' && o.motoboyId === mb.id);
+    if (activeOrder) {
+      const cli = clientes.find(c => c.id === activeOrder.clienteId || c.nome.toLowerCase() === activeOrder.clienteNome.toLowerCase());
+      const deCidade = cli?.cidade || mb.cidade || 'Passos, MG';
+      const origem = `${cli?.nome || activeOrder.clienteNome}, ${cli?.endereco || ''}, ${deCidade}`;
+      const destino = `${activeOrder.destinatarioNome || 'Oficina'}, ${activeOrder.enderecoEntrega || ''}`;
+      const url = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(origem)}&destination=${encodeURIComponent(destino)}`;
+      window.open(url, '_blank', 'noopener,noreferrer');
+    } else {
+      const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`Centro, ${mb.cidade || 'Passos, MG'}`)}`;
+      window.open(url, '_blank', 'noopener,noreferrer');
+    }
+  };
+
   const handleAceitarOuPerguntarOrdem = (o: OrdemServico) => {
     if (mapsPreference === 'always_open') {
       handleAtualizarStatusOrdem(o.id, 'Moto a Caminho');
@@ -4128,6 +4143,17 @@ export default function App() {
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
+                      {m.empresaExclusiva && (
+                        <button
+                          type="button"
+                          onClick={() => handleRastrearMotoboyNoGoogleMaps(m)}
+                          className="bg-orange-600 hover:bg-orange-700 active:scale-95 hover:scale-103 text-white font-mono font-black text-[10px] px-2.5 py-1.5 rounded-lg transition shadow-sm cursor-pointer flex items-center gap-1 shrink-0"
+                          title="Rastrear localização do entregador exclusivo no Google Maps"
+                        >
+                          <Navigation className="w-2.5 h-2.5 animate-pulse" />
+                          Rastrear 🗺️
+                        </button>
+                      )}
                       <div className="text-right">
                         <span className="text-[9px] text-slate-450 block uppercase font-bold tracking-tight">Repasse</span>
                         <span className="text-sm font-extrabold text-slate-950 font-mono">R$ {m.valorRepasseFixo.toFixed(2)}</span>
@@ -5167,29 +5193,7 @@ export default function App() {
 
           {/* Right Panel: Motoboy delivery log history & fast-actions */}
           <div className="lg:col-span-4 space-y-6">
-            {/* GPS Map for Motoboy tracking */}
-            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
-              <h3 className="text-xs font-black text-slate-900 uppercase font-mono tracking-widest mb-3 flex items-center gap-1.5 border-b border-slate-100 pb-2">
-                <TorqueLogLogoIcon size={18} className="text-orange-500 animate-[pulse_2s_infinite]" variant={logoVariant} />
-                Seu GPS Setorial: {activeMotoboyUser?.cidade || 'Passos - MG'}
-              </h3>
-              <div className="h-56 rounded-lg overflow-hidden border border-slate-200">
-                <MapaDaCidade 
-                  clientes={clientes}
-                  ordens={ordens}
-                  motoboys={motoboys}
-                  selectedMotoboyIdForTracking={activeMotoboyUser?.id || null}
-                  setSelectedMotoboyIdForTracking={() => {}}
-                  activeSessionRole={effectiveRole}
-                  activeClienteUser={null}
-                  selectedQuadrant={undefined}
-                  animationTick={animationTick}
-                />
-              </div>
-              <p className="text-[10px] text-slate-400 font-mono mt-2 leading-relaxed text-center">
-                🔴 Suas coordenadas de satélite piscam em laranja. Dirija com cuidado!
-              </p>
-            </div>
+
 
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
               <h3 className="text-xs font-black text-slate-900 uppercase font-mono tracking-widest mb-3 flex items-center gap-1">
@@ -5765,16 +5769,18 @@ export default function App() {
                         </span>
                       </div>
 
-                      <button
-                        onClick={() => setSelectedMotoboyIdForTracking(isTracked ? null : mb.id)}
-                        className={`text-[9px] font-mono font-bold py-1 px-2 rounded border uppercase transition cursor-pointer ${
-                          isTracked
-                            ? 'bg-orange-500 text-white border-orange-400'
-                            : 'bg-white hover:bg-slate-100 border-slate-205 text-slate-700'
-                        }`}
-                      >
-                        {isTracked ? 'Rastro 🛰️' : 'Seguindo'}
-                      </button>
+                      {mb.empresaExclusiva ? (
+                        <button
+                          onClick={() => handleRastrearMotoboyNoGoogleMaps(mb)}
+                          className="text-[9px] font-mono font-black py-1.5 px-2.5 rounded border bg-orange-600 hover:bg-orange-700 hover:scale-103 text-white uppercase transition duration-150 cursor-pointer flex items-center gap-1 shrink-0 shadow shadow-orange-500/10"
+                          title="Rastrear localização do entregador exclusivo no Google Maps"
+                        >
+                          <Navigation className="w-2.5 h-2.5 animate-pulse" />
+                          Rastrear 🗺️
+                        </button>
+                      ) : (
+                        <span className="text-[10px] text-slate-400 font-mono italic pr-1">Rotativo</span>
+                      )}
                     </div>
                   );
                 })}
