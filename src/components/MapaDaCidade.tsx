@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Quadrante, Cliente, OrdemServico, Motoboy } from '../types';
 import { MapPin, Navigation, Info, Bike } from 'lucide-react';
 
@@ -53,6 +53,8 @@ export default function MapaDaCidade({
   // Coordinates of central hub (TorqueLog Base in Setor E)
   const hubX = 300;
   const hubY = 220;
+
+  const [zoomState, setZoomState] = useState<{ minX: number; minY: number; width: number; height: number } | null>(null);
 
   // Let's calculate the real-time positions of all motoboys based on active orders
   const simulatedMotoboysWithPositions = useMemo(() => {
@@ -124,6 +126,72 @@ export default function MapaDaCidade({
       };
     });
   }, [motoboys, ordens, animationTick]);
+
+  const handleCentralizar = () => {
+    // Filter active motoboys (situacao is either 'Ativo' or undefined/blank)
+    const activeRiders = simulatedMotoboysWithPositions.filter(
+      m => !m.situacao || m.situacao.toLowerCase() === 'ativo'
+    );
+
+    if (activeRiders.length === 0) {
+      setZoomState(null); // Reset to full view if no active motoboys are found
+      return;
+    }
+
+    const xs = activeRiders.map(r => r.x);
+    const ys = activeRiders.map(r => r.y);
+
+    const minX = Math.min(...xs);
+    const maxX = Math.max(...xs);
+    const minY = Math.min(...ys);
+    const maxY = Math.max(...ys);
+
+    // Padding to ensure some space around the icons
+    const padding = 55;
+    let boundingWidth = (maxX - minX) + padding * 2;
+    let boundingHeight = (maxY - minY) + padding * 2;
+
+    // Minimum view boundary size to prevent extreme zoom-in
+    const minSize = 200;
+    if (boundingWidth < minSize) {
+      boundingWidth = minSize;
+    }
+    if (boundingHeight < minSize) {
+      boundingHeight = minSize;
+    }
+
+    // Keep aspect ratio 4:3 (600 / 450)
+    const currentAspect = boundingWidth / boundingHeight;
+    const targetAspect = 600 / 450; // 1.333
+    if (currentAspect > targetAspect) {
+      boundingHeight = boundingWidth / targetAspect;
+    } else {
+      boundingWidth = boundingHeight * targetAspect;
+    }
+
+    const centerX = (minX + maxX) / 2;
+    const centerY = (minY + maxY) / 2;
+
+    let newMinX = centerX - boundingWidth / 2;
+    let newMinY = centerY - boundingHeight / 2;
+
+    // Safety clamps relative to original "0 0 600 450"
+    if (newMinX < -20) newMinX = -20;
+    if (newMinY < -20) newMinY = -20;
+    if (newMinX + boundingWidth > 620) {
+      newMinX = 620 - boundingWidth;
+    }
+    if (newMinY + boundingHeight > 470) {
+      newMinY = 470 - boundingHeight;
+    }
+
+    setZoomState({
+      minX: Math.round(newMinX),
+      minY: Math.round(newMinY),
+      width: Math.round(boundingWidth),
+      height: Math.round(boundingHeight)
+    });
+  };
 
   // Let's filter clients to show on the map
   const clientsWithCoords = useMemo(() => {
@@ -201,10 +269,32 @@ export default function MapaDaCidade({
 
       {/* Graphical Map Canvas Container */}
       <div className="relative w-full aspect-[4/3] bg-slate-900/90 rounded-xl border border-slate-850 p-1">
+        
+        {/* Floating controls for Centralizar / Resetar */}
+        <div className="absolute top-3 right-3 z-30 flex items-center gap-1.5 bg-slate-950/80 backdrop-blur-xs p-1 rounded-lg border border-slate-800">
+          <button
+            onClick={handleCentralizar}
+            title="Centralizar nos motoboys ativos"
+            className="bg-orange-500 hover:bg-orange-600 text-slate-950 font-sans text-[10px] font-black px-2.5 py-1.5 rounded-md flex items-center gap-1 transition cursor-pointer"
+          >
+            🎯 Centralizar
+          </button>
+          {zoomState && (
+            <button
+              onClick={() => setZoomState(null)}
+              title="Restaurar visualização completa"
+              className="bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white font-sans text-[10px] font-bold px-2.5 py-1.5 rounded-md border border-slate-800 flex items-center gap-1 transition cursor-pointer"
+            >
+              🔄 Restaurar
+            </button>
+          )}
+        </div>
+
         <svg 
-          viewBox="0 0 600 450" 
+          viewBox={zoomState ? `${zoomState.minX} ${zoomState.minY} ${zoomState.width} ${zoomState.height}` : "0 0 600 450"} 
           className="w-full h-full select-none"
           xmlns="http://www.w3.org/2000/svg"
+          id="mapa-da-cidade"
         >
           {/* Futuristic HUD Grid Lines */}
           <defs>
