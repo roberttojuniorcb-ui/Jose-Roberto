@@ -3082,7 +3082,7 @@ export default function App() {
             </div>
 
             {/* 📬 INTERACTIVE SIMULATED EMAIL INBOX POPOVER (NEXT TO CANAL DATABASE) */}
-            {activeSessionRole === 'Empresa' && (
+            {(activeSessionRole === 'Empresa' || activeSessionRole === 'Cliente') && (
               <div className="relative" id="header-central-emails-simulados">
                 <button
                   type="button"
@@ -7035,6 +7035,18 @@ export default function App() {
                   criadoEm: new Date().toISOString(),
                   motoboysAtivos: 0
                 };
+
+                // Enviar e-mail de confirmação para o email sandbox do destinatário
+                const partnerEmailEntry = {
+                  id: `EML-${Math.floor(1005 + Math.random() * 8990)}`,
+                  para: novoCli.email,
+                  assunto: `🎉 Ativação & Credenciais de Novo Parceiro B2B - ${novoCli.nome}`,
+                  corpo: `Olá, ${novoCli.nome}!\n\nSua agro-oficina ou autopeças parceira foi cadastrada com sucesso pelo distribuidor ${activeClienteUser?.nome || 'Parceiro Master'} na nossa rede inteligente TorqueLog B2B.\n\nSua conta está ativa e pronta para receber despachos e compartilhar entregadores.\n\n🔑 Credenciais de Logon:\n• Perfil de Acesso: Cliente B2B\n• Nome na Lista: ${novoCli.nome}\n• Senha Provisória: cli-${randCode}\n\nEntre no portal para começar a agendar e acompanhar suas entregas expressas com risco zero!\n\nAtenciosamente,\nEngenharia de Redes TorqueLog B2B`,
+                  codigo: `cli-${randCode}`,
+                  data: new Date().toLocaleTimeString(),
+                  lido: false
+                };
+                setSimulatedEmails(prev => [partnerEmailEntry, ...prev]);
 
                 // Sync with local state
                 const updatedClientesList = [novoCli, ...clientes];
