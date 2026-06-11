@@ -395,6 +395,10 @@ export default function App() {
 
   const [githubRepoPath, setGithubRepoPath] = useState<string>(() => safeGetLocalStorage('torquelog_github_repo_path', 'roberttojuniorcb/torquelog'));
   const [showGithubConfig, setShowGithubConfig] = useState<boolean>(false);
+  const [mapsPreference, setMapsPreference] = useState<'always_ask' | 'always_open' | 'always_skip_maps'>(() => {
+    return safeGetLocalStorage('torque_log_maps_pref', 'always_ask') as 'always_ask' | 'always_open' | 'always_skip_maps';
+  });
+  const [rememberPreference, setRememberPreference] = useState<boolean>(false);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -2319,6 +2323,17 @@ export default function App() {
     const destino = `${o.destinatarioNome || 'Oficina'}, ${o.enderecoEntrega || ''}`;
     const url = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(origem)}&destination=${encodeURIComponent(destino)}`;
     window.open(url, '_blank', 'noopener,noreferrer');
+  };
+
+  const handleAceitarOuPerguntarOrdem = (o: OrdemServico) => {
+    if (mapsPreference === 'always_open') {
+      handleAtualizarStatusOrdem(o.id, 'Moto a Caminho');
+      handleAbrirGoogleMaps(o);
+    } else if (mapsPreference === 'always_skip_maps') {
+      handleAtualizarStatusOrdem(o.id, 'Moto a Caminho');
+    } else {
+      setOrderToAcceptPrompt(o);
+    }
   };
 
   // Simulate Accepting/Routing on the deliverer's app
@@ -4923,7 +4938,7 @@ export default function App() {
                         type="button"
                         onClick={() => {
                           playNotificationSound();
-                          setOrderToAcceptPrompt(alertOrder);
+                          handleAceitarOuPerguntarOrdem(alertOrder);
                           setActiveDriverAlerts(prev => prev.filter(o => o.id !== alertOrder.id));
                         }}
                         className="bg-white hover:bg-slate-50 text-orange-600 hover:scale-103 font-mono font-black text-xs px-5 py-3 rounded-xl transition shadow shadow-black/10 cursor-pointer flex items-center justify-center gap-1.5 flex-1 md:flex-none uppercase tracking-wider"
@@ -4994,7 +5009,7 @@ export default function App() {
                 </div>
               )}
 
-              <div className="mt-4">
+              <div className="mt-4 flex flex-wrap gap-3 items-center">
                 <button
                   type="button"
                   onClick={() => handleAbrirRelatorio('Motoboy')}
@@ -5002,6 +5017,24 @@ export default function App() {
                 >
                   📊 CONFERÊNCIA & FECHAMENTO SEMANA/MÊS 🧾
                 </button>
+
+                {/* Preferência do Maps */}
+                <div className="bg-slate-950/85 border border-slate-800 rounded-xl px-3 py-1.5 flex items-center gap-2 shadow font-mono text-[10px]">
+                  <span className="text-orange-400 font-bold block whitespace-nowrap">🗺️ Google Maps:</span>
+                  <select
+                    value={mapsPreference}
+                    onChange={(e) => {
+                      const val = e.target.value as any;
+                      setMapsPreference(val);
+                      localStorage.setItem('torque_log_maps_pref', val);
+                    }}
+                    className="bg-slate-900 border border-slate-755 rounded px-2 py-1 text-[10px] text-slate-100 font-sans font-bold focus:outline-none focus:ring-1 focus:ring-orange-500 cursor-pointer"
+                  >
+                    <option value="always_ask">Perguntar sempre</option>
+                    <option value="always_open">Abrir Rota direto 🏍️</option>
+                    <option value="always_skip_maps">Não abrir Mapa 👍</option>
+                  </select>
+                </div>
               </div>
             </div>
             
@@ -5105,7 +5138,7 @@ export default function App() {
                       <div className="flex sm:flex-col items-stretch sm:items-end gap-2 shrink-0 w-full sm:w-auto border-t sm:border-t-0 pt-2 sm:pt-0 mt-1 sm:mt-0">
                         {o.status !== 'Moto a Caminho' ? (
                           <button
-                            onClick={() => setOrderToAcceptPrompt(o)}
+                            onClick={() => handleAceitarOuPerguntarOrdem(o)}
                             className="bg-orange-500 hover:bg-orange-600 active:scale-95 text-white font-mono font-bold text-xs px-3 py-2 rounded-lg transition shadow shadow-orange-500/10 cursor-pointer flex items-center gap-1.5 w-full sm:w-auto text-center justify-center font-mono font-black"
                           >
                             <TorqueLogLogoIcon size={16} className="text-white animate-spin-slow" variant={logoVariant} />
@@ -6156,12 +6189,31 @@ export default function App() {
                 </p>
               </div>
 
+              {/* Remember preference checkbox */}
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 flex items-start gap-2.5">
+                <input
+                  type="checkbox"
+                  id="remember-pref-checkbox"
+                  checked={rememberPreference}
+                  onChange={(e) => setRememberPreference(e.target.checked)}
+                  className="mt-0.5 rounded border-slate-300 text-orange-600 focus:ring-orange-500 w-4 h-4 cursor-pointer"
+                />
+                <label htmlFor="remember-pref-checkbox" className="text-[11px] text-slate-650 leading-tight font-sans cursor-pointer select-none">
+                  <strong className="text-slate-800 block mb-0.5">Lembrar minha escolha para as próximas vezes</strong>
+                  Salva sua escolha e pula esse diálogo de confirmação em corridas futuras.
+                </label>
+              </div>
+
               <div className="flex flex-col gap-2 pt-1 font-mono">
                 <button
                   type="button"
                   onClick={() => {
                     handleAtualizarStatusOrdem(orderToAcceptPrompt.id, 'Moto a Caminho');
                     handleAbrirGoogleMaps(orderToAcceptPrompt);
+                    if (rememberPreference) {
+                      localStorage.setItem('torque_log_maps_pref', 'always_open');
+                      setMapsPreference('always_open');
+                    }
                     setOrderToAcceptPrompt(null);
                   }}
                   className="w-full bg-orange-600 hover:bg-orange-700 active:scale-98 text-white font-black text-xs py-3 rounded-xl transition duration-155 flex items-center justify-center gap-2 shadow-md shadow-orange-500/10 cursor-pointer text-center"
@@ -6174,6 +6226,10 @@ export default function App() {
                   type="button"
                   onClick={() => {
                     handleAtualizarStatusOrdem(orderToAcceptPrompt.id, 'Moto a Caminho');
+                    if (rememberPreference) {
+                      localStorage.setItem('torque_log_maps_pref', 'always_skip_maps');
+                      setMapsPreference('always_skip_maps');
+                    }
                     setOrderToAcceptPrompt(null);
                   }}
                   className="w-full bg-slate-900 hover:bg-slate-800 active:scale-98 text-white font-bold text-xs py-2.5 rounded-xl transition cursor-pointer text-center"
