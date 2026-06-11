@@ -49,6 +49,7 @@ export interface OrdemServico {
   clienteId: string;
   clienteNome: string;
   quadrante: Quadrante;
+  cidade?: string; // City of the order
   itensDescricao: string; // Ex: "2x Amortecedores Dianteiros LD, 1x Jogo de Pastilhas"
   itensAnalistas: PecasItem[];
   enderecoEntrega?: string; // Delivery address free text or selected client address

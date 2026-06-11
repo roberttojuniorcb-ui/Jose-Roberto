@@ -106,6 +106,16 @@ const checkIsExclusiveTime = (empresaExclusiva: string | undefined): boolean => 
   return false;
 };
 
+const normalizeCity = (city: string | undefined): string => {
+  if (!city) return '';
+  return city
+    .split('-')[0] // Split state/UF tag if present, e.g. "Passos - MG" -> "Passos"
+    .normalize('NFD') // Decompose accented letter combinations
+    .replace(/[\u0300-\u036f]/g, '') // Strip away accent symbols
+    .toLowerCase()
+    .trim();
+};
+
 export default function App() {
   // --- STATE MANAGEMENT ---
   const [clientes, setClientes] = useState<Cliente[]>(() => getInitialClientes());
@@ -335,6 +345,12 @@ export default function App() {
   const [activeClienteUser, setActiveClienteUser] = useState<Cliente | null>(null);
 
   const isExclusiveNow = checkIsExclusiveTime(activeMotoboyUser?.empresaExclusiva);
+
+  const filteredMotoboysForClient = useMemo(() => {
+    if (!activeClienteUser) return motoboys;
+    const clientCityNormalized = normalizeCity(activeClienteUser.cidade);
+    return motoboys.filter(mb => normalizeCity(mb.cidade) === clientCityNormalized);
+  }, [activeClienteUser, motoboys]);
 
   // --- ADMIN CITY FILTER & SEARCH ---
   const [selectedAdminCity, setSelectedAdminCity] = useState<string>('Todas');
@@ -5604,6 +5620,7 @@ export default function App() {
                   clienteId: activeClienteUser.id,
                   clienteNome: activeClienteUser.nome,
                   quadrante: finalQuadrante,
+                  cidade: activeClienteUser.cidade || 'Passos - MG',
                   itensDescricao: `Entrega expressa para: ${finalDestName}`,
                   itensAnalistas: [], // Empty since we do not need items/cubage logic
                   enderecoEntrega: finalEndereco,
@@ -5892,49 +5909,55 @@ export default function App() {
               </div>
 
               <div className="space-y-3 max-h-[290px] overflow-y-auto pr-1">
-                {motoboys.map((mb, idx) => {
-                  const isTracked = selectedMotoboyIdForTracking === mb.id;
-                  const activeDelivery = ordens.find(o => o.status === 'Moto a Caminho' && o.motoboyId === mb.id);
-                  const isDeliveringForSelf = activeDelivery && activeDelivery.clienteId === activeClienteUser?.id;
+                {filteredMotoboysForClient.length === 0 ? (
+                  <div className="p-8 text-center text-slate-400 italic font-mono text-xs border border-dashed border-slate-200 rounded-xl bg-slate-50">
+                    Nenhum entregador cadastrado para a sua cidade ({activeClienteUser?.cidade || 'Passos - MG'}).
+                  </div>
+                ) : (
+                  filteredMotoboysForClient.map((mb, idx) => {
+                    const isTracked = selectedMotoboyIdForTracking === mb.id;
+                    const activeDelivery = ordens.find(o => o.status === 'Moto a Caminho' && o.motoboyId === mb.id);
+                    const isDeliveringForSelf = activeDelivery && activeDelivery.clienteId === activeClienteUser?.id;
 
-                  const statusClass = activeDelivery 
-                    ? (isDeliveringForSelf ? 'bg-orange-100 text-orange-850 animate-pulse font-bold' : 'bg-slate-100 text-slate-505')
-                    : 'bg-emerald-100 text-emerald-800';
+                    const statusClass = activeDelivery 
+                      ? (isDeliveringForSelf ? 'bg-orange-100 text-orange-850 animate-pulse font-bold' : 'bg-slate-100 text-slate-505')
+                      : 'bg-emerald-100 text-emerald-800';
 
-                  const statusText = activeDelivery 
-                    ? (isDeliveringForSelf ? 'Sua Entrega 🏍️' : 'Em outra rota')
-                    : 'Pátio Central / Loja';
+                    const statusText = activeDelivery 
+                      ? (isDeliveringForSelf ? 'Sua Entrega 🏍️' : 'Em outra rota')
+                      : 'Pátio Central / Loja';
 
-                  return (
-                    <div 
-                      key={mb.id} 
-                      className={`p-3 bg-slate-50 border rounded-xl flex items-center justify-between gap-2 transition duration-200 ${
-                        isTracked ? 'border-orange-400 bg-orange-50/20 shadow-xs' : 'border-slate-150 hover:bg-slate-100/50'
-                      }`}
-                    >
-                      <div className="space-y-0.5">
-                        <span className="text-xs font-bold text-slate-900 block font-mono leading-none">{mb.nome}</span>
-                        <span className="text-[9px] text-slate-400 font-mono block">MEI Ativo • Passos</span>
-                        <span className={`inline-block mt-0.5 text-[9px] font-mono px-1.5 py-0.2 rounded ${statusClass}`}>
-                          {statusText}
-                        </span>
+                    return (
+                      <div 
+                        key={mb.id} 
+                        className={`p-3 bg-slate-50 border rounded-xl flex items-center justify-between gap-2 transition duration-200 ${
+                          isTracked ? 'border-orange-400 bg-orange-50/20 shadow-xs' : 'border-slate-150 hover:bg-slate-100/50'
+                        }`}
+                      >
+                        <div className="space-y-0.5">
+                          <span className="text-xs font-bold text-slate-900 block font-mono leading-none">{mb.nome}</span>
+                          <span className="text-[9px] text-slate-400 font-mono block">MEI Ativo • {mb.cidade}</span>
+                          <span className={`inline-block mt-0.5 text-[9px] font-mono px-1.5 py-0.2 rounded ${statusClass}`}>
+                            {statusText}
+                          </span>
+                        </div>
+
+                        {mb.empresaExclusiva ? (
+                          <button
+                            onClick={() => handleRastrearMotoboyNoGoogleMaps(mb)}
+                            className="text-[9px] font-mono font-black py-1.5 px-2.5 rounded border bg-orange-600 hover:bg-orange-700 hover:scale-103 text-white uppercase transition duration-150 cursor-pointer flex items-center gap-1 shrink-0 shadow shadow-orange-500/10"
+                            title="Rastrear localização do entregador exclusivo no Google Maps"
+                          >
+                            <Navigation className="w-2.5 h-2.5 animate-pulse" />
+                            Rastrear 🗺️
+                          </button>
+                        ) : (
+                          <span className="text-[10px] text-slate-400 font-mono italic pr-1">Rotativo</span>
+                        )}
                       </div>
-
-                      {mb.empresaExclusiva ? (
-                        <button
-                          onClick={() => handleRastrearMotoboyNoGoogleMaps(mb)}
-                          className="text-[9px] font-mono font-black py-1.5 px-2.5 rounded border bg-orange-600 hover:bg-orange-700 hover:scale-103 text-white uppercase transition duration-150 cursor-pointer flex items-center gap-1 shrink-0 shadow shadow-orange-500/10"
-                          title="Rastrear localização do entregador exclusivo no Google Maps"
-                        >
-                          <Navigation className="w-2.5 h-2.5 animate-pulse" />
-                          Rastrear 🗺️
-                        </button>
-                      ) : (
-                        <span className="text-[10px] text-slate-400 font-mono italic pr-1">Rotativo</span>
-                      )}
-                    </div>
-                  );
-                })}
+                    );
+                  })
+                )}
               </div>
             </div>
 
@@ -5948,7 +5971,7 @@ export default function App() {
             <MapaDaCidade 
               clientes={clientes}
               ordens={ordens}
-              motoboys={motoboys}
+              motoboys={filteredMotoboysForClient}
               selectedMotoboyIdForTracking={selectedMotoboyIdForTracking}
               setSelectedMotoboyIdForTracking={setSelectedMotoboyIdForTracking}
               activeSessionRole={effectiveRole}
