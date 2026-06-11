@@ -374,8 +374,6 @@ export default function GpsNavigator({ order, client, onBack, onDelivered }: Gps
               </g>
 
               {/* SVG Origin coordinates */}
-              const startX = 220;
-              const startY = 240;
 
               {/* SVG Destination coordinates mapping based on sector quadrant centroids */}
               {(() => {

@@ -2783,7 +2783,7 @@ export default function App() {
                 {loginRole === 'Cliente' && (
                   <div className="space-y-2">
                     <div>
-                      <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">Selecione seu Nome como Parceiros</label>
+                      <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">Selecione seu Nome (Parceiros)</label>
                       <div className="relative">
                         <select
                           value={selectedLoginUserId}
@@ -4071,6 +4071,22 @@ export default function App() {
                       placeholder="Ex: BARROS AUTOPEÇAS"
                       className="w-full bg-white text-slate-900 border border-slate-250 rounded p-2 text-xs focus:ring-2 focus:ring-orange-550 font-mono font-semibold"
                     />
+                  </div>
+
+                  <div>
+                    <label className="block text-[9px] font-bold text-slate-700 uppercase mb-0.5 font-mono">
+                      Veículo de Atuação
+                    </label>
+                    <select
+                      value={newMotoboyVeiculo}
+                      onChange={(e) => setNewMotoboyVeiculo(e.target.value)}
+                      className="w-full bg-white text-slate-900 border border-slate-250 rounded p-1.5 text-xs focus:ring-2 focus:ring-orange-550 font-mono font-semibold"
+                    >
+                      <option value="Moto">Moto 🏍️</option>
+                      <option value="Carro">Carro 🚗</option>
+                      <option value="Van">Van 🚐</option>
+                      <option value="Furgão">Furgão 🚚</option>
+                    </select>
                   </div>
 
                   <button
@@ -6937,7 +6953,7 @@ export default function App() {
                     className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded-lg p-2 text-xs focus:ring-2 focus:ring-orange-500 font-mono mb-1.5 font-semibold"
                   >
                     <option value="Autopeças">Autopeças</option>
-                    <option value="Oficina mecânica font-mono">Oficina mecânica</option>
+                    <option value="Oficina mecânica">Oficina mecânica</option>
                     <option value="Farmácia">Farmácia</option>
                     <option value="Lanchonete">Lanchonete</option>
                     <option value="Restaurante">Restaurante</option>
@@ -7176,7 +7192,7 @@ export default function App() {
                     className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded-lg p-2 text-xs focus:ring-2 focus:ring-orange-500 font-mono mb-1.5 font-semibold"
                   >
                     <option value="Autopeças">Autopeças</option>
-                    <option value="Oficina mecânica font-mono">Oficina mecânica</option>
+                    <option value="Oficina mecânica">Oficina mecânica</option>
                     <option value="Farmácia">Farmácia</option>
                     <option value="Lanchonete">Lanchonete</option>
                     <option value="Restaurante">Restaurante</option>
