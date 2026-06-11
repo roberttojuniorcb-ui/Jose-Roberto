@@ -74,7 +74,6 @@ import {
   BAÚ_CAPACIDADE_MAXIMA 
 } from './utils/logisticsEngine';
 import MapaDaCidade from './components/MapaDaCidade';
-import GpsNavigator from './components/GpsNavigator';
 import TorqueLogLogoIcon from './components/TorqueLogLogoIcon';
 
 const MONTHS_PT = [
@@ -383,7 +382,7 @@ export default function App() {
   const [selectedMotoboyIdForTracking, setSelectedMotoboyIdForTracking] = useState<string | null>(null);
   const [animationTick, setAnimationTick] = useState<number>(0);
   const [mobileInstallPrompt, setMobileInstallPrompt] = useState<'ios' | 'android' | null>(null);
-  const [activeGpsOrder, setActiveGpsOrder] = useState<OrdemServico | null>(null);
+  const [orderToAcceptPrompt, setOrderToAcceptPrompt] = useState<OrdemServico | null>(null);
   // Safe storage helper to prevent crash in sandboxed iframes when cookies/storage are denied
   const safeGetLocalStorage = (key: string, defaultValue: string): string => {
     try {
@@ -2313,6 +2312,15 @@ export default function App() {
     });
   };
 
+  const handleAbrirGoogleMaps = (o: OrdemServico) => {
+    const cli = clientes.find(c => c.id === o.clienteId || c.nome.toLowerCase() === o.clienteNome.toLowerCase());
+    const deCidade = cli?.cidade || 'Passos, MG';
+    const origem = `${cli?.nome || o.clienteNome}, ${cli?.endereco || ''}, ${deCidade}`;
+    const destino = `${o.destinatarioNome || 'Oficina'}, ${o.enderecoEntrega || ''}`;
+    const url = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(origem)}&destination=${encodeURIComponent(destino)}`;
+    window.open(url, '_blank', 'noopener,noreferrer');
+  };
+
   // Simulate Accepting/Routing on the deliverer's app
   const handleAtualizarStatusOrdem = async (ordemId: string, novoStatus: OrdemServico['status']) => {
     let targetO = ordens.find(o => o.id === ordemId);
@@ -2331,13 +2339,6 @@ export default function App() {
     });
 
     setOrdens(nextOrdens);
-
-    if (novoStatus === 'Moto a Caminho') {
-      const updatedOrder = nextOrdens.find(o => o.id === ordemId);
-      if (updatedOrder) {
-        setActiveGpsOrder(updatedOrder);
-      }
-    }
 
     if (isFirebaseConfigured) {
       try {
@@ -4876,18 +4877,7 @@ export default function App() {
           ========================================== */}
       {effectiveRole === 'Motoboy' && (
         <main className="max-w-7xl mx-auto p-4 lg:p-6 flex flex-col gap-6 flex-1 w-full animate-fade-in" id="motoboy-main">
-          {activeGpsOrder ? (
-            <GpsNavigator 
-              order={activeGpsOrder}
-              client={clientes.find(c => c.id === activeGpsOrder.clienteId) || null}
-              onBack={() => setActiveGpsOrder(null)}
-              onDelivered={() => {
-                setActiveSignOrder(activeGpsOrder);
-                setActiveGpsOrder(null);
-              }}
-            />
-          ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full">
               {/* Active Audio/Visual Driver Alerts Banner */}
           {activeDriverAlerts.length > 0 && (
             <div className="lg:col-span-12 space-y-3" id="driver-live-alerts-container">
@@ -4933,7 +4923,7 @@ export default function App() {
                         type="button"
                         onClick={() => {
                           playNotificationSound();
-                          handleAtualizarStatusOrdem(alertOrder.id, 'Moto a Caminho');
+                          setOrderToAcceptPrompt(alertOrder);
                           setActiveDriverAlerts(prev => prev.filter(o => o.id !== alertOrder.id));
                         }}
                         className="bg-white hover:bg-slate-50 text-orange-600 hover:scale-103 font-mono font-black text-xs px-5 py-3 rounded-xl transition shadow shadow-black/10 cursor-pointer flex items-center justify-center gap-1.5 flex-1 md:flex-none uppercase tracking-wider"
@@ -5115,7 +5105,7 @@ export default function App() {
                       <div className="flex sm:flex-col items-stretch sm:items-end gap-2 shrink-0 w-full sm:w-auto border-t sm:border-t-0 pt-2 sm:pt-0 mt-1 sm:mt-0">
                         {o.status !== 'Moto a Caminho' ? (
                           <button
-                            onClick={() => handleAtualizarStatusOrdem(o.id, 'Moto a Caminho')}
+                            onClick={() => setOrderToAcceptPrompt(o)}
                             className="bg-orange-500 hover:bg-orange-600 active:scale-95 text-white font-mono font-bold text-xs px-3 py-2 rounded-lg transition shadow shadow-orange-500/10 cursor-pointer flex items-center gap-1.5 w-full sm:w-auto text-center justify-center font-mono font-black"
                           >
                             <TorqueLogLogoIcon size={16} className="text-white animate-spin-slow" variant={logoVariant} />
@@ -5125,11 +5115,11 @@ export default function App() {
                           <div className="flex flex-col gap-1.5 w-full">
                             <button
                               type="button"
-                              onClick={() => setActiveGpsOrder(o)}
-                              className="bg-orange-500 hover:bg-orange-600 active:scale-95 text-white font-mono font-bold text-xs px-3 py-2 rounded-lg transition shadow shadow-orange-500/10 cursor-pointer flex items-center gap-1.5 justify-center w-full grow font-black"
+                              onClick={() => handleAbrirGoogleMaps(o)}
+                              className="bg-slate-900 hover:bg-slate-850 active:scale-95 text-white font-mono font-bold text-xs px-3 py-2 rounded-lg transition shadow cursor-pointer flex items-center gap-1.5 justify-center w-full grow font-black"
                             >
-                              <Navigation className="w-3.5 h-3.5 animate-pulse" />
-                              Seguir no GPS 🗺️
+                              <Navigation className="w-3.5 h-3.5" />
+                              Ver Rota (Google Maps) 🗺️
                             </button>
                             <button
                               type="button"
@@ -5226,7 +5216,6 @@ export default function App() {
             </div>
           </div>
           </div>
-          )}
 
         </main>
       )}
@@ -6118,6 +6107,88 @@ export default function App() {
                 </div>
               </form>
 
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ==========================================
+          MODAL: CONFIRMAR ACEITE E MAPA DA ROTA (MOTOBOY)
+          ========================================== */}
+      <AnimatePresence>
+        {orderToAcceptPrompt && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm shadow-2xl" id="modal-confirmar-aceite">
+            <motion.div 
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white rounded-2xl shadow-2xl border border-slate-250 max-w-md w-full p-6 space-y-4"
+            >
+              <div className="flex justify-between items-start">
+                <div className="bg-orange-100 text-orange-600 p-2.5 rounded-xl shrink-0 flex items-center justify-center shadow-xs">
+                  <Navigation className="w-5 h-5 animate-pulse" />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setOrderToAcceptPrompt(null)}
+                  className="text-slate-400 hover:text-slate-600 font-bold text-lg font-mono px-2"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="space-y-2">
+                <h3 className="text-base font-black text-slate-900 font-sans tracking-tight">
+                  Aceitar Corrida e Iniciar Despacho?
+                </h3>
+                <p className="text-xs text-slate-600 leading-relaxed font-sans">
+                  Você está assumindo a responsabilidade pela corrida de <strong className="text-slate-900">{orderToAcceptPrompt.clienteNome}</strong> com destino a <strong className="text-slate-900">{orderToAcceptPrompt.destinatarioNome || 'Oficina / Cliente'}</strong>.
+                </p>
+                
+                <div className="bg-orange-50/50 rounded-xl p-3 border border-orange-100 text-xs text-orange-850 space-y-1.5 font-mono">
+                  <p>🏢 <strong>Coleta:</strong> {orderToAcceptPrompt.clienteNome}</p>
+                  <p>🎯 <strong>Entrega:</strong> {orderToAcceptPrompt.destinatarioNome || 'Oficina'} • {orderToAcceptPrompt.enderecoEntrega || `Setor ${orderToAcceptPrompt.quadrante}`}</p>
+                  <p>🧭 <strong>Vizinhança/Quadrante:</strong> Setor {orderToAcceptPrompt.quadrante}</p>
+                </div>
+                
+                <p className="text-xs text-slate-500 font-sans font-semibold pt-1">
+                  Deseja abrir a rota dinâmica desta corrida no Google Maps para te orientar no trajeto?
+                </p>
+              </div>
+
+              <div className="flex flex-col gap-2 pt-1 font-mono">
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleAtualizarStatusOrdem(orderToAcceptPrompt.id, 'Moto a Caminho');
+                    handleAbrirGoogleMaps(orderToAcceptPrompt);
+                    setOrderToAcceptPrompt(null);
+                  }}
+                  className="w-full bg-orange-600 hover:bg-orange-700 active:scale-98 text-white font-black text-xs py-3 rounded-xl transition duration-155 flex items-center justify-center gap-2 shadow-md shadow-orange-500/10 cursor-pointer text-center"
+                >
+                  <Navigation className="w-4 h-4 text-white" />
+                  Sim, Aceitar e Abrir Rota 🗺️
+                </button>
+                
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleAtualizarStatusOrdem(orderToAcceptPrompt.id, 'Moto a Caminho');
+                    setOrderToAcceptPrompt(null);
+                  }}
+                  className="w-full bg-slate-900 hover:bg-slate-800 active:scale-98 text-white font-bold text-xs py-2.5 rounded-xl transition cursor-pointer text-center"
+                >
+                  Não, aceitar sem abrir mapa (Já sei o caminho) 👍
+                </button>
+                
+                <button
+                  type="button"
+                  onClick={() => setOrderToAcceptPrompt(null)}
+                  className="w-full bg-slate-100 hover:bg-slate-200 text-slate-550 text-xs font-semibold py-2 rounded-lg transition cursor-pointer text-center"
+                >
+                  Cancelar / Voltar ✕
+                </button>
+              </div>
             </motion.div>
           </div>
         )}
