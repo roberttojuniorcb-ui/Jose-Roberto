@@ -37,7 +37,7 @@ import {
   Bell,
   Volume2
 } from 'lucide-react';
-import { Cliente, OrdemServico, Quadrante, APIResponse, Motoboy } from './types';
+import { Cliente, OrdemServico, Quadrante, APIResponse, Motoboy, obterEstimativaTempoPercurso } from './types';
 import { getInitialClientes, AUTO_PECA_SUGESTOES, INITIAL_MOTOBOYS } from './mockData';
 import { 
   query, 
@@ -232,6 +232,7 @@ export default function App() {
   const [newClientEmail, setNewClientEmail] = useState<string>('');
   const [newClientSenha, setNewClientSenha] = useState<string>('');
   const [newClientMotoboysAtivos, setNewClientMotoboysAtivos] = useState<number>(1);
+  const [newClientRamo, setNewClientRamo] = useState<string>('Autopeças');
 
   // --- STATE FOR QUICK REGISTERING CLIENT/DESTINATARIO (CRUD) ---
   const [isQuickRegisteringDestinatario, setIsQuickRegisteringDestinatario] = useState<boolean>(false);
@@ -253,6 +254,7 @@ export default function App() {
   const [editClientEmail, setEditClientEmail] = useState<string>('');
   const [editClientSenha, setEditClientSenha] = useState<string>('');
   const [editClientMotoboysAtivos, setEditClientMotoboysAtivos] = useState<number>(1);
+  const [editClientRamo, setEditClientRamo] = useState<string>('Autopeças');
 
   // --- STATES FOR FIRST ACCESS SELF-REGISTRATION ---
   const [isFirstAccessModalOpen, setIsFirstAccessModalOpen] = useState<boolean>(false);
@@ -308,6 +310,7 @@ export default function App() {
   const [newMotoboySenha, setNewMotoboySenha] = useState<string>('passos123');
   const [newMotoboyRepasse, setNewMotoboyRepasse] = useState<number>(4.00);
   const [newMotoboyEmpresaExclusiva, setNewMotoboyEmpresaExclusiva] = useState<string>('');
+  const [newMotoboyVeiculo, setNewMotoboyVeiculo] = useState<string>('Moto');
 
   // --- STATE FOR MOTOBOY EDITING (CRUD) ---
   const [motoboyParaEditar, setMotoboyParaEditar] = useState<Motoboy | null>(null);
@@ -318,6 +321,7 @@ export default function App() {
   const [editMotoboyRepasse, setEditMotoboyRepasse] = useState<number>(4.00);
   const [editMotoboySituacao, setEditMotoboySituacao] = useState<string>('Ativo');
   const [editMotoboyEmpresaExclusiva, setEditMotoboyEmpresaExclusiva] = useState<string>('');
+  const [editMotoboyVeiculo, setEditMotoboyVeiculo] = useState<string>('Moto');
 
   // --- STATES FOR EXCLUSION CONFIRMATION ---
   const [deleteConfirmType, setDeleteConfirmType] = useState<'cliente' | 'motoboy' | 'multiple-clientes' | 'ordem' | null>(null);
@@ -330,6 +334,8 @@ export default function App() {
   const [activeSessionRole, setActiveSessionRole] = useState<'Empresa' | 'Motoboy' | 'Cliente' | null>(null);
   const [activeMotoboyUser, setActiveMotoboyUser] = useState<Motoboy | null>(null);
   const [activeClienteUser, setActiveClienteUser] = useState<Cliente | null>(null);
+
+  const isExclusiveNow = checkIsExclusiveTime(activeMotoboyUser?.empresaExclusiva);
 
   // --- ADMIN CITY FILTER & SEARCH ---
   const [selectedAdminCity, setSelectedAdminCity] = useState<string>('Todas');
@@ -987,6 +993,16 @@ export default function App() {
     };
   }, [clientes, ordens]);
 
+  const obterValorRepasseOperacional = (o: OrdemServico) => {
+    if (isExclusiveNow && activeMotoboyUser?.empresaExclusiva) {
+      const isMyExclusiveDistributor = o.clienteNome.toLowerCase() === activeMotoboyUser.empresaExclusiva.toLowerCase() || o.clienteId === activeMotoboyUser.empresaExclusiva;
+      if (isMyExclusiveDistributor) {
+        return activeMotoboyUser.valorRepasseFixo || 4.00;
+      }
+    }
+    return o.valorPagoMotoboy || 4.00;
+  };
+
   // Statistics for the active logged-in Motoboy (Daily/Monthly)
   const motoboyStats = useMemo(() => {
     if (!activeMotoboyUser) return { hojeCount: 0, hojeEarnings: 0, mesCount: 0, mesEarnings: 0 };
@@ -1010,7 +1026,7 @@ export default function App() {
 
         const isOToday = orderDateString === cleanToday;
         const isOThisMonth = orderMonth === cleanMonth && orderYear === cleanYear;
-        const repasse = o.valorPagoMotoboy || 4.00;
+        const repasse = obterValorRepasseOperacional(o);
 
         if (isOThisMonth && o.status === 'Entregue') {
           mesCount++;
@@ -1024,7 +1040,7 @@ export default function App() {
     });
 
     return { hojeCount, hojeEarnings, mesCount, mesEarnings };
-  }, [activeMotoboyUser, ordens]);
+  }, [activeMotoboyUser, ordens, isExclusiveNow]);
 
   // Statistics for the active logged-in Cliente (Daily/Monthly Billing representation)
   const clienteStats = useMemo(() => {
@@ -1282,6 +1298,39 @@ export default function App() {
     }
   }, []);
 
+  // Live sync active users when changed in list by Admin
+  useEffect(() => {
+    if (activeMotoboyUser) {
+      const liveMotoboy = motoboys.find(m => m.id === activeMotoboyUser.id);
+      if (liveMotoboy && (
+        liveMotoboy.cidade !== activeMotoboyUser.cidade ||
+        liveMotoboy.empresaExclusiva !== activeMotoboyUser.empresaExclusiva ||
+        liveMotoboy.nome !== activeMotoboyUser.nome ||
+        liveMotoboy.veiculo !== activeMotoboyUser.veiculo ||
+        liveMotoboy.valorRepasseFixo !== activeMotoboyUser.valorRepasseFixo
+      )) {
+        setActiveMotoboyUser(liveMotoboy);
+      }
+    }
+  }, [motoboys, activeMotoboyUser]);
+
+  useEffect(() => {
+    if (activeClienteUser) {
+      const liveCliente = clientes.find(c => c.id === activeClienteUser.id);
+      if (liveCliente && (
+        liveCliente.nome !== activeClienteUser.nome ||
+        liveCliente.quadrante !== activeClienteUser.quadrante ||
+        liveCliente.endereco !== activeClienteUser.endereco ||
+        liveCliente.telefone !== activeClienteUser.telefone ||
+        liveCliente.cidade !== activeClienteUser.cidade ||
+        liveCliente.cep !== activeClienteUser.cep ||
+        liveCliente.ramo !== activeClienteUser.ramo
+      )) {
+        setActiveClienteUser(liveCliente);
+      }
+    }
+  }, [clientes, activeClienteUser]);
+
   // Use simple countdown triggers instead of complex nested intervals
   useEffect(() => {
     const timer = setInterval(() => {
@@ -1295,8 +1344,6 @@ export default function App() {
     return () => clearInterval(timer);
   }, []);
 
-  const isExclusiveNow = checkIsExclusiveTime(activeMotoboyUser?.empresaExclusiva);
-  
   const motoboyVisibleOrders = useMemo(() => {
     if (!activeMotoboyUser) return [];
     return ordens.filter(o => {
@@ -1459,7 +1506,8 @@ export default function App() {
       cadastroCompleto: false, // Explicitly false! Trigger B2B onboarding setup on first login/access!
       criadoPor: source,
       criadoEm: new Date().toISOString(),
-      motoboysAtivos: Number(newClientMotoboysAtivos) || 0
+      motoboysAtivos: Number(newClientMotoboysAtivos) || 0,
+      ramo: newClientRamo
     };
 
     setClientes(prev => [novoCli, ...prev]);
@@ -1538,6 +1586,7 @@ export default function App() {
     setNewClientTelefone('');
     setNewClientEmail('');
     setNewClientSenha('');
+    setNewClientRamo('Autopeças');
   };
 
   // Update / Edit client (CRUD update)
@@ -1565,7 +1614,8 @@ export default function App() {
       valorCobradoCliente: Number(editClientValorCobradoCliente) || 10.00,
       email: editClientEmail,
       senha: editClientSenha || clienteParaEditar.senha,
-      motoboysAtivos: Number(editClientMotoboysAtivos) || 0
+      motoboysAtivos: Number(editClientMotoboysAtivos) || 0,
+      ramo: editClientRamo
     };
 
     setClientes(prev => prev.map(c => c.id === clienteParaEditar.id ? updatedCli : c));
@@ -1619,7 +1669,8 @@ export default function App() {
       senha: editMotoboySenha || motoboyParaEditar.senha,
       valorRepasseFixo: Number(editMotoboyRepasse) || 4.00,
       situacao: editMotoboySituacao || 'Ativo',
-      empresaExclusiva: editMotoboyEmpresaExclusiva || undefined
+      empresaExclusiva: editMotoboyEmpresaExclusiva || undefined,
+      veiculo: editMotoboyVeiculo
     };
 
     setMotoboys(prev => prev.map(m => m.id === motoboyParaEditar.id ? updatedMb : m));
@@ -2187,7 +2238,8 @@ export default function App() {
       senha: newMotoboySenha || 'passos123',
       valorRepasseFixo: Number(newMotoboyRepasse) || 4.00,
       criadoEm: new Date().toISOString(),
-      empresaExclusiva: newMotoboyEmpresaExclusiva || undefined
+      empresaExclusiva: newMotoboyEmpresaExclusiva || undefined,
+      veiculo: newMotoboyVeiculo
     };
 
     setMotoboys(prev => [novoMotoboy, ...prev]);
@@ -2224,6 +2276,7 @@ export default function App() {
     setNewMotoboyTelefone('');
     setNewMotoboySenha('passos123');
     setNewMotoboyEmpresaExclusiva('');
+    setNewMotoboyVeiculo('Moto');
   };
 
   // Copy current selected day's deliveries audit report
@@ -2691,7 +2744,7 @@ export default function App() {
                       onClick={() => { setLoginRole('Cliente'); setIsSelfRegistering(false); }}
                       className={`py-2 text-xs font-bold rounded-lg transition-all ${loginRole === 'Cliente' ? 'bg-orange-500 text-white shadow' : 'text-slate-400 hover:text-white'}`}
                     >
-                      🏢 Distribuidora
+                      🏢 Parceiros
                     </button>
                   </div>
                 </div>
@@ -2730,7 +2783,7 @@ export default function App() {
                 {loginRole === 'Cliente' && (
                   <div className="space-y-2">
                     <div>
-                      <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">Selecione sua Distribuidora</label>
+                      <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">Selecione seu Nome como Parceiros</label>
                       <div className="relative">
                         <select
                           value={selectedLoginUserId}
@@ -3840,6 +3893,7 @@ export default function App() {
                             setEditClientValorCobradoCliente(cli.valorCobradoCliente);
                             setEditClientValorPagoMotoboy(cli.valorPagoMotoboy);
                             setEditClientMotoboysAtivos(cli.motoboysAtivos || 0);
+                            setEditClientRamo(cli.ramo || 'Autopeças');
                           }}
                           className="bg-slate-100 hover:bg-slate-200 text-slate-705 p-1 rounded transition border border-slate-250 cursor-pointer"
                           title="Editar cadastro do cliente"
@@ -4071,6 +4125,7 @@ export default function App() {
                           setEditMotoboyRepasse(m.valorRepasseFixo);
                           setEditMotoboySituacao(m.situacao || 'Ativo');
                           setEditMotoboyEmpresaExclusiva(m.empresaExclusiva || '');
+                          setEditMotoboyVeiculo(m.veiculo || 'Moto');
                         }}
                         className="bg-slate-100 hover:bg-slate-200 text-slate-700 p-1.5 rounded transition border border-slate-250 cursor-pointer self-center"
                         title="Editar credenciamento de motoboy"
@@ -5007,22 +5062,33 @@ export default function App() {
                           
                           {/* Dynamic payout rates on each run card */}
                           <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 border border-emerald-200/60 px-2 py-0.5 rounded text-[10px] font-bold font-mono">
-                            💰 Ganho: R$ {((o.valorPagoMotoboy || 4.00) + (o.retornoPeca ? (o.taxaReversa || 15.00) : 0)).toFixed(2)}
+                            💰 Ganho: R$ {((obterValorRepasseOperacional(o)) + (o.retornoPeca ? (o.taxaReversa || 15.00) : 0)).toFixed(2)}
                             {isExclusiveNow && activeMotoboyUser?.empresaExclusiva && (o.clienteNome.toLowerCase() === activeMotoboyUser.empresaExclusiva.toLowerCase() || o.clienteId === activeMotoboyUser.empresaExclusiva) ? (
-                              <span className="text-[8px] text-emerald-600/90 font-normal font-sans ml-0.5">(Fixo Distribuidora)</span>
+                              <span className="text-[8px] text-emerald-600/90 font-normal font-sans ml-0.5">(Fixo Exclusividade)</span>
                             ) : (
-                              <span className="text-[8px] text-emerald-600/90 font-normal font-sans ml-0.5">(TorqueLog Freelancer)</span>
+                              <span className="text-[8px] text-emerald-600/90 font-normal font-sans ml-0.5">(Livre Co-Faturado TorqueLog)</span>
                             )}
                           </span>
                         </div>
                         
                         <div className="text-xs text-slate-750 font-mono space-y-0.5 leading-normal mt-1.5">
-                          <p>🏢 <strong>Ponto de Retirada (Coleta):</strong> {o.clienteNome}</p>
+                          <p>
+                            🏢 <strong>Ponto de Retirada (Coleta):</strong> {o.clienteNome}
+                            {clientes.find(c => c.id === o.clienteId || c.nome.toLowerCase() === o.clienteNome.toLowerCase())?.ramo && (
+                              <span className="bg-indigo-50 border border-indigo-150 text-indigo-700 px-1.5 py-0.5 rounded text-[9px] font-bold font-sans ml-1.5 uppercase shadow-xs">
+                                👜 {clientes.find(c => c.id === o.clienteId || c.nome.toLowerCase() === o.clienteNome.toLowerCase())?.ramo}
+                              </span>
+                            )}
+                          </p>
                           <p>🎯 <strong>Ponto de Destino:</strong> <span className="text-orange-600 font-extrabold">{o.destinatarioNome || 'Oficina / Destinatário Final'}</span> • {o.enderecoEntrega || `Setor ${o.quadrante}`}</p>
+                          
+                          <div className="p-1 px-2 border border-orange-200 bg-orange-50/40 rounded text-[10px] text-orange-700 w-fit flex items-center gap-1.5 mt-1">
+                            <span>🗺️ <strong>Logística de Percurso:</strong> Origem ➔ Destino • Rota Est.: ~{obterEstimativaTempoPercurso(o.quadrante).tempoMin} min • Distância: {obterEstimativaTempoPercurso(o.quadrante).distanciaKm} km</span>
+                          </div>
                         </div>
                         
                         {o.retornoPeca && (
-                          <div className="inline-flex items-center gap-1.5 bg-red-50 border border-red-100 text-red-700 text-[10px] px-2 py-0.5 rounded font-mono font-bold">
+                          <div className="inline-flex items-center gap-1.5 bg-red-50 border border-red-100 text-red-700 text-[10px] px-2 py-0.5 rounded font-mono font-bold mt-1">
                             <AlertTriangle className="w-3.5 h-3.5 text-red-500" />
                             REVERSA: Coletar retorno de peça na entrega e devolver ao solicitante
                           </div>
@@ -5745,6 +5811,9 @@ export default function App() {
                         <div>🎯 <strong>Oficina de Entrega (Destino):</strong> {o.destinatarioNome || 'Oficina Credenciada'}</div>
                         <div>📍 <strong>Endereço de Destino:</strong> {o.enderecoEntrega}</div>
                         <div>🧭 <strong>Região / Quadrante Atribuído:</strong> Setor {o.quadrante}</div>
+                        <div className="text-[10px] text-orange-650 bg-orange-50 border border-orange-100 rounded px-1.5 py-0.5 mt-1.5 font-bold flex items-center gap-1 w-fit">
+                          <span>⏱️ Rota Est.: ~{obterEstimativaTempoPercurso(o.quadrante).tempoMin} min • 🛣️ Distância Coleta-Entrega: {obterEstimativaTempoPercurso(o.quadrante).distanciaKm} km</span>
+                        </div>
                       </div>
 
                       {o.motoboyNome ? (
@@ -6852,6 +6921,40 @@ export default function App() {
                   />
                 </div>
 
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1 font-mono">
+                    Ramo da Empresa / Estabelecimento *
+                  </label>
+                  <select
+                    value={['Autopeças', 'Oficina mecânica', 'Farmácia', 'Lanchonete', 'Restaurante'].includes(newClientRamo) ? newClientRamo : (newClientRamo ? 'Outro' : 'Autopeças')}
+                    onChange={(e) => {
+                      if (e.target.value !== 'Outro') {
+                        setNewClientRamo(e.target.value);
+                      } else {
+                        setNewClientRamo('');
+                      }
+                    }}
+                    className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded-lg p-2 text-xs focus:ring-2 focus:ring-orange-500 font-mono mb-1.5 font-semibold"
+                  >
+                    <option value="Autopeças">Autopeças</option>
+                    <option value="Oficina mecânica font-mono">Oficina mecânica</option>
+                    <option value="Farmácia">Farmácia</option>
+                    <option value="Lanchonete">Lanchonete</option>
+                    <option value="Restaurante">Restaurante</option>
+                    <option value="Outro">✍️ Digitar ramo personalizado...</option>
+                  </select>
+                  {(!['Autopeças', 'Oficina mecânica', 'Farmácia', 'Lanchonete', 'Restaurante'].includes(newClientRamo) || newClientRamo === '') && (
+                    <input
+                      type="text"
+                      required
+                      value={newClientRamo}
+                      onChange={(e) => setNewClientRamo(e.target.value)}
+                      placeholder="Escreva o ramo da empresa..."
+                      className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded-lg p-2.5 text-xs focus:ring-2 focus:ring-orange-500 font-mono"
+                    />
+                  )}
+                </div>
+
                 {/* Region selector (Quadrante) removed for Admin, defaulted to A */}
 
                 <div>
@@ -7055,6 +7158,40 @@ export default function App() {
                     placeholder="Ex: Oficina Mecânica do Renan"
                     className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded-lg p-2.5 text-xs focus:ring-2 focus:ring-orange-500 focus:border-orange-500 font-mono"
                   />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1 font-mono">
+                    Ramo da Empresa / Estabelecimento *
+                  </label>
+                  <select
+                    value={['Autopeças', 'Oficina mecânica', 'Farmácia', 'Lanchonete', 'Restaurante'].includes(editClientRamo) ? editClientRamo : (editClientRamo ? 'Outro' : 'Autopeças')}
+                    onChange={(e) => {
+                      if (e.target.value !== 'Outro') {
+                        setEditClientRamo(e.target.value);
+                      } else {
+                        setEditClientRamo('');
+                      }
+                    }}
+                    className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded-lg p-2 text-xs focus:ring-2 focus:ring-orange-500 font-mono mb-1.5 font-semibold"
+                  >
+                    <option value="Autopeças">Autopeças</option>
+                    <option value="Oficina mecânica font-mono">Oficina mecânica</option>
+                    <option value="Farmácia">Farmácia</option>
+                    <option value="Lanchonete">Lanchonete</option>
+                    <option value="Restaurante">Restaurante</option>
+                    <option value="Outro">✍️ Digitar ramo personalizado...</option>
+                  </select>
+                  {(!['Autopeças', 'Oficina mecânica', 'Farmácia', 'Lanchonete', 'Restaurante'].includes(editClientRamo) || editClientRamo === '') && (
+                    <input
+                      type="text"
+                      required
+                      value={editClientRamo}
+                      onChange={(e) => setEditClientRamo(e.target.value)}
+                      placeholder="Escreva o ramo da empresa..."
+                      className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded-lg p-2.5 text-xs focus:ring-2 focus:ring-orange-500 font-mono"
+                    />
+                  )}
                 </div>
 
                 <div>
@@ -7363,6 +7500,22 @@ export default function App() {
                     placeholder="Escreva ou escolha a empresa exclusiva de atendimento"
                     className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded-lg p-2 text-xs focus:ring-2 focus:ring-orange-500 font-mono font-semibold"
                   />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1 font-mono">
+                    Veículo de Atuação
+                  </label>
+                  <select
+                    value={editMotoboyVeiculo}
+                    onChange={(e) => setEditMotoboyVeiculo(e.target.value)}
+                    className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded-lg p-2.5 text-xs focus:ring-2 focus:ring-orange-500 font-mono font-semibold"
+                  >
+                    <option value="Moto">Moto 🏍️</option>
+                    <option value="Carro">Carro 🚗</option>
+                    <option value="Van">Van 🚐</option>
+                    <option value="Furgão">Furgão 🚚</option>
+                  </select>
                 </div>
 
                 <div>

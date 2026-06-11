@@ -16,6 +16,7 @@ export interface Cliente {
   cadastroCompleto?: boolean; // True when client completed company info & set custom password
   cnpj?: string;
   inscricaoEstadual?: string;
+  ramo?: string; // Business branch like "Farmácia", "Lanchonete", "Restaurante", "Oficina Mecânica", "Autopeças"
   criadoPor: 'Empresa' | 'Entregador' | 'Cliente';
   criadoPorClienteId?: string; // ID of the distributor who registered this sub-client
   criadoEm: string;
@@ -33,6 +34,7 @@ export interface Motoboy {
   criadoEm: string;
   situacao?: string; // Observação sobre a situação do motoboy (ex: ativo, faltou, mudou telefone)
   empresaExclusiva?: string; // Empresa/B2B Cliente exclusivo ao qual o motoboy presta serviços (ex: BARROS AUTOPEÇAS)
+  veiculo?: string; // Vehicle like Moto, Carro, Van, Furgão
 }
 
 export interface PecasItem {
@@ -92,4 +94,16 @@ export interface APIResponse {
     trava_cubagem_status: "Liberado - Cabe no Baú" | "Bloqueado - Excesso de Volume";
     canhoto_digital: string;
   };
+}
+
+export function obterEstimativaTempoPercurso(quadrante: Quadrante): { tempoMin: number, distanciaKm: number } {
+  const estimativas: Record<Quadrante, { tempoMin: number, distanciaKm: number }> = {
+    A: { tempoMin: 10, distanciaKm: 4.2 },
+    B: { tempoMin: 8, distanciaKm: 3.6 },
+    C: { tempoMin: 12, distanciaKm: 5.1 },
+    D: { tempoMin: 6, distanciaKm: 2.8 },
+    E: { tempoMin: 4, distanciaKm: 1.5 },
+    F: { tempoMin: 13, distanciaKm: 6.0 }
+  };
+  return estimativas[quadrante] || { tempoMin: 9, distanciaKm: 3.6 };
 }

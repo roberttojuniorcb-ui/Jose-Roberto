@@ -9,7 +9,8 @@ export const INITIAL_MOTOBOYS = [
     senha: "passos2026",
     valorRepasseFixo: 4.00,
     empresaExclusiva: "BARROS AUTOPEÇAS",
-    criadoEm: new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString()
+    criadoEm: new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString(),
+    veiculo: "Moto"
   },
   {
     id: "MOTO-02",
@@ -19,7 +20,8 @@ export const INITIAL_MOTOBOYS = [
     senha: "passos2026",
     valorRepasseFixo: 4.00,
     empresaExclusiva: "MARIA ANDRADE",
-    criadoEm: new Date(Date.now() - 15 * 24 * 3600 * 1000).toISOString()
+    criadoEm: new Date(Date.now() - 15 * 24 * 3600 * 1000).toISOString(),
+    veiculo: "Moto"
   },
   {
     id: "MOTO-03",
@@ -29,7 +31,8 @@ export const INITIAL_MOTOBOYS = [
     senha: "santa2026",
     valorRepasseFixo: 5.50,
     empresaExclusiva: "BARROS AUTOPEÇAS",
-    criadoEm: new Date(Date.now() - 5 * 24 * 3600 * 1000).toISOString()
+    criadoEm: new Date(Date.now() - 5 * 24 * 3600 * 1000).toISOString(),
+    veiculo: "Moto"
   },
   {
     id: "MOTO-04",
@@ -39,7 +42,8 @@ export const INITIAL_MOTOBOYS = [
     senha: "santa2026",
     valorRepasseFixo: 5.50,
     empresaExclusiva: "MARIA ANDRADE",
-    criadoEm: new Date(Date.now() - 2 * 24 * 3600 * 1000).toISOString()
+    criadoEm: new Date(Date.now() - 2 * 24 * 3600 * 1000).toISOString(),
+    veiculo: "Moto"
   }
 ];
 
@@ -61,6 +65,7 @@ export function getInitialClientes(): Cliente[] {
       cadastroCompleto: true,
       cnpj: "12.345.678/0001-90",
       inscricaoEstadual: "123.456.789.110",
+      ramo: "Autopeças",
       criadoPor: "Empresa",
       criadoEm: new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString()
     },
@@ -80,6 +85,7 @@ export function getInitialClientes(): Cliente[] {
       cadastroCompleto: true,
       cnpj: "98.765.432/0001-01",
       inscricaoEstadual: "987.654.321.110",
+      ramo: "Autopeças",
       criadoPor: "Empresa",
       criadoEm: new Date(Date.now() - 15 * 24 * 3600 * 1000).toISOString()
     }
