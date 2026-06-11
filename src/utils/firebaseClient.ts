@@ -232,6 +232,9 @@ export async function syncMotoboysToFirebase(motoboys: any[]) {
         cidade: m.cidade,
         senha: m.senha,
         valorRepasseFixo: Number(m.valorRepasseFixo),
+        situacao: m.situacao || 'Ativo',
+        empresaExclusiva: m.empresaExclusiva || '',
+        veiculo: m.veiculo || 'Moto',
         criadoEm: m.criadoEm
       };
       batch.set(docRef, payload, { merge: true });
