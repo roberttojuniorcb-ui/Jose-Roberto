@@ -3175,7 +3175,7 @@ export default function App() {
                 </span>
                 LOGÍSTICA GEOGRÁFICA EM TEMPO REAL: {selectedAdminCity === 'Todas' ? 'TODAS AS CIDADES' : selectedAdminCity.toUpperCase()}
               </h3>
-              <p className="text-xs text-slate-500 mt-0.5">Distribuição estratégica em 6 setores regionais • Arrastre de motoboys e pedidos simulados por satélite</p>
+              <p className="text-xs text-slate-500 mt-0.5">Distribuição estratégica em 6 setores regionais para agrupamento e otimização de despachos</p>
             </div>
             <div className="flex flex-wrap items-center gap-3">
               <button
@@ -3258,11 +3258,11 @@ export default function App() {
             </div>
           </div>
 
-          {/* Master 2-Column Grid of Heatmap Matrix + Interactive Map */}
+          {/* Master Heatmap Matrix */}
           <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
             
-            {/* Left side: Sector Cards & Alarm status */}
-            <div className="xl:col-span-7 space-y-4">
+            {/* Full-width Sector Cards & Alarm status */}
+            <div className="xl:col-span-12 space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3.5">
                 {(['A', 'B', 'C', 'D', 'E', 'F'] as Quadrante[]).map((q) => {
                   const pendingCount = pendingCounts[q];
@@ -3379,21 +3379,7 @@ export default function App() {
               </div>
             </div>
 
-            {/* Right side: Real-time SVG map visualization in Admin session */}
-            <div className="xl:col-span-5 h-full">
-              <MapaDaCidade 
-                clientes={clientes}
-                ordens={ordens}
-                motoboys={motoboys}
-                selectedMotoboyIdForTracking={selectedMotoboyIdForTracking}
-                setSelectedMotoboyIdForTracking={setSelectedMotoboyIdForTracking}
-                activeSessionRole={effectiveRole}
-                activeClienteUser={activeClienteUser}
-                selectedQuadrant={selectedQuadrant}
-                setSelectedQuadrant={setSelectedQuadrant}
-                animationTick={animationTick}
-              />
-            </div>
+
 
           </div>
 
