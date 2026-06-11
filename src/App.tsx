@@ -1677,10 +1677,16 @@ export default function App() {
     };
 
     setMotoboys(prev => prev.map(m => m.id === motoboyParaEditar.id ? updatedMb : m));
+    
+    // Immediately update active Motoboy session if they are currently logged in with this modified account
+    if (activeMotoboyUser && activeMotoboyUser.id === updatedMb.id) {
+      setActiveMotoboyUser(updatedMb);
+    }
+    
     setMotoboyParaEditar(null);
     setEditMotoboyEmpresaExclusiva('');
 
-    setSupabaseSuccessMsg(`✅ Cadastro do motoboy "${updatedMb.nome}" atualizado com sucesso!`);
+    setSupabaseSuccessMsg(`✅ Cadastro do motoboy "${updatedMb.nome}" atualizado com sucesso e refletido no painel! 🏍️`);
     setTimeout(() => setSupabaseSuccessMsg(''), 4000);
   };
 
@@ -3066,6 +3072,178 @@ export default function App() {
                 </span>
               </div>
             </div>
+
+            {/* 📬 INTERACTIVE SIMULATED EMAIL INBOX POPOVER (NEXT TO CANAL DATABASE) */}
+            {activeSessionRole === 'Empresa' && (
+              <div className="relative" id="header-central-emails-simulados">
+                <button
+                  type="button"
+                  onClick={() => setShowSimulatedInbox(!showSimulatedInbox)}
+                  className="px-3 py-1.5 rounded border border-orange-500/20 hover:border-orange-500/40 bg-slate-800/80 font-mono text-xs flex items-center gap-2 cursor-pointer transition-all hover:scale-[1.02]"
+                >
+                  <div className="relative">
+                    <span className="text-sm">📬</span>
+                    <span className="absolute -top-1.5 -right-1.5 shrink-0 bg-orange-500 text-white text-[8px] font-black w-4.5 h-4.5 rounded-full flex items-center justify-center">
+                      {simulatedEmails.length}
+                    </span>
+                  </div>
+                  <div className="text-left">
+                    <span className="block text-[9px] text-slate-400 leading-none">Email Sandbox</span>
+                    <span className="text-sm font-bold text-white block uppercase tracking-tight">Caixa B2B</span>
+                  </div>
+                </button>
+
+                {showSimulatedInbox && (
+                  <div className="absolute right-0 top-12 z-50 bg-slate-900 border border-slate-800 rounded-xl shadow-2xl w-[320px] sm:w-[380px] max-h-[420px] flex flex-col overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
+                    {/* Header */}
+                    <div className="bg-slate-950 border-b border-slate-800 p-2.5 flex justify-between items-center shrink-0">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-base">📬</span>
+                        <div>
+                          <h4 className="text-[10px] font-black text-white font-mono uppercase tracking-wider leading-none">SMTP Sandbox</h4>
+                          <p className="text-[8px] text-slate-400 font-mono mt-0.5 leading-none">E-mails de Ativação B2B</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSimulatedEmails([
+                              {
+                                id: 'EML-CLEARED',
+                                para: 'suporte@torque-log.com',
+                                assunto: '🧹 Caixa Limpa',
+                                corpo: 'A caixa de e-mails de simulação foi esvaziada.\n\nNovos registros ou tentativas de Primeiro Acesso gerarão novos e-mails simulados aqui em tempo real!',
+                                data: new Date().toLocaleTimeString(),
+                                lido: true
+                              }
+                            ]);
+                            setSelectedSimulatedEmail(null);
+                          }}
+                          className="bg-slate-900 hover:bg-slate-855 text-slate-400 hover:text-white px-2 py-0.5 text-[8px] font-mono border border-slate-800 rounded cursor-pointer"
+                          title="Esvaziar todos os e-mails"
+                        >
+                          Limpar
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setShowSimulatedInbox(false)}
+                          className="text-slate-400 hover:text-white font-mono text-[10px] font-black hover:bg-slate-850 w-5 h-5 rounded flex items-center justify-center cursor-pointer transition"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Email list or selected email details */}
+                    <div className="flex-1 overflow-y-auto p-2.5 space-y-2 max-h-[320px] bg-slate-900">
+                      {selectedSimulatedEmail ? (
+                        // VIEW EMAIL DETAILS
+                        <div className="space-y-2.5 font-mono text-[10px]">
+                          <button
+                            type="button"
+                            onClick={() => setSelectedSimulatedEmail(null)}
+                            className="text-orange-400 hover:text-orange-355 cursor-pointer flex items-center gap-1 font-bold mb-1 text-[9px]"
+                          >
+                            ← Voltar para Caixa
+                          </button>
+                          <div className="bg-slate-950/80 border border-slate-850 p-2 rounded-lg space-y-0.5 text-slate-300">
+                            <p><span className="text-slate-500">Para:</span> <strong className="text-emerald-400 select-all">{selectedSimulatedEmail.para}</strong></p>
+                            <p><span className="text-slate-500">Assunto:</span> <strong className="text-white">{selectedSimulatedEmail.assunto}</strong></p>
+                          </div>
+                          
+                          <div className="bg-slate-950 p-2.5 rounded-lg border border-slate-850 text-[11px] text-slate-300 leading-normal whitespace-pre-wrap select-text max-h-[140px] overflow-y-auto">
+                            {selectedSimulatedEmail.corpo}
+                          </div>
+
+                          {selectedSimulatedEmail.codigo && (
+                            <div className="p-2 bg-slate-950 rounded-lg border border-orange-500/20 flex flex-col items-center gap-1.5">
+                              <p className="text-[9px] text-slate-400 tracking-wider text-center">🔐 CHAVE DE ATIVAÇÃO</p>
+                              <strong className="text-xs text-orange-400 select-all font-mono tracking-wider bg-slate-900 px-2 py-0.5 border border-orange-500/10 rounded">
+                                {selectedSimulatedEmail.codigo}
+                              </strong>
+                              <div className="flex gap-1.5 w-full pt-1">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(selectedSimulatedEmail.codigo!);
+                                    setSupabaseSuccessMsg(`📋 Token ${selectedSimulatedEmail.codigo} copiado!`);
+                                    setTimeout(() => setSupabaseSuccessMsg(''), 3000);
+                                  }}
+                                  className="flex-1 text-center py-1 bg-slate-800 hover:bg-slate-755 text-white font-bold rounded cursor-pointer font-mono text-[9px] border border-slate-700 active:scale-95 transition-all"
+                                >
+                                  Copiar
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const cod = selectedSimulatedEmail.codigo!;
+                                    if (cod.startsWith('temp-')) {
+                                      navigator.clipboard.writeText(cod);
+                                      alert(`Seu token de Primeiro Acesso é ${cod} (copiado). Faça o login com o perfil "Cliente B2B", selecione seu nome e digite este token como senha!`);
+                                    } else {
+                                      setSelfRegVerificationCode(cod);
+                                      setFirstAccessVerificationCode(cod);
+                                      setSupabaseSuccessMsg("⚡ Token pré-preenchido!");
+                                      setTimeout(() => setSupabaseSuccessMsg(''), 3000);
+                                    }
+                                  }}
+                                  className="flex-1 text-center py-1 bg-orange-500 hover:bg-orange-600 active:scale-95 text-white font-bold rounded cursor-pointer font-mono text-[9px] shadow-sm transform transition-all"
+                                >
+                                  Usar Token
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        // LIST DISPATCHED EMAILS
+                        <div className="space-y-1.5">
+                          {simulatedEmails.length === 0 ? (
+                            <div className="p-6 text-center text-slate-505 italic font-mono text-[10px]">
+                              Nenhum e-mail no sandbox.
+                            </div>
+                          ) : (
+                            <div className="space-y-1.5 max-h-[200px] overflow-y-auto pr-0.5">
+                              {simulatedEmails.map((eml) => (
+                                <div
+                                  key={eml.id}
+                                  onClick={() => {
+                                    setSelectedSimulatedEmail(eml);
+                                    eml.lido = true;
+                                  }}
+                                  className={`p-2 rounded-lg border border-slate-850 hover:border-slate-800 bg-slate-950/40 hover:bg-slate-950/80 transition-all cursor-pointer group text-left ${!eml.lido ? 'border-l-2 border-l-orange-500' : ''}`}
+                                >
+                                  <div className="flex justify-between items-center gap-2">
+                                    <span className="text-[9px] text-emerald-400 font-mono font-bold truncate max-w-[170px]">
+                                      Para: {eml.para}
+                                    </span>
+                                    <span className="text-[8px] text-slate-500 font-mono shrink-0">
+                                      {eml.data}
+                                    </span>
+                                  </div>
+                                  <h5 className="text-[10px] font-bold text-white group-hover:text-orange-400 mt-1 truncate">
+                                    {eml.assunto}
+                                  </h5>
+                                  {eml.codigo && (
+                                    <span className="inline-block mt-1 font-mono text-[8px] bg-slate-900 border border-slate-800/60 text-orange-400 px-1.5 py-0.2 rounded font-bold">
+                                      Código: {eml.codigo}
+                                    </span>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          <div className="pt-1.5 border-t border-slate-800 mt-1.5 text-[9px] leading-relaxed text-slate-500 font-mono">
+                            💡 Registro de parceiros e "Primeiro Acesso" envia tokens para este painel.
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
         </div>
@@ -4983,20 +5161,24 @@ export default function App() {
               <h1 className="text-2xl font-black mt-2">Olá, {activeMotoboyUser?.nome}!</h1>
               <p className="text-xs text-slate-400 font-mono mt-1">
                 Região de atuação contratual: <strong className="text-orange-400">{activeMotoboyUser?.cidade || 'Passos - MG'}</strong> • {' '}
-                {isExclusiveNow && activeMotoboyUser?.empresaExclusiva ? (
-                  <span>Tarifa Fixa Exclusiva B2B: <strong className="text-emerald-400">R$ {(activeMotoboyUser?.valorRepasseFixo || 4.00).toFixed(2)}</strong> por entrega</span>
+                {activeMotoboyUser?.empresaExclusiva ? (
+                  isExclusiveNow ? (
+                    <span>Contrato: <strong className="text-amber-400">Exclusivo B2B</strong> • Ganho: <strong className="text-emerald-400">R$ {(activeMotoboyUser?.valorRepasseFixo || 4.00).toFixed(2)}</strong> fixos por entrega</span>
+                  ) : (
+                    <span>Contrato: <strong className="text-emerald-400">Freelancer Liberado</strong> • Ganho acordado com parceiro: <strong className="text-emerald-400">R$ {(activeMotoboyUser?.valorRepasseFixo || 4.00).toFixed(2)}</strong> por entrega</span>
+                  )
                 ) : (
-                  <span>Tarifa Freelancer: <strong className="text-emerald-400">Variável por cliente</strong> (ou R$ {(activeMotoboyUser?.valorRepasseFixo || 4.00).toFixed(2)} se fixado com a distribuidora)</span>
+                  <span>Contrato: <strong className="text-emerald-400">Freelancer Geral</strong> • Tarifa variável por cliente local</span>
                 )}
               </p>
               
               {activeMotoboyUser?.empresaExclusiva && (
-                <div className="mt-3.5 p-3 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-[11px] font-mono font-bold transition-all shadow-inner bg-slate-950/80 border-slate-800">
+                <div className="mt-3.5 p-3.5 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-xs font-mono font-bold transition-all shadow-inner bg-slate-950/80 border-slate-800">
                   <div className="flex items-center gap-2">
                     <span className="text-base">🏢</span>
                     <div>
-                      <span className="text-slate-400">Distribuidora Exclusiva:</span>{' '}
-                      <span className="text-orange-400 font-black">{activeMotoboyUser.empresaExclusiva}</span>
+                      <span className="text-slate-440 text-[9px] block">Parceiro Exclusivo</span>
+                      <span className="text-orange-400 font-black uppercase text-xs">{activeMotoboyUser.empresaExclusiva}</span>
                     </div>
                   </div>
                   <div>
@@ -5006,15 +5188,15 @@ export default function App() {
                           <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping" />
                           EXCLUSIVO (Até 18h Seg-Sex | Até 12h Sáb)
                         </span>
-                        <span className="text-[9px] text-slate-400 font-mono">Valor da entrega: R$ {(activeMotoboyUser.valorRepasseFixo || 4.00).toFixed(2)}</span>
+                        <span className="text-[10px] text-slate-350 font-mono">Valor de ganho por entrega: <strong className="text-emerald-400 text-xs">R$ {(activeMotoboyUser.valorRepasseFixo || 4.00).toFixed(2)}</strong></span>
                       </div>
                     ) : (
                       <div className="flex flex-col items-end gap-1">
-                        <span className="inline-flex items-center gap-1.5 bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 px-2.5 py-1 rounded-lg text-[10px] tracking-wider font-extrabold animate-pulse">
+                        <span className="inline-flex items-center gap-1.5 bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 px-2.5 py-1 rounded-lg text-[10px] tracking-wider font-extrabold text-right">
                           <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
                           FREELANCER LIBERADO PODEMOS PEGAR OUTROS!
                         </span>
-                        <span className="text-[9px] text-slate-400 font-mono">Exibindo valores negociados de outros clientes</span>
+                        <span className="text-[10px] text-slate-350 font-mono text-right">Valor acordado com {activeMotoboyUser.empresaExclusiva}: <strong className="text-emerald-450 text-emerald-400 text-xs">R$ {(activeMotoboyUser.valorRepasseFixo || 4.00).toFixed(2)}</strong> por entrega</span>
                       </div>
                     )}
                   </div>
@@ -8033,7 +8215,7 @@ export default function App() {
                 )}
 
                 {firstAccessError && (
-                  <div className="p-3 bg-red-950/40 border border-red-900/60 text-red-400 text-xs rounded-lg flex items-start gap-1.5 font-mono">
+                  <div className="p-3 bg-red-955/40 border border-red-900/60 text-red-405 text-red-400 text-xs rounded-lg flex items-start gap-1.5 font-mono">
                     <span className="shrink-0 mt-0.5">⚠️</span>
                     <span>{firstAccessError}</span>
                   </div>
@@ -8069,196 +8251,6 @@ export default function App() {
           </div>
         )}
       </AnimatePresence>
-
-      {/* 📬 INTERACTIVE SIMULATED EMAIL INBOX (CENTRAL DE NOTIFICAÇÕES & TOKENS B2B) */}
-      {activeSessionRole === 'Empresa' && (
-        <div className="fixed bottom-6 left-6 z-50 flex flex-col items-start transition-all" id="central-emails-simulados">
-          {!showSimulatedInbox ? (
-            <button
-              type="button"
-              onClick={() => setShowSimulatedInbox(true)}
-              className="flex items-center gap-2 bg-slate-900 border border-orange-500 hover:border-orange-400 text-white font-mono font-bold text-[11px] uppercase tracking-wide px-3.5 py-2.5 rounded-2xl shadow-2xl transition hover:scale-105 active:scale-95 cursor-pointer relative"
-            >
-              <span className="absolute -top-1.5 -right-1.5 shrink-0 bg-orange-500 text-white text-[9px] font-black w-5 h-5 rounded-full flex items-center justify-center border-2 border-slate-900 animate-bounce">
-                {simulatedEmails.length}
-              </span>
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-orange-500"></span>
-              </span>
-              <span>📬 Caixa de Entrada B2B</span>
-            </button>
-          ) : (
-            <div className="bg-slate-900/95 border border-slate-800 rounded-2xl shadow-2xl w-[350px] sm:w-[420px] max-h-[500px] flex flex-col overflow-hidden backdrop-blur-md animate-in fade-in slide-in-from-bottom-5 duration-200">
-              {/* Header */}
-              <div className="bg-slate-950 border-b border-slate-800 p-3.5 flex justify-between items-center">
-                <div className="flex items-center gap-2">
-                  <div className="relative">
-                    <span className="absolute top-0 right-0 w-2.5 h-2.5 bg-green-500 border-2 border-slate-950 rounded-full"></span>
-                    <span className="text-lg">📬</span>
-                  </div>
-                  <div>
-                    <h4 className="text-[11px] font-black text-white font-mono uppercase tracking-widest leading-none">SMTP Local Sandbox</h4>
-                    <p className="text-[9px] text-slate-400 font-mono mt-0.5 leading-none">Visualização Geral de E-mails Enviados</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSimulatedEmails([
-                        {
-                          id: 'EML-CLEARED',
-                          para: 'suporte@torque-log.com',
-                          assunto: '🧹 Caixa Limpa',
-                          corpo: 'A caixa de e-mails de simulação foi esvaziada.\n\nNovos registros ou tentativas de Primeiro Acesso gerarão novos e-mails simulados aqui em tempo real!',
-                          data: new Date().toLocaleTimeString(),
-                          lido: true
-                        }
-                      ]);
-                      setSelectedSimulatedEmail(null);
-                    }}
-                    className="bg-slate-900 hover:bg-slate-850 text-slate-400 hover:text-white px-2 py-1 text-[9px] font-mono border border-slate-800 rounded-lg cursor-pointer"
-                    title="Esvaziar todos os e-mails"
-                  >
-                    Limpar
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setShowSimulatedInbox(false)}
-                    className="text-slate-400 hover:text-white font-mono text-[11px] font-black hover:bg-slate-850 w-6 h-6 rounded-lg flex items-center justify-center cursor-pointer transition"
-                  >
-                    ✕
-                  </button>
-                </div>
-              </div>
-
-              {/* Email list or selected email details */}
-              <div className="flex-1 overflow-y-auto p-3 space-y-2.5 max-h-[380px] min-h-[220px]">
-                {selectedSimulatedEmail ? (
-                  // VIEW EMAIL DETAILS
-                  <div className="space-y-3 font-mono text-[11px]">
-                    <button
-                      type="button"
-                      onClick={() => setSelectedSimulatedEmail(null)}
-                      className="text-orange-400 hover:text-orange-350 cursor-pointer flex items-center gap-1 font-bold mb-2 text-[10px]"
-                    >
-                      ← Voltar para Caixa de Entrada
-                    </button>
-                    <div className="bg-slate-950/80 border border-slate-850 p-2.5 rounded-xl space-y-1 text-slate-300">
-                      <p><span className="text-slate-500">De:</span> <strong className="text-white">suporte@torquelog.com.br</strong></p>
-                      <p><span className="text-slate-500">Para:</span> <strong className="text-emerald-400 select-all">{selectedSimulatedEmail.para}</strong></p>
-                      <p><span className="text-slate-500">Data:</span> <strong className="text-slate-400">{selectedSimulatedEmail.data}</strong></p>
-                      <p className="border-t border-slate-900 pt-1.5 mt-1.5"><span className="text-slate-500">Assunto:</span> <strong className="text-white">{selectedSimulatedEmail.assunto}</strong></p>
-                    </div>
-                    
-                    <div className="bg-slate-950 p-3 rounded-xl border border-slate-850 text-xs text-slate-300 leading-relaxed whitespace-pre-wrap select-text">
-                      {selectedSimulatedEmail.corpo}
-                    </div>
-
-                    {selectedSimulatedEmail.codigo && (
-                      <div className="p-3 bg-slate-950 rounded-xl border border-orange-500/30 flex flex-col items-center gap-2">
-                        <p className="text-[10px] text-slate-400 tracking-wider text-center">🔐 CHAVE DE ATIVAÇÃO IDENTIFICADA</p>
-                        <strong className="text-base text-orange-400 select-all font-mono tracking-widest bg-slate-900 px-3 py-1 border border-orange-500/20 rounded-md">
-                          {selectedSimulatedEmail.codigo}
-                        </strong>
-                        <div className="flex gap-2 w-full pt-1">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              navigator.clipboard.writeText(selectedSimulatedEmail.codigo);
-                              setSupabaseSuccessMsg(`📋 Token ${selectedSimulatedEmail.codigo} copiado!`);
-                              setTimeout(() => setSupabaseSuccessMsg(''), 3000);
-                            }}
-                            className="flex-1 text-center py-1.5 bg-slate-800 hover:bg-slate-750 text-white font-bold rounded-lg cursor-pointer font-mono text-[10px] border border-slate-700 active:scale-95 transition-all"
-                          >
-                            📋 Copiar Token
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const cod = selectedSimulatedEmail.codigo;
-                              // Pre fill both types of confirmation inputs based on prefix/format
-                              if (cod.startsWith('temp-')) {
-                                // It is direct login temp senha, we copy it and show how to login!
-                                navigator.clipboard.writeText(cod);
-                                alert(`Seu token de Primeiro Acesso é ${cod} (copiado). Faça o login com o perfil "Cliente B2B", selecione seu nome e digite este token as senha!`);
-                              } else {
-                                // Put into active verification inputs
-                                setSelfRegVerificationCode(cod);
-                                setFirstAccessVerificationCode(cod);
-                                setSupabaseSuccessMsg("⚡ Token pré-preenchido nos formulários!");
-                                setTimeout(() => setSupabaseSuccessMsg(''), 3000);
-                              }
-                            }}
-                            className="flex-1 text-center py-1.5 bg-orange-500 hover:bg-orange-600 active:scale-95 text-white font-bold rounded-lg cursor-pointer font-mono text-[10px] shadow-sm transform transition-all"
-                          >
-                            ⚡ Usar Automático
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  // LIST DISPATCHED EMAILS
-                  <div className="space-y-2">
-                    <p className="text-[10px] text-slate-455 uppercase font-mono tracking-wider pl-1 font-bold">Mensagens Recebidas ({simulatedEmails.length})</p>
-                    
-                    {simulatedEmails.length === 0 ? (
-                      <div className="p-8 text-center text-slate-500 italic font-mono text-[11px]">
-                        Nenhum e-mail transitando no momento.
-                      </div>
-                    ) : (
-                      <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
-                        {simulatedEmails.map((eml) => (
-                          <div
-                            key={eml.id}
-                            onClick={() => {
-                              setSelectedSimulatedEmail(eml);
-                              eml.lido = true;
-                            }}
-                            className={`p-3 rounded-xl border border-slate-850 hover:border-slate-700 bg-slate-950/40 hover:bg-slate-950/90 transition-all cursor-pointer group text-left ${!eml.lido ? 'border-l-4 border-l-orange-500' : ''}`}
-                          >
-                            <div className="flex justify-between items-start">
-                              <span className="text-[10px] text-emerald-400 font-mono font-bold truncate max-w-[200px]">
-                                Para: {eml.para}
-                              </span>
-                              <span className="text-[9px] text-slate-505 font-mono font-medium shrink-0">
-                                {eml.data}
-                              </span>
-                            </div>
-                            <h5 className="text-[11px] font-bold text-white group-hover:text-orange-400 mt-1 truncate font-sans">
-                              {eml.assunto}
-                            </h5>
-                            <p className="text-[10px] text-slate-400 mt-0.5 line-clamp-2 leading-relaxed">
-                              {eml.corpo.replace(/\n/g, ' ')}
-                            </p>
-                            {eml.codigo && (
-                              <span className="inline-block mt-2 font-mono text-[9px] bg-slate-900 border border-slate-800 text-orange-400 px-1.5 py-0.5 rounded-md font-bold">
-                                Código: {eml.codigo}
-                              </span>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    
-                    <div className="pt-2 border-t border-slate-800 mt-2 text-[10px] leading-relaxed text-slate-500 font-mono">
-                      💡 <strong>Testando Fluxo:</strong> Registre um cliente novo no painel Administrador. O e-mail de Primeiro Acesso chegará aqui imediatamente!
-                    </div>
-                  </div>
-                )}
-              </div>
-              
-              {/* Footer */}
-              <div className="bg-slate-950/80 border-t border-slate-850 px-3 py-2 flex items-center justify-between text-[9px] text-slate-500 font-mono">
-                <span>Sessão: Ativa e Conectada</span>
-                <span className="text-slate-400 hover:text-white transition cursor-pointer" onClick={() => setSelectedSimulatedEmail(null)}>Voltar</span>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
 
       {/* Floating Supabase Live Status Toast */}
       {supabaseSuccessMsg && (
