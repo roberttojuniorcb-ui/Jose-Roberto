@@ -2523,8 +2523,8 @@ export default function App() {
               <TorqueLogLogoIcon size={80} className="text-orange-500" variant="esportivo" />
             </div>
             <div>
-              <div className="flex items-center gap-3">
-                <span className="text-[46px] font-black tracking-tighter font-mono text-orange-400 drop-shadow-md">TorqueLog</span>
+              <div className="flex items-center gap-3 select-none" translate="no">
+                <span className="text-[46px] font-black tracking-tighter font-mono text-orange-400 drop-shadow-md notranslate">TorqueLog</span>
                 <span className="text-[10px] bg-slate-900 border border-orange-500/30 text-orange-400 px-2.5 py-0.5 rounded font-black font-mono animate-pulse">B2B PORTAL</span>
               </div>
               <p className="text-[10.5px] text-slate-400 font-mono tracking-wider uppercase mt-1">PLATAFORMA INTEGRADA DE DISTRIBUIÇÃO DE MERCADORIAS</p>
