@@ -2834,7 +2834,7 @@ export default function App() {
                 )}
 
                 {loginRole === 'Cliente' && (
-                  <div className="space-y-2">
+                  <div className="space-y-4">
                     <div>
                       <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">Selecione seu Nome (Parceiros)</label>
                       <div className="relative">
@@ -2852,40 +2852,94 @@ export default function App() {
                         <ChevronRight className="w-4 h-4 text-slate-400 absolute right-3 top-3.5 pointer-events-none rotate-90" />
                       </div>
                     </div>
+
+                    <div>
+                      <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">Senha de Acesso</label>
+                      <div className="relative">
+                        <input
+                          type="password"
+                          placeholder="Digite sua senha..."
+                          value={loginPasswordInput}
+                          onChange={(e) => setLoginPasswordInput(e.target.value)}
+                          className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 pl-10 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-orange-500"
+                        />
+                        <Key className="w-4 h-4 text-slate-500 absolute left-3.5 top-3.5 pointer-events-none" />
+                      </div>
+                    </div>
+
+                    {/* Submit Button right below Password for Cliente role */}
+                    <button
+                      type="submit"
+                      className="w-full bg-orange-500 hover:bg-orange-600 active:transform active:scale-95 text-white font-mono font-bold text-sm py-3 rounded-xl transition duration-150 flex items-center justify-center gap-2 shadow-lg shadow-orange-500/10 cursor-pointer"
+                    >
+                      <Lock className="w-4 h-4 text-white" />
+                      AUTENTICAR PORTAL
+                    </button>
                     
-                    <div className="bg-slate-950/70 border border-slate-800 p-3 rounded-lg text-xs leading-normal">
-                      <p className="text-slate-300 font-mono text-[11.5px]">
-                        🆕 <strong className="text-emerald-400">Cliente Novo?</strong> Se sua oficina não possui convênio ainda, registre sua empresa sozinho imediatamente:
+                    <div className="bg-slate-950/90 border border-orange-500/30 p-3.5 rounded-xl text-xs leading-relaxed space-y-2.5">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm">🏢</span>
+                        <span className="font-extrabold text-[12px] font-mono text-orange-400">Cadastro de Novos Parceiros</span>
+                      </div>
+                      
+                      <p className="text-slate-300 text-[11px] font-mono leading-relaxed">
+                        A inclusão de novos clientes é realizada apenas pela administração TorqueLog. Para habilitar sua empresa conosco e negociar taxas personalizadas, precisamos dos seguintes dados:
                       </p>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setIsSelfRegistering(true);
-                          setSelfRegStep('form');
-                          setSelfRegError('');
-                        }}
-                        className="mt-2 text-emerald-400 hover:text-emerald-300 underline font-black font-mono text-[11.5px] block text-left"
+
+                      <ul className="space-y-1 text-slate-400 font-mono text-[10px] pl-2 border-l border-orange-500/20">
+                        <li className="flex items-center gap-1.5 font-bold">
+                          <span className="text-[8px] text-orange-500">■</span> Nome da Empresa / Fantasia
+                        </li>
+                        <li className="flex items-center gap-1.5 font-bold">
+                          <span className="text-[8px] text-orange-500">■</span> CNPJ da Empresa
+                        </li>
+                        <li className="flex items-center gap-1.5 font-bold">
+                          <span className="text-[8px] text-orange-500">■</span> Endereço Completo
+                        </li>
+                        <li className="flex items-center gap-1.5 font-bold">
+                          <span className="text-[8px] text-orange-500">■</span> Telefone WhatsApp
+                        </li>
+                        <li className="flex items-center gap-1.5 font-bold">
+                          <span className="text-[8px] text-orange-500">■</span> E-mail Corporativo
+                        </li>
+                      </ul>
+
+                      <p className="text-[10px] text-slate-400 font-mono leading-normal italic">
+                        💬 No WhatsApp você tira suas dúvidas e negocia os melhores valores para corridas recorrentes!
+                      </p>
+
+                      <a
+                        href="https://api.whatsapp.com/send?phone=5519984427748&text=Olá!%20Gostaria%20de%20cadastrar%20uma%20nova%20empresa%20parceira%20na%20TorqueLog.%20Aqui%25e0s%20nossos%20dados:%0A-%20Nome:%20%0A-%20CNPJ:%20%0A-%20Endereço:%20%0A-%20Telefone:%20%0A-%20Email:%20"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="w-full bg-emerald-600 hover:bg-emerald-500 hover:scale-[1.01] active:scale-[0.99] text-white font-mono font-black text-[11px] py-2 px-3 rounded-lg transition duration-150 flex items-center justify-center gap-2 shadow-sm cursor-pointer mt-1"
+                        id="btn-whatsapp-novo-cadastro-parceiro"
                       >
-                        🚀 REALIZAR NOVO CADASTRO B2B PROPRIO →
-                      </button>
+                        <svg className="w-4 h-4 fill-current shrink-0" viewBox="0 0 24 24" referrerPolicy="no-referrer">
+                          <path d="M12.031 6.172c-2.02 0-3.659 1.635-3.659 3.659 0 .614.152 1.209.444 1.74l-.472 1.72 1.764-.46a3.618 3.618 0 0 0 1.923.541c2.019 0 3.66-1.636 3.66-3.66 0-2.022-1.64-3.66-3.66-3.66zm1.905 5.155c-.078.22-.44.426-.644.453-.203.027-.457.042-.741-.051a2.822 2.822 0 0 1-1.127-.723 3.123 3.123 0 0 1-.774-1.22c-.156-.37-.024-.572.073-.674.098-.102.219-.254.329-.381.11-.127.147-.212.22-.352.073-.14.037-.263-.018-.37-.056-.107-.491-1.185-.674-1.62-.178-.426-.358-.369-.492-.375-.123-.005-.264-.006-.405-.006a.78.78 0 0 0-.563.262c-.195.214-.741.724-.741 1.763 0 1.04.757 2.046.862 2.188.106.14 1.491 2.278 3.611 3.193.504.218.898.348 1.206.446.505.161.966.138 1.33.084.406-.06.126-.412.247-.412a1.008 1.008 0 0 0 .7.493c.241.05.485.074.726.074.458 0 .895-.083 1.298-.246zM12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm.019 21.72c-1.83 0-3.623-.483-5.203-1.397l-.373-.222-3.867 1.013 1.03-3.768-.243-.387A9.673 9.673 0 0 1 2.28 12c0-5.352 4.36-9.712 9.72-9.712 5.353 0 9.712 4.36 9.712 9.712 0 5.353-4.36 9.72-9.712 9.72z" />
+                        </svg>
+                        Chamar no WhatsApp & Cadastrar
+                      </a>
                     </div>
                   </div>
                 )}
 
                 {/* Password input */}
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">Senha de Acesso</label>
-                  <div className="relative">
-                    <input
-                      type="password"
-                      placeholder="Digite sua senha..."
-                      value={loginPasswordInput}
-                      onChange={(e) => setLoginPasswordInput(e.target.value)}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 pl-10 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-orange-500"
-                    />
-                    <Key className="w-4 h-4 text-slate-500 absolute left-3.5 top-3.5 pointer-events-none" />
+                {loginRole !== 'Cliente' && (
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">Senha de Acesso</label>
+                    <div className="relative">
+                      <input
+                        type="password"
+                        placeholder="Digite sua senha..."
+                        value={loginPasswordInput}
+                        onChange={(e) => setLoginPasswordInput(e.target.value)}
+                        className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 pl-10 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-orange-500"
+                      />
+                      <Key className="w-4 h-4 text-slate-500 absolute left-3.5 top-3.5 pointer-events-none" />
+                    </div>
                   </div>
-                </div>
+                )}
 
                 {/* Error prompt */}
                 {loginError && (
@@ -2896,13 +2950,15 @@ export default function App() {
                 )}
 
                 {/* Login button */}
-                <button
-                  type="submit"
-                  className="w-full bg-orange-500 hover:bg-orange-600 active:transform active:scale-95 text-white font-mono font-bold text-sm py-3 rounded-xl transition duration-150 flex items-center justify-center gap-2 shadow-lg shadow-orange-500/10 cursor-pointer"
-                >
-                  <Lock className="w-4 h-4 text-white" />
-                  AUTENTICAR PORTAL
-                </button>
+                {loginRole !== 'Cliente' && (
+                  <button
+                    type="submit"
+                    className="w-full bg-orange-500 hover:bg-orange-600 active:transform active:scale-95 text-white font-mono font-bold text-sm py-3 rounded-xl transition duration-150 flex items-center justify-center gap-2 shadow-lg shadow-orange-500/10 cursor-pointer"
+                  >
+                    <Lock className="w-4 h-4 text-white" />
+                    AUTENTICAR PORTAL
+                  </button>
+                )}
               </form>
 
               {/* Proposal Link, Whatsapp Support Button & Email Container */}
