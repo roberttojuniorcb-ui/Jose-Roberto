@@ -55,7 +55,10 @@ import {
   deleteClienteFromFirebase,
   deleteMotoboyFromFirebase,
   deleteOrdemFromFirebase,
-  loadInitialDataFromFirebase
+  loadInitialDataFromFirebase,
+  syncSingleClienteToFirebase,
+  syncSingleOrdemToFirebase,
+  syncSingleMotoboyToFirebase
 } from './utils/firebaseClient';
 import { 
   supabase,
@@ -218,7 +221,8 @@ export default function App() {
   // --- FILTER & SELECTIONS FOR DISPATCH ---
   const [selectedQuadrant, setSelectedQuadrant] = useState<Quadrante>('A');
   const [selectedClienteId, setSelectedClienteId] = useState<string>('');
-  const [itemTexto, setItemTexto] = useState<string>('Peças Diversas');
+  const [itemTexto, setItemTexto] = useState<string>('Objeto de Envio');
+  const [clientItemTexto, setClientItemTexto] = useState<string>('Objeto de Envio');
   const [retornoPeca, setRetornoPeca] = useState<boolean>(false);
   const [taxaReversaParam, setTaxaReversaParam] = useState<number>(15.00);
 
@@ -525,8 +529,21 @@ export default function App() {
   const [dbSyncStatus, setDbSyncStatus] = useState<'synced' | 'connecting' | 'updating' | 'local'>(
     (isFirebaseConfigured || isSupabaseConfigured) ? 'connecting' : 'local'
   );
+  const [firebaseQuotaExceeded, setFirebaseQuotaExceeded] = useState<boolean>(false);
+
+  useEffect(() => {
+    const handleQuota = () => {
+      setFirebaseQuotaExceeded(true);
+    };
+    window.addEventListener('firebase-quota-exceeded', handleQuota);
+    return () => {
+      window.removeEventListener('firebase-quota-exceeded', handleQuota);
+    };
+  }, []);
+
   const isSupabaseBootstrappedRef = React.useRef<boolean>(false);
   const isFirebaseBootstrappedRef = React.useRef<boolean>(false);
+  const isIncomingSyncRef = React.useRef<boolean>(false);
 
   // Reusable query and mapper function for polling & real-time DB tracking for Supabase fallback
   const fetchLatestOrdensFromSupabase = async (isBackground = false) => {
@@ -592,6 +609,7 @@ export default function App() {
     let active = true;
 
     async function loadData() {
+      let firebaseLoadedSuccessful = false;
       if (isFirebaseConfigured) {
         setSupabaseLoading(true);
         setDbSyncStatus('connecting');
@@ -627,15 +645,25 @@ export default function App() {
             setSupabaseSuccessMsg('Banco Firebase Firestore carregado em tempo real! 🔥');
             setTimeout(() => setSupabaseSuccessMsg(''), 5000);
             setDbSyncStatus('synced');
+            firebaseLoadedSuccessful = true;
           }
         } catch (err) {
           console.error("Firebase loader failed:", err);
+          const isQuota = (err instanceof Error && (
+            err.message.includes('resource-exhausted') || 
+            err.message.includes('Quota limit exceeded') || 
+            err.message.includes('quota-exceeded')
+          )) || (err && typeof err === 'object' && ('code' in err) && (err as any).code === 'resource-exhausted');
+          if (isQuota) {
+            setFirebaseQuotaExceeded(true);
+          }
           setDbSyncStatus('local');
         } finally {
           if (active) setSupabaseLoading(false);
         }
-        return;
       }
+
+      if (firebaseLoadedSuccessful) return;
 
       // Supabase Fallback
       if (supabase) {
@@ -753,11 +781,20 @@ export default function App() {
           });
         });
         if (mapped.length > 0) {
+          isIncomingSyncRef.current = true;
           setOrdens(mapped);
         }
         setDbSyncStatus('synced');
       }, (error) => {
         console.error("Firestore onSnapshot streaming error:", error);
+        const isQuota = (error instanceof Error && (
+          error.message.includes('resource-exhausted') || 
+          error.message.includes('Quota limit exceeded') || 
+          error.message.includes('quota-exceeded')
+        )) || (error && typeof error === 'object' && ('code' in error) && (error as any).code === 'resource-exhausted');
+        if (isQuota) {
+          setFirebaseQuotaExceeded(true);
+        }
         setDbSyncStatus('updating');
       });
 
@@ -819,6 +856,10 @@ export default function App() {
   }, [clientes]);
 
   useEffect(() => {
+    if (isIncomingSyncRef.current) {
+      isIncomingSyncRef.current = false;
+      return;
+    }
     if (isFirebaseConfigured && isFirebaseBootstrappedRef.current) {
       syncOrdensToFirebase(ordens);
     }
@@ -1395,7 +1436,7 @@ export default function App() {
     const targetCliente = clientes.find(c => c.id === selectedClienteId);
     if (!targetCliente) return;
 
-    const finalItemMsg = itemTexto.trim() || 'Peças Diversas';
+    const finalItemMsg = itemTexto.trim() || 'Objeto de Envio';
 
     // Apply the active 15 minutes sweep logic
     const sweepMatchIds = executarVarreduraSweep(targetCliente.quadrante, ordens, new Date().toISOString());
@@ -1458,16 +1499,20 @@ export default function App() {
     const nextOrdensList = [novaOrdem, ...updatedOrdens];
     setOrdens(nextOrdensList);
 
+    const changedOrdens = [novaOrdem, ...updatedOrdens.filter(o => sweepMatchIds.includes(o.id))];
+
     if (isFirebaseConfigured) {
       try {
-        await syncOrdensToFirebase(nextOrdensList);
+        for (const o of changedOrdens) {
+          await syncSingleOrdemToFirebase(o);
+        }
       } catch (err) {
         console.error("Erro ao sincronizar ordem faturada no Firebase:", err);
       }
     }
     if (supabase) {
       try {
-        await syncOrdensToSupabase(nextOrdensList);
+        await syncOrdensToSupabase(changedOrdens);
       } catch (err) {
         console.error("Erro ao sincronizar ordem faturada no Supabase:", err);
       }
@@ -1480,7 +1525,7 @@ export default function App() {
     setApiActionDescription(`Despacho de entrega para [${targetCliente.nome}] no Setor ${targetCliente.quadrante}`);
 
     // Clean reset of form variables for next entry
-    setItemTexto('Peças Diversas');
+    setItemTexto('Objeto de Envio');
     setRetornoPeca(false);
     setSelectedClienteId('');
     alert(`Entrega ${novaOrdemId} despachada com sucesso! Já está visível na tela dos entregadores para aceite.`);
@@ -1697,6 +1742,13 @@ export default function App() {
     // Immediately update active Motoboy session if they are currently logged in with this modified account
     if (activeMotoboyUser && activeMotoboyUser.id === updatedMb.id) {
       setActiveMotoboyUser(updatedMb);
+    }
+
+    if (isFirebaseConfigured) {
+      syncSingleMotoboyToFirebase(updatedMb).catch(err => console.error(err));
+    }
+    if (supabase) {
+      syncMotoboysToSupabase([updatedMb]).catch(err => console.error(err));
     }
     
     setMotoboyParaEditar(null);
@@ -2270,6 +2322,13 @@ export default function App() {
     setMotoboys(prev => [novoMotoboy, ...prev]);
     setIsAddingNewMotoboy(false);
 
+    if (isFirebaseConfigured) {
+      syncSingleMotoboyToFirebase(novoMotoboy).catch(err => console.error("Firebase Sync error:", err));
+    }
+    if (supabase) {
+      syncMotoboysToSupabase([novoMotoboy]).catch(err => console.error("Supabase Sync error:", err));
+    }
+
     // Update API Console
     const mockOrdemSim: OrdemServico = {
       id: "MOTO-REG",
@@ -2392,16 +2451,18 @@ export default function App() {
 
     setOrdens(nextOrdens);
 
-    if (isFirebaseConfigured) {
+    const updatedO = nextOrdens.find(o => o.id === ordemId);
+
+    if (isFirebaseConfigured && updatedO) {
       try {
-        await syncOrdensToFirebase(nextOrdens);
+        await syncSingleOrdemToFirebase(updatedO);
       } catch (err) {
         console.error("Erro ao sincronizar atualização de status no Firebase:", err);
       }
     }
-    if (supabase) {
+    if (supabase && updatedO) {
       try {
-        await syncOrdensToSupabase(nextOrdens);
+        await syncOrdensToSupabase([updatedO]);
       } catch (err) {
         console.error("Erro ao sincronizar atualização de status no Supabase:", err);
       }
@@ -2457,16 +2518,18 @@ export default function App() {
 
     setOrdens(nextOrdens);
 
-    if (isFirebaseConfigured) {
+    const updatedO = nextOrdens.find(o => o.id === ordemId);
+
+    if (isFirebaseConfigured && updatedO) {
       try {
-        await syncOrdensToFirebase(nextOrdens);
+        await syncSingleOrdemToFirebase(updatedO);
       } catch (err) {
         console.error("Erro ao sincronizar assinatura de canhoto no Firebase:", err);
       }
     }
-    if (supabase) {
+    if (supabase && updatedO) {
       try {
-        await syncOrdensToSupabase(nextOrdens);
+        await syncOrdensToSupabase([updatedO]);
       } catch (err) {
         console.error("Erro ao sincronizar assinatura de canhoto no Supabase:", err);
       }
@@ -3016,6 +3079,34 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 font-sans flex flex-col selection:bg-orange-500 selection:text-white" id="torquelog-app">
+      
+      {firebaseQuotaExceeded && (
+        <div className="bg-amber-650 text-white px-4 py-2 text-xs font-mono flex flex-col md:flex-row justify-between items-center gap-2 border-b-2 border-amber-500 shadow-sm animate-[pulse_3s_infinite]" id="firebase-quota-banner">
+          <div className="flex items-center gap-2">
+            <span className="text-sm">⚠️</span>
+            <span>
+              <strong>Limite de Quota Diária do Firebase Excedido:</strong> Os limites de gravação do banco de dados gratuito (Spark Plan) foram temporariamente recarregados/excedidos. O TorqueLog continuará operando 100% via modo Offline/Local e Supabase para evitar qualquer interrupção.
+            </span>
+          </div>
+          <div className="flex items-center gap-3 w-full md:w-auto justify-end mt-2 md:mt-0">
+            <a 
+              href="https://console.firebase.google.com/project/deft-theater-qw1xt/firestore/databases/ai-studio-d6760809-7ca1-4a14-bd81-e0c03bad38d1/data?openUpgradeDialog=true"
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="bg-amber-800 hover:bg-amber-900 border border-amber-400/30 text-[10.5px] font-black px-3 py-1 rounded transition-all uppercase whitespace-nowrap active:scale-95 flex items-center gap-1"
+            >
+              Liberar no Console 🚀
+            </a>
+            <button 
+              onClick={() => setFirebaseQuotaExceeded(false)}
+              className="text-amber-200 hover:text-white font-black px-2 cursor-pointer transition-all"
+              type="button"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
       
       {/* --- TOP HIGH-PERFORMANCE NAVIGATION & HUD --- */}
       <header className="bg-slate-900 text-white border-b-4 border-orange-500 sticky top-0 z-50 shadow-md p-4" id="header-hud">
@@ -3723,7 +3814,7 @@ export default function App() {
               <div>
                 <div className="flex justify-between items-center mb-1.5">
                   <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider font-mono">
-                    Passo C: Detalhamento das Peças (Opcional - Padrão: Peças Diversas)
+                    Passo C: Detalhamento do Objeto de Envio (Opcional - Padrão: Objeto de Envio)
                   </label>
                   <span className="text-[10px] text-orange-600 font-mono font-bold">Livre de Preenchimento ⚡</span>
                 </div>
@@ -3732,7 +3823,7 @@ export default function App() {
                   type="text"
                   value={itemTexto}
                   onChange={(e) => setItemTexto(e.target.value)}
-                  placeholder="Deixe em branco para usar 'Peças Diversas' ou discrimine se desejar"
+                  placeholder="Ex: um remédio, um lanche, autopeças... (ou deixe em branco para 'Objeto de Envio')"
                   className="w-full bg-slate-50 text-slate-950 border border-slate-250 rounded-lg p-3 text-xs focus:ring-2 focus:ring-orange-500 font-mono"
                 />
 
@@ -4521,7 +4612,7 @@ export default function App() {
                       </div>
 
                       <div className="bg-white border text-[11px] p-2 rounded-lg text-slate-650 font-mono mb-3 space-y-1 border-slate-100">
-                        <div><strong>📦 Peças:</strong> {o.itensDescricao}</div>
+                        <div><strong>📦 Objeto de Envio:</strong> {o.itensDescricao}</div>
                         <div>
                           <strong>🛡️ Tipo de Contrato:</strong> B2B Avulso MEI (Sem subordinação ou jornada)
                         </div>
@@ -5629,10 +5720,10 @@ export default function App() {
                     setClientes(updatedClientes);
                     
                     if (isFirebaseConfigured) {
-                      await syncClientesToFirebase(updatedClientes).catch(err => console.error("Erro Firebase:", err));
+                      await syncSingleClienteToFirebase(novoCli).catch(err => console.error("Erro Firebase:", err));
                     }
                     if (supabase) {
-                      await syncClientesToSupabase(updatedClientes).catch(err => console.error("Erro Supabase:", err));
+                      await syncClientesToSupabase([novoCli]).catch(err => console.error("Erro Supabase:", err));
                     }
 
                     finalClienteId = newId;
@@ -5677,7 +5768,7 @@ export default function App() {
                   clienteNome: activeClienteUser.nome,
                   quadrante: finalQuadrante,
                   cidade: activeClienteUser.cidade || 'Passos - MG',
-                  itensDescricao: `Entrega expressa para: ${finalDestName}`,
+                  itensDescricao: clientItemTexto.trim() || 'Objeto de Envio',
                   itensAnalistas: [], // Empty since we do not need items/cubage logic
                   enderecoEntrega: finalEndereco,
                   destinatarioNome: finalDestName,
@@ -5696,14 +5787,14 @@ export default function App() {
 
                 if (isFirebaseConfigured) {
                   try {
-                    await syncOrdensToFirebase(updatedList);
+                    await syncSingleOrdemToFirebase(novaOrdem);
                   } catch (err) {
                     console.error("Erro ao sincronizar nova ordem individual no Firebase:", err);
                   }
                 }
                 if (supabase) {
                   try {
-                    await syncOrdensToSupabase(updatedList);
+                    await syncOrdensToSupabase([novaOrdem]);
                   } catch (err) {
                     console.error("Erro ao sincronizar nova ordem individual no Supabase:", err);
                   }
@@ -5722,6 +5813,7 @@ export default function App() {
                 setQuickClientNome('');
                 setQuickClientEndereco('');
                 setIsQuickRegisteringDestinatario(false);
+                setClientItemTexto('Objeto de Envio');
 
                 // Set local reactive dispatch confirmation card details
                 setLastDispatchedOrder({ id: novaOrdemId, destName: finalDestName });
@@ -5895,10 +5987,10 @@ export default function App() {
                                 setClientes(updatedList);
                                 
                                 if (isFirebaseConfigured) {
-                                  await syncClientesToFirebase(updatedList).catch(err => console.error("Firebase Sync error:", err));
+                                  await syncSingleClienteToFirebase(novoCli).catch(err => console.error("Firebase Sync error:", err));
                                 }
                                 if (supabase) {
-                                  await syncClientesToSupabase(updatedList).catch(err => console.error("Supabase Sync error:", err));
+                                  await syncClientesToSupabase([novoCli]).catch(err => console.error("Supabase Sync error:", err));
                                 }
 
                                 setDestinoClienteId(novoCli.id);
@@ -5920,6 +6012,17 @@ export default function App() {
                     </div>
                   </>
                 )}
+
+                <div className="space-y-1">
+                  <label className="block text-xs font-bold text-slate-700 uppercase font-mono">Detalhamento do Objeto de Envio (Opcional)</label>
+                  <input
+                    type="text"
+                    value={clientItemTexto}
+                    onChange={(e) => setClientItemTexto(e.target.value)}
+                    placeholder="Ex: um remédio, um lanche... (Padrão: Objeto de Envio)"
+                    className="w-full bg-slate-50 text-slate-950 border border-slate-200 rounded-lg p-2.5 text-xs focus:ring-2 focus:ring-orange-500 font-mono"
+                  />
+                </div>
 
                 <div>
                   <label className="block text-xs font-bold text-slate-700 uppercase mb-2 font-mono">Sua Tarifa de Contrato B2B</label>
@@ -6267,8 +6370,8 @@ export default function App() {
 
               <div className="bg-slate-50 py-2.5 px-3 rounded-lg border text-xs font-mono text-slate-650 space-y-1 border-slate-200 mb-4">
                 <div><strong>Ordem ID:</strong> {activeSignOrder.id}</div>
-                <div><strong>Oficina Destinatária:</strong> {activeSignOrder.clienteNome}</div>
-                <div><strong>Peças Entregues:</strong> {activeSignOrder.itensDescricao}</div>
+                <div><strong>Destinatário B2B:</strong> {activeSignOrder.clienteNome}</div>
+                <div><strong>Objeto Entregue:</strong> {activeSignOrder.itensDescricao}</div>
                 <div className="border-t border-slate-200 mt-2 pt-1.5 text-[11px]">
                   {effectiveRole === 'Motoboy' ? (
                     // Within courier / driver session: ONLY show the freight price (repasse)
@@ -6570,7 +6673,7 @@ export default function App() {
                             <div className="space-y-0.5">
                               <span className="bg-slate-900 text-orange-450 px-1 font-bold rounded text-[8.5px] mr-1">{ord.id}</span>
                               <span className="text-slate-450">{new Date(ord.criadoEm).toLocaleDateString()}</span>
-                              <span className="text-slate-500 block max-w-sm truncate text-[9px]">Oficina: {ord.destinatarioNome || 'Balcão/Peças'}</span>
+                              <span className="text-slate-550 block max-w-sm truncate text-[9px]">Destinatário: {ord.destinatarioNome || 'Balcão Geral'}</span>
                             </div>
                             <div className="text-right">
                               <strong className="text-slate-800 block">R$ {val.toFixed(2)}</strong>
@@ -6949,9 +7052,9 @@ export default function App() {
                             <tr className="bg-slate-100 border-b border-slate-200 font-mono text-[10px] text-slate-500 uppercase tracking-wider">
                               <th className="p-3">Cod OS</th>
                               <th className="p-3">Data/Hora</th>
-                              <th className="p-3">B2B Cliente / Oficina</th>
+                              <th className="p-3">Cliente / Destinatário B2B</th>
                               <th className="p-3">Entregador (Motoboy)</th>
-                              <th className="p-3">Peças Descrição</th>
+                              <th className="p-3">Descrição do Objeto</th>
                               <th className="p-3">Status</th>
                               <th className="p-3 text-right">
                                 {reportRole === 'Cliente' ? 'Custo (R$)' : (reportRole === 'Motoboy' ? 'Frete (R$)' : 'Valores (R$)')}
@@ -7111,7 +7214,7 @@ export default function App() {
                 // Sync with Firebase Firestore if active
                 if (isFirebaseConfigured) {
                   try {
-                    await syncClientesToFirebase(updatedClientesList);
+                    await syncSingleClienteToFirebase(novoCli);
                   } catch (err) {
                     console.error("Erro ao sincronizar novo cliente com o Firebase:", err);
                   }
@@ -7120,7 +7223,7 @@ export default function App() {
                 // Sync with Supabase if active
                 if (supabase) {
                   try {
-                    await syncClientesToSupabase(updatedClientesList);
+                    await syncClientesToSupabase([novoCli]);
                   } catch (err) {
                     console.error("Erro ao sincronizar novo cliente com o Supabase:", err);
                   }

@@ -87,11 +87,115 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
     operationType,
     path
   };
+
+  const isQuota = (error instanceof Error && (
+    error.message.includes('resource-exhausted') || 
+    error.message.includes('Quota limit exceeded') || 
+    error.message.includes('quota-exceeded')
+  )) || (error && typeof error === 'object' && ('code' in error) && (error as any).code === 'resource-exhausted');
+
+  if (isQuota) {
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('firebase-quota-exceeded', { detail: errInfo }));
+    }
+  }
+
   console.error('Firestore Error Details: ', JSON.stringify(errInfo));
   throw new Error(JSON.stringify(errInfo));
 }
 
 // --- SYNCHRONIZATION AND CRUD HELPERS ---
+
+/**
+ * Single document writes to optimize Firebase quota usage
+ */
+export async function syncSingleClienteToFirebase(c: any) {
+  if (!isFirebaseConfigured) return null;
+  try {
+    const docRef = doc(db, 'clientes', c.id);
+    const payload = {
+      id: c.id,
+      nome: c.nome,
+      quadrante: c.quadrante,
+      endereco: c.endereco,
+      telefone: c.telefone,
+      cidade: c.cidade,
+      valorPagoMotoboy: Number(c.valorPagoMotoboy),
+      valorCobradoCliente: Number(c.valorCobradoCliente),
+      senha: c.senha || 'cliente123',
+      email: c.email || null,
+      emailConfirmado: c.emailConfirmado || false,
+      cadastroCompleto: c.cadastroCompleto || false,
+      cnpj: c.cnpj || null,
+      inscricaoEstadual: c.inscricaoEstadual || null,
+      criadoPor: c.criadoPor,
+      criadoEm: c.criadoEm,
+      criadoPorClienteId: c.criadoPorClienteId || null
+    };
+    await setDoc(docRef, payload, { merge: true });
+    return true;
+  } catch (err) {
+    handleFirestoreError(err, OperationType.WRITE, `clientes/${c.id}`);
+    return null;
+  }
+}
+
+export async function syncSingleOrdemToFirebase(o: any) {
+  if (!isFirebaseConfigured) return null;
+  try {
+    const docRef = doc(db, 'ordens_servico', o.id);
+    const payload = {
+      id: o.id,
+      clienteId: o.clienteId,
+      clienteNome: o.clienteNome,
+      quadrante: o.quadrante,
+      itensDescricao: o.itensDescricao,
+      itensAnalistas: o.itensAnalistas || [],
+      enderecoEntrega: o.enderecoEntrega || null,
+      destinatarioNome: o.destinatarioNome || null,
+      retornoPeca: o.retornoPeca || false,
+      taxaReversa: Number(o.taxaReversa || 0),
+      valorPagoMotoboy: Number(o.valorPagoMotoboy),
+      valorCobradoCliente: Number(o.valorCobradoCliente),
+      motoboyId: o.motoboyId || null,
+      motoboyNome: o.motoboyNome || null,
+      status: o.status,
+      grupoRotaId: o.grupoRotaId || null,
+      motivoDesmembramento: o.motivoDesmembramento || null,
+      travaCubagemStatus: o.travaCubagemStatus || 'Liberado - Cabe no Baú',
+      criadoEm: o.criadoEm
+    };
+    await setDoc(docRef, payload, { merge: true });
+    return true;
+  } catch (err) {
+    handleFirestoreError(err, OperationType.WRITE, `ordens_servico/${o.id}`);
+    return null;
+  }
+}
+
+export async function syncSingleMotoboyToFirebase(m: any) {
+  if (!isFirebaseConfigured) return null;
+  try {
+    const docRef = doc(db, 'motoboys', m.id);
+    const payload = {
+      id: m.id,
+      nome: m.nome,
+      telefone: m.telefone,
+      cidade: m.cidade,
+      senha: m.senha,
+      valorRepasseFixo: Number(m.valorRepasseFixo),
+      situacao: m.situacao || 'Ativo',
+      empresaExclusiva: m.empresaExclusiva || '',
+      veiculo: m.veiculo || 'Moto',
+      criadoEm: m.criadoEm
+    };
+    await setDoc(docRef, payload, { merge: true });
+    return true;
+  } catch (err) {
+    handleFirestoreError(err, OperationType.WRITE, `motoboys/${m.id}`);
+    return null;
+  }
+}
 
 /**
  * Bulk writes/updates active Clientes in Firebase Firestore
@@ -314,6 +418,16 @@ export async function loadInitialDataFromFirebase() {
     };
   } catch (err) {
     console.error("Could not load initial data from Firebase:", err);
-    return null;
+    const isQuota = (err instanceof Error && (
+      err.message.includes('resource-exhausted') || 
+      err.message.includes('Quota limit exceeded') || 
+      err.message.includes('quota-exceeded')
+    )) || (err && typeof err === 'object' && ('code' in err) && (err as any).code === 'resource-exhausted');
+    if (isQuota) {
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('firebase-quota-exceeded', { detail: err }));
+      }
+    }
+    throw err;
   }
 }
