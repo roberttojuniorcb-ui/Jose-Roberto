@@ -1,6 +1,22 @@
 import express from "express";
 import path from "path";
 import { createServer as createViteServer } from "vite";
+import nodemailer from "nodemailer";
+
+// Configuração do transportador SMTP
+const transporter = nodemailer.createTransport({
+  host: "smtp.torquelog.com.br", // standard SMTP server for torquelog.com.br
+  port: 465, // SSL port or 587
+  secure: true, // true for 465, false for other ports
+  auth: {
+    user: "administracao@torquelog.com.br",
+    pass: "Torquelogadm2026@",
+  },
+  tls: {
+    // Permitir certificados auto-assinados ou não verificados para evitar rejeições
+    rejectUnauthorized: false
+  }
+});
 
 async function startServer() {
   const app = express();
@@ -12,6 +28,40 @@ async function startServer() {
   // Rota de teste/api
   app.get("/api/health", (req, res) => {
     res.json({ status: "ok", message: "TorqueLog Node.js Backend operando com sucesso!" });
+  });
+
+  // Rota de envio de email de confirmação usando SMTP real
+  app.post("/api/send-email", async (req, res) => {
+    const { to, subject, body, html } = req.body;
+
+    if (!to || !subject || (!body && !html)) {
+      return res.status(400).json({ 
+        status: "error", 
+        error: "Parâmetros 'to', 'subject' e 'body' ou 'html' são obrigatórios." 
+      });
+    }
+
+    try {
+      const info = await transporter.sendMail({
+        from: `"Administração TorqueLog" <administracao@torquelog.com.br>`,
+        to,
+        subject,
+        text: body,
+        html: html || body.replace(/\n/g, "<br>")
+      });
+
+      console.log(`Email enviado com sucesso para ${to}. ID: ${info.messageId}`);
+      return res.json({ 
+        status: "ok", 
+        messageId: info.messageId 
+      });
+    } catch (error: any) {
+      console.error("Erro ao enviar email por SMTP:", error);
+      return res.status(500).json({ 
+        status: "error", 
+        error: error.message || "Erro desconhecido ao enviar email." 
+      });
+    }
   });
 
   // Vite middleware integrado para desenvolvimento/produção

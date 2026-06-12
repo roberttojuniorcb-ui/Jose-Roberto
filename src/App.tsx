@@ -314,6 +314,27 @@ export default function App() {
   const [showSimulatedInbox, setShowSimulatedInbox] = useState<boolean>(false);
   const [selectedSimulatedEmail, setSelectedSimulatedEmail] = useState<any | null>(null);
 
+  // --- FUNÇÃO PARA ENVIAR EMAIL REAL VIA SMTP ---
+  const sendRealEmail = async (to: string, subject: string, body: string, html?: string) => {
+    try {
+      const res = await fetch("/api/send-email", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ to, subject, body, html }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        console.error("Erro SMTP enviado pelo Backend:", data.error);
+      } else {
+        console.log("E-mail real enviado com sucesso via SMTP!", data);
+      }
+    } catch (err) {
+      console.error("Falha ao se conectar na API de envio de e-mails:", err);
+    }
+  };
+
   // --- MOTOBOY REGISTRATION & SESSIONS (NEW COMPONENT REQUIREMENTS) ---
   const [motoboys, setMotoboys] = useState<Motoboy[]>(() => INITIAL_MOTOBOYS);
   const [isAddingNewMotoboy, setIsAddingNewMotoboy] = useState<boolean>(false);
@@ -1589,6 +1610,11 @@ export default function App() {
     };
     setSimulatedEmails(prev => [clientEmailEntry, ...prev]);
 
+    // Enviar email SMTP real para o parceiro
+    if (novoCli.email) {
+      sendRealEmail(novoCli.email, clientEmailEntry.assunto, clientEmailEntry.corpo);
+    }
+
     // Call Supabase native auth register link if configured (real integration)
     if (supabase) {
       try {
@@ -2124,6 +2150,11 @@ export default function App() {
         lido: false
       };
       setSimulatedEmails(prev => [selfRegEmailMsg, ...prev]);
+
+      // Enviar e-mail SMTP real
+      if (selfRegEmail) {
+        sendRealEmail(selfRegEmail, selfRegEmailMsg.assunto, selfRegEmailMsg.corpo);
+      }
 
       setTimeout(() => setSupabaseSuccessMsg(''), 4000);
     }, 1200);
@@ -7207,6 +7238,11 @@ export default function App() {
                 };
                 setSimulatedEmails(prev => [partnerEmailEntry, ...prev]);
 
+                // Enviar email real via SMTP
+                if (novoCli.email) {
+                  sendRealEmail(novoCli.email, partnerEmailEntry.assunto, partnerEmailEntry.corpo);
+                }
+
                 // Sync with local state
                 const updatedClientesList = [novoCli, ...clientes];
                 setClientes(updatedClientesList);
@@ -8208,6 +8244,11 @@ export default function App() {
                                 lido: false
                               };
                               setSimulatedEmails(prev => [firstAccessEmailMsg, ...prev]);
+
+                              // Enviar email real via SMTP
+                              if (firstAccessEmail) {
+                                sendRealEmail(firstAccessEmail, firstAccessEmailMsg.assunto, firstAccessEmailMsg.corpo);
+                              }
 
                               setTimeout(() => setSupabaseSuccessMsg(''), 5000);
                             }, 1200);
