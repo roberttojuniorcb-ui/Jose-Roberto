@@ -903,6 +903,9 @@ export default function App() {
   const [selectedLoginUserId, setSelectedLoginUserId] = useState<string>('');
   const [loginPasswordInput, setLoginPasswordInput] = useState<string>('');
   const [loginError, setLoginError] = useState<string>('');
+  const [showAdminPasswordModal, setShowAdminPasswordModal] = useState<boolean>(false);
+  const [adminPasswordInput, setAdminPasswordInput] = useState<string>('');
+  const [adminLoginError, setAdminLoginError] = useState<string>('');
 
   // --- STATE FOR CURRENT MOTOBOY SIGNATURE MODAL ---
   const [activeSignOrder, setActiveSignOrder] = useState<OrdemServico | null>(null);
@@ -2604,9 +2607,10 @@ export default function App() {
 
   const effectiveRole = activeSessionRole === 'Empresa' ? adminVisualPerspective : activeSessionRole;
 
-  if (!activeSessionRole) {
-    return (
-      <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-between p-4 sm:p-6 md:p-8 font-sans selection:bg-orange-500 selection:text-white relative overflow-hidden" id="login-screen">
+  return (
+    <>
+      {!activeSessionRole ? (
+        <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-between p-4 sm:p-6 md:p-8 font-sans selection:bg-orange-500 selection:text-white relative overflow-hidden" id="login-screen">
         
         {/* Abstract background ambient aura */}
         <div className="absolute top-[-20%] left-[-10%] w-[500px] h-[500px] rounded-full bg-orange-600/10 blur-[130px] pointer-events-none" />
@@ -3070,10 +3074,9 @@ export default function App() {
                 <button
                   type="button"
                   onClick={() => {
-                    setLoginRole('Empresa');
-                    setIsSelfRegistering(false);
-                    setLoginPasswordInput('');
-                    setLoginError('');
+                    setShowAdminPasswordModal(true);
+                    setAdminPasswordInput('');
+                    setAdminLoginError('');
                   }}
                   className="w-full bg-slate-950 hover:bg-slate-900 border border-slate-850 hover:border-slate-700 text-slate-400 hover:text-white transition-all text-[11.5px] font-mono font-bold py-2 px-3 rounded-xl flex items-center justify-center gap-1.5 cursor-pointer shadow-md"
                   id="btn-admin-login-backdoor"
@@ -3113,11 +3116,8 @@ export default function App() {
           </p>
         </footer>
       </div>
-    );
-  }
-
-  return (
-    <div className="min-h-screen bg-slate-50 text-slate-800 font-sans flex flex-col selection:bg-orange-500 selection:text-white" id="torquelog-app">
+    ) : (
+      <div className="min-h-screen bg-slate-50 text-slate-800 font-sans flex flex-col selection:bg-orange-500 selection:text-white" id="torquelog-app">
       
       {firebaseQuotaExceeded && (
         <div className="bg-amber-650 text-white px-4 py-2 text-xs font-mono flex flex-col md:flex-row justify-between items-center gap-2 border-b-2 border-amber-500 shadow-sm animate-[pulse_3s_infinite]" id="firebase-quota-banner">
@@ -8147,9 +8147,13 @@ export default function App() {
         )}
       </AnimatePresence>
 
+    </div>
+    )}
+
       {/* ==========================================
           MODAL: CLIENT FIRST ACCESS / ACTIVATION
-          ========================================== */}
+          ==========================================
+          These live outside the activeSessionRole ternary so they can be shown during login phase. */}
       <AnimatePresence>
         {isFirstAccessModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-sm shadow-2xl overflow-y-auto" id="modal-first-access">
@@ -8463,6 +8467,100 @@ export default function App() {
           </div>
         )}
       </AnimatePresence>
+ 
+      {/* ==========================================
+          MODAL: ADMIN ACCESS PASSWORD VERIFICATION
+          ========================================== */}
+      <AnimatePresence>
+        {showAdminPasswordModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md" id="modal-admin-auth">
+            <motion.div 
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-slate-900 rounded-2xl shadow-2xl border border-slate-800 max-w-sm w-full p-6 relative overflow-hidden"
+            >
+              {/* Outer decorative line */}
+              <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-orange-500 to-amber-500"></div>
+              
+              <div className="flex justify-between items-start mb-4">
+                <div>
+                  <h3 className="text-sm font-bold text-white uppercase font-mono tracking-wider flex items-center gap-1.5">
+                    <Shield className="w-4 h-4 text-orange-400 shrink-0" />
+                    Autenticação Master Admin
+                  </h3>
+                  <span className="text-[10px] text-slate-400 font-mono">Entre com a chave de controle central TorqueLog</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowAdminPasswordModal(false)}
+                  className="text-slate-400 hover:text-white font-black text-xs p-1 cursor-pointer"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <form 
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  setAdminLoginError('');
+                  const MAIN_DEV_MASTER_PASSWORD = 'torqueadmin2026';
+                  if (adminPasswordInput === MAIN_DEV_MASTER_PASSWORD) {
+                    setActiveSessionRole('Empresa');
+                    setActiveMotoboyUser(null);
+                    setActiveClienteUser(null);
+                    setShowAdminPasswordModal(false);
+                    setAdminPasswordInput('');
+                  } else {
+                    setAdminLoginError('🔒 Senha de Administrador incorreta! Tente novamente.');
+                  }
+                }} 
+                className="space-y-4"
+              >
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1.5 font-mono">Senha Master do Painel</label>
+                  <input
+                    type="password"
+                    required
+                    autoFocus
+                    placeholder="Sua senha de segurança..."
+                    value={adminPasswordInput}
+                    onChange={(e) => setAdminPasswordInput(e.target.value)}
+                    className="w-full bg-slate-955 border border-slate-805 rounded-lg p-2.5 text-xs font-mono text-white focus:outline-none focus:border-orange-500 placeholder-slate-650 bg-slate-950"
+                  />
+                </div>
+
+                {adminLoginError && (
+                  <div className="p-3 bg-red-955/40 border border-red-900/50 text-red-400 text-[11px] rounded-lg flex items-start gap-1.5 font-mono leading-tight">
+                    <span className="shrink-0">⚠️</span>
+                    <span>{adminLoginError}</span>
+                  </div>
+                )}
+
+                <div className="flex gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowAdminPasswordModal(false);
+                      setAdminPasswordInput('');
+                      setAdminLoginError('');
+                    }}
+                    className="flex-1 bg-slate-800 hover:bg-slate-750 text-slate-300 py-2 rounded-xl text-xs font-bold font-mono transition cursor-pointer"
+                  >
+                    Voltar
+                  </button>
+                  <button
+                    type="submit"
+                    className="flex-1 bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-500 hover:to-amber-500 text-white py-2 rounded-xl text-xs font-extrabold font-mono transition cursor-pointer shadow-lg shadow-orange-500/10"
+                  >
+                    Acessar Painel 🚀
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* Floating Supabase Live Status Toast */}
       {supabaseSuccessMsg && (
@@ -8476,8 +8574,7 @@ export default function App() {
           </p>
         </div>
       )}
-
-    </div>
+  </>
   );
 
   // Helper inside standard React state modifiers because of input controls
