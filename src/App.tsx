@@ -2547,9 +2547,15 @@ export default function App() {
 
   const handleAbrirGoogleMaps = (o: OrdemServico) => {
     const cli = clientes.find(c => c.id === o.clienteId || c.nome.toLowerCase() === o.clienteNome.toLowerCase());
-    const deCidade = cli?.cidade || 'Passos, MG';
-    const origem = `${cli?.nome || o.clienteNome}, ${cli?.endereco || ''}, ${deCidade}`;
-    const destino = `${o.destinatarioNome || 'Oficina'}, ${o.enderecoEntrega || ''}`;
+    const deCidade = cli?.cidade || o.cidade || 'Passos, MG';
+    const origemCep = cli?.cep ? `, CEP ${cli.cep}` : '';
+    const origem = `${cli?.endereco || ''}${origemCep}, ${deCidade}`;
+    
+    const destCli = clientes.find(c => c.nome.toLowerCase() === o.destinatarioNome?.toLowerCase() || c.id === o.destinatarioNome);
+    const destCep = destCli?.cep ? `, CEP ${destCli.cep}` : '';
+    const destCidade = destCli?.cidade || deCidade;
+    const destino = `${o.enderecoEntrega || ''}${destCep}, ${destCidade}`;
+    
     const url = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(origem)}&destination=${encodeURIComponent(destino)}`;
     window.open(url, '_blank', 'noopener,noreferrer');
   };
@@ -2559,8 +2565,14 @@ export default function App() {
     if (activeOrder) {
       const cli = clientes.find(c => c.id === activeOrder.clienteId || c.nome.toLowerCase() === activeOrder.clienteNome.toLowerCase());
       const deCidade = cli?.cidade || mb.cidade || 'Passos, MG';
-      const origem = `${cli?.nome || activeOrder.clienteNome}, ${cli?.endereco || ''}, ${deCidade}`;
-      const destino = `${activeOrder.destinatarioNome || 'Oficina'}, ${activeOrder.enderecoEntrega || ''}`;
+      const origemCep = cli?.cep ? `, CEP ${cli.cep}` : '';
+      const origem = `${cli?.endereco || ''}${origemCep}, ${deCidade}`;
+      
+      const destCli = clientes.find(c => c.nome.toLowerCase() === activeOrder.destinatarioNome?.toLowerCase() || c.id === activeOrder.destinatarioNome);
+      const destCep = destCli?.cep ? `, CEP ${destCli.cep}` : '';
+      const destCidade = destCli?.cidade || deCidade;
+      const destino = `${activeOrder.enderecoEntrega || ''}${destCep}, ${destCidade}`;
+      
       const url = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(origem)}&destination=${encodeURIComponent(destino)}`;
       window.open(url, '_blank', 'noopener,noreferrer');
     } else {
@@ -2802,13 +2814,23 @@ export default function App() {
                         <span className="text-emerald-400 animate-pulse text-[9px] font-mono font-semibold">🔍 BUSCANDO CEP...</span>
                       )}
                     </label>
-                    <input
-                      type="text"
-                      placeholder="Ex: 37900-124"
-                      value={selfRegCEP}
-                      onChange={(e) => handleCEPChange(e.target.value, 'selfReg')}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-sm text-white focus:outline-none focus:border-emerald-500 font-mono"
-                    />
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        placeholder="Ex: 37900-124"
+                        value={selfRegCEP}
+                        onChange={(e) => handleCEPChange(e.target.value, 'selfReg')}
+                        className="flex-1 bg-slate-950 border border-slate-800 rounded-lg p-2 text-sm text-white focus:outline-none focus:border-emerald-500 font-mono"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleFetchCEP(selfRegCEP, 'selfReg')}
+                        disabled={isFetchingCEP || !selfRegCEP}
+                        className="bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-800 text-white text-xs font-black px-4 rounded-lg font-mono tracking-tight cursor-pointer shadow transition shrink-0"
+                      >
+                        {isFetchingCEP ? '...' : '🔍 Buscar'}
+                      </button>
+                    </div>
                   </div>
 
                   <div>
@@ -7860,14 +7882,24 @@ export default function App() {
                       <span className="text-emerald-500 animate-pulse text-[10px] font-mono leading-none">🔍 BUSCANDO CEP...</span>
                     )}
                   </label>
-                  <input
-                    type="text"
-                    required
-                    value={clientNewClientCEP}
-                    onChange={(e) => handleCEPChange(e.target.value, 'clientNewClient')}
-                    placeholder="Ex: 37900-124"
-                    className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded-lg p-2.5 text-xs focus:ring-2 focus:ring-orange-500 font-mono"
-                  />
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      required
+                      value={clientNewClientCEP}
+                      onChange={(e) => handleCEPChange(e.target.value, 'clientNewClient')}
+                      placeholder="Ex: 37900-124"
+                      className="flex-1 bg-slate-50 text-slate-900 border border-slate-200 rounded-lg p-2.5 text-xs focus:ring-2 focus:ring-orange-500 font-mono"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleFetchCEP(clientNewClientCEP, 'clientNewClient')}
+                      disabled={isClientFetchingNewClientCEP || !clientNewClientCEP}
+                      className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 text-white text-xs font-black px-4 rounded-lg font-mono tracking-tight cursor-pointer shadow transition shrink-0"
+                    >
+                      {isClientFetchingNewClientCEP ? '...' : '🔍 Buscar CEP'}
+                    </button>
+                  </div>
                 </div>
 
                 <div>
@@ -8025,13 +8057,23 @@ export default function App() {
                       <span className="text-emerald-500 animate-pulse text-[10px] font-mono leading-none">🔍 BUSCANDO CEP...</span>
                     )}
                   </label>
-                  <input
-                    type="text"
-                    value={newClientCEP}
-                    onChange={(e) => handleCEPChange(e.target.value, 'newClient')}
-                    placeholder="Ex: 37900-124"
-                    className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded-lg p-2.5 text-xs focus:ring-2 focus:ring-orange-500 focus:border-orange-500 font-mono"
-                  />
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={newClientCEP}
+                      onChange={(e) => handleCEPChange(e.target.value, 'newClient')}
+                      placeholder="Ex: 37900-124"
+                      className="flex-1 bg-slate-50 text-slate-900 border border-slate-200 rounded-lg p-2.5 text-xs focus:ring-2 focus:ring-orange-500 focus:border-orange-500 font-mono"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleFetchCEP(newClientCEP, 'newClient')}
+                      disabled={isFetchingNewClientCEP || !newClientCEP}
+                      className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 text-white text-xs font-black px-4 rounded-lg font-mono tracking-tight cursor-pointer shadow transition shrink-0"
+                    >
+                      {isFetchingNewClientCEP ? '...' : '🔍 Buscar CEP'}
+                    </button>
+                  </div>
                 </div>
 
                 <div>
@@ -8295,13 +8337,23 @@ export default function App() {
                       <span className="text-emerald-500 animate-pulse text-[10px] font-mono leading-none font-bold">🔍 BUSCANDO CEP...</span>
                     )}
                   </label>
-                  <input
-                    type="text"
-                    value={editClientCEP}
-                    onChange={(e) => handleCEPChange(e.target.value, 'editClient')}
-                    placeholder="Ex: 37900-124"
-                    className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded-lg p-2.5 text-xs focus:ring-2 focus:ring-orange-500 focus:border-orange-500 font-mono"
-                  />
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={editClientCEP}
+                      onChange={(e) => handleCEPChange(e.target.value, 'editClient')}
+                      placeholder="Ex: 37900-124"
+                      className="flex-1 bg-slate-50 text-slate-900 border border-slate-200 rounded-lg p-2.5 text-xs focus:ring-2 focus:ring-orange-500 focus:border-orange-500 font-mono"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleFetchCEP(editClientCEP, 'editClient')}
+                      disabled={isFetchingEditClientCEP || !editClientCEP}
+                      className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 text-white text-xs font-black px-4 rounded-lg font-mono tracking-tight cursor-pointer shadow transition shrink-0"
+                    >
+                      {isFetchingEditClientCEP ? '...' : '🔍 Buscar CEP'}
+                    </button>
+                  </div>
                 </div>
 
                 <div>
@@ -9054,14 +9106,24 @@ export default function App() {
                             <span className="text-emerald-400 animate-pulse text-[9px] font-mono leading-none">🔍 BUSCANDO...</span>
                           )}
                         </label>
-                        <input
-                          type="text"
-                          required
-                          placeholder="Ex: 37900-124"
-                          value={firstAccessCEP}
-                          onChange={(e) => handleCEPChange(e.target.value, 'firstAccess')}
-                          className="w-full bg-slate-100/10 text-white placeholder-slate-600 border border-slate-800 rounded-lg p-2.5 text-xs font-mono focus:outline-none focus:border-orange-500"
-                        />
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            required
+                            placeholder="Ex: 37900-124"
+                            value={firstAccessCEP}
+                            onChange={(e) => handleCEPChange(e.target.value, 'firstAccess')}
+                            className="flex-1 bg-slate-100/10 text-white placeholder-slate-600 border border-slate-800 rounded-lg p-2.5 text-xs font-mono focus:outline-none focus:border-orange-500"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleFetchCEP(firstAccessCEP, 'firstAccess')}
+                            disabled={isFetchingFirstAccessCEP || !firstAccessCEP}
+                            className="bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-800 text-white text-xs font-black px-3.5 rounded-lg font-mono tracking-tight cursor-pointer shadow transition shrink-0"
+                          >
+                            {isFetchingFirstAccessCEP ? '...' : '🔍 Buscar'}
+                          </button>
+                        </div>
                       </div>
                       <div>
                         <label className="block text-[10px] font-bold text-slate-300 uppercase mb-1 font-mono text-left">Cidade / UF *</label>
