@@ -37,7 +37,7 @@ import {
   Bell,
   Volume2
 } from 'lucide-react';
-import { Cliente, OrdemServico, Quadrante, APIResponse, Motoboy, obterEstimativaTempoPercurso } from './types';
+import { Cliente, OrdemServico, Quadrante, APIResponse, Motoboy, Representante, obterEstimativaTempoPercurso } from './types';
 import { getInitialClientes, INITIAL_MOTOBOYS } from './mockData';
 import { 
   query, 
@@ -122,6 +122,41 @@ const normalizeCity = (city: string | undefined): string => {
 export default function App() {
   // --- STATE MANAGEMENT ---
   const [clientes, setClientes] = useState<Cliente[]>(() => getInitialClientes());
+
+  // --- REPRESENTANTES & INDICAÇÕES STATES ---
+  const [representantes, setRepresentantes] = useState<Representante[]>(() => [
+    {
+      id: 'REP-101',
+      nome: 'Carlos Souza (Representante Sul)',
+      telefone: '(35) 98822-1144',
+      email: 'carlos.representante@torquelog.com',
+      pix: '35988221144',
+      criadoEm: new Date().toISOString(),
+    },
+    {
+      id: 'REP-102',
+      nome: 'Mariana Costa (Representante Leste)',
+      telefone: '(35) 98711-5588',
+      email: 'mariana.representante@torquelog.com',
+      pix: 'mariana@pix.com',
+      criadoEm: new Date().toISOString(),
+    }
+  ]);
+  const [isAddingNewRepresentative, setIsAddingNewRepresentative] = useState<boolean>(false);
+  const [newRepNome, setNewRepNome] = useState<string>('');
+  const [newRepTelefone, setNewRepTelefone] = useState<string>('');
+  const [newRepEmail, setNewRepEmail] = useState<string>('');
+  const [newRepPix, setNewRepPix] = useState<string>('');
+  const [representativeParaEditar, setRepresentativeParaEditar] = useState<Representante | null>(null);
+  const [editRepNome, setEditRepNome] = useState<string>('');
+  const [editRepTelefone, setEditRepTelefone] = useState<string>('');
+  const [editRepEmail, setEditRepEmail] = useState<string>('');
+  const [editRepPix, setEditRepPix] = useState<string>('');
+  const [selectedRepIdForDetails, setSelectedRepIdForDetails] = useState<string>('REP-101');
+
+  // states for assigning to client
+  const [newClientIndicadoPorRepId, setNewClientIndicadoPorRepId] = useState<string>('');
+  const [editClientIndicadoPorRepId, setEditClientIndicadoPorRepId] = useState<string>('');
   const [ordens, setOrdens] = useState<OrdemServico[]>(() => {
     // Stable initial setup to showcase systems immediately
     return [
@@ -379,6 +414,7 @@ export default function App() {
 
   // --- ADMIN CITY FILTER & SEARCH ---
   const [selectedAdminCity, setSelectedAdminCity] = useState<string>('Todas');
+  const [adminSubTab, setAdminSubTab] = useState<'logistica' | 'representantes'>('logistica');
 
   // --- CLIENT SELF-REGISTRATION STATE ---
   const [isSelfRegistering, setIsSelfRegistering] = useState<boolean>(false);
@@ -1595,7 +1631,8 @@ export default function App() {
       criadoPor: source,
       criadoEm: new Date().toISOString(),
       motoboysAtivos: Number(newClientMotoboysAtivos) || 0,
-      ramo: newClientRamo
+      ramo: newClientRamo,
+      indicadoPorRepId: newClientIndicadoPorRepId || undefined
     };
 
     setClientes(prev => [novoCli, ...prev]);
@@ -1680,6 +1717,7 @@ export default function App() {
     setNewClientEmail('');
     setNewClientSenha('');
     setNewClientRamo('Autopeças');
+    setNewClientIndicadoPorRepId('');
   };
 
   // Update / Edit client (CRUD update)
@@ -1708,7 +1746,8 @@ export default function App() {
       email: editClientEmail,
       senha: editClientSenha || clienteParaEditar.senha,
       motoboysAtivos: Number(editClientMotoboysAtivos) || 0,
-      ramo: editClientRamo
+      ramo: editClientRamo,
+      indicadoPorRepId: editClientIndicadoPorRepId || undefined
     };
 
     setClientes(prev => prev.map(c => c.id === clienteParaEditar.id ? updatedCli : c));
@@ -1743,6 +1782,67 @@ export default function App() {
     setDeleteConfirmType('ordem');
     setDeleteConfirmId(ordemId);
     setDeleteConfirmName(`Ordem de Serviço ${ordemId} (${targetO.destinatarioNome || targetO.enderecoEntrega || 'Sem Oficina/Destino'})`);
+  };
+
+  // --- REPRESENTANTES MANAGEMENT EVENT HANDLERS ---
+  const handleCriarRepresentante = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newRepNome.trim()) {
+      alert("Por favor, informe o nome do representante.");
+      return;
+    }
+    const novoRep: Representante = {
+      id: `REP-${Math.floor(100 + Math.random() * 900)}`,
+      nome: newRepNome,
+      telefone: newRepTelefone || '(35) 99999-0000',
+      email: newRepEmail || 'contato@torquelog.com',
+      pix: newRepPix || 'Não informado',
+      criadoEm: new Date().toISOString()
+    };
+    setRepresentantes(prev => [...prev, novoRep]);
+    setNewRepNome('');
+    setNewRepTelefone('');
+    setNewRepEmail('');
+    setNewRepPix('');
+    setIsAddingNewRepresentative(false);
+    setSelectedRepIdForDetails(novoRep.id);
+    setSupabaseSuccessMsg(`🤝 Representante ${novoRep.nome} cadastrado com sucesso!`);
+    setTimeout(() => setSupabaseSuccessMsg(''), 3000);
+  };
+
+  const handleDeletarRepresentante = (id: string) => {
+    const rep = representantes.find(r => r.id === id);
+    if (!rep) return;
+    if (confirm(`Tem certeza que deseja remover o representante ${rep.nome}? Os parceiros indicados por ele ficarão sem representante associado.`)) {
+      setRepresentantes(prev => prev.filter(r => r.id !== id));
+      // update clients who were linked to this representative to have no representative
+      setClientes(prev => prev.map(c => c.indicadoPorRepId === id ? { ...c, indicadoPorRepId: undefined } : c));
+      if (selectedRepIdForDetails === id) {
+        setSelectedRepIdForDetails('');
+      }
+      setSupabaseSuccessMsg(`🗑️ Representante excluído com sucesso!`);
+      setTimeout(() => setSupabaseSuccessMsg(''), 3000);
+    }
+  };
+
+  const handleEditarRepresentanteSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!representativeParaEditar) return;
+    if (!editRepNome.trim()) {
+      alert("Por favor, preencha o Nome do representante.");
+      return;
+    }
+    const updatedRep: Representante = {
+      ...representativeParaEditar,
+      nome: editRepNome,
+      telefone: editRepTelefone,
+      email: editRepEmail,
+      pix: editRepPix
+    };
+    setRepresentantes(prev => prev.map(r => r.id === representativeParaEditar.id ? updatedRep : r));
+    setRepresentativeParaEditar(null);
+    setSupabaseSuccessMsg(`💾 Alterações do representante salvas com sucesso!`);
+    setTimeout(() => setSupabaseSuccessMsg(''), 3000);
   };
 
   // Update motoboy credentials or situation (CRUD update)
@@ -3549,6 +3649,51 @@ export default function App() {
         </div>
       </div>
       {effectiveRole === 'Empresa' && (
+        <div className="max-w-7xl mx-auto px-4 lg:px-6 pt-4">
+          {/* --- ADMIN MASTER SUB-TAB NAVIGATION --- */}
+          <div className="bg-slate-900 text-white rounded-2xl shadow-lg border border-slate-800 p-4 flex flex-col md:flex-row justify-between items-center gap-4">
+            <div className="flex items-center gap-3">
+              <div className="bg-orange-500/10 p-2.5 rounded-xl border border-orange-500/20">
+                <Users className="w-5 h-5 text-orange-400 shrink-0" />
+              </div>
+              <div>
+                <h2 className="text-sm font-black tracking-wider uppercase font-mono text-white flex items-center gap-2">
+                  <span>TorqueLog Master Panel</span>
+                  <span className="text-[9px] bg-orange-500 text-white px-1.5 py-0.5 rounded-md font-bold">CONTROL</span>
+                </h2>
+                <p className="text-xs text-slate-400 font-mono">Gerencie a logística de entregas regional ou administre o programa de indicações por representantes comerciaises</p>
+              </div>
+            </div>
+            <div className="flex bg-slate-950 p-1.5 rounded-xl border border-slate-800 w-full md:w-auto shrink-0 select-none">
+              <button
+                type="button"
+                onClick={() => setAdminSubTab('logistica')}
+                className={`flex-1 md:flex-none px-4 py-2 text-xs font-bold font-mono rounded-lg transition-all duration-150 cursor-pointer ${
+                  adminSubTab === 'logistica'
+                    ? 'bg-orange-500 text-white shadow-md'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-900'
+                }`}
+              >
+                🏍️ Despacho & Logística
+              </button>
+              <button
+                type="button"
+                onClick={() => setAdminSubTab('representantes')}
+                className={`flex-1 md:flex-none px-4 py-2 text-xs font-bold font-mono rounded-lg transition-all duration-150 cursor-pointer ${
+                  adminSubTab === 'representantes'
+                    ? 'bg-orange-500 text-white shadow-md'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-900'
+                }`}
+                id="tab-admin-referrals"
+              >
+                🤝 Programa Indicações (Representative)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {effectiveRole === 'Empresa' && adminSubTab === 'logistica' && (
         <main className="max-w-7xl mx-auto p-4 lg:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 flex-1 w-full" id="main-grid">
 
         {/* --- DYNAMIC LOGISTICS HOT ZONE GRAPHICAL MATRIX VISUALIZER --- */}
@@ -4260,6 +4405,7 @@ export default function App() {
                             setEditClientValorPagoMotoboy(cli.valorPagoMotoboy);
                             setEditClientMotoboysAtivos(cli.motoboysAtivos || 0);
                             setEditClientRamo(cli.ramo || 'Autopeças');
+                            setEditClientIndicadoPorRepId(cli.indicadoPorRepId || '');
                           }}
                           className="bg-slate-100 hover:bg-slate-200 text-slate-705 p-1 rounded transition border border-slate-250 cursor-pointer"
                           title="Editar cadastro do cliente"
@@ -4752,7 +4898,7 @@ export default function App() {
       {/* ==========================================
           BOTTOM LOGISTICS WORKSPACE: DELIVERED LOGS (INTERACTIVE CALENDAR)
           ========================================== */}
-      {effectiveRole === 'Empresa' && (
+      {effectiveRole === 'Empresa' && adminSubTab === 'logistica' && (
         <section className="max-w-7xl mx-auto px-4 lg:px-6 mb-6 w-full" id="delivered-history">
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 mt-2">
             
@@ -5246,6 +5392,385 @@ export default function App() {
 
           </div>
         </section>
+      )}
+
+      {/* ==========================================
+          REPRESENTATIVIDADE & PROGRAMA DE INDICAÇÕES (CADERNO DO INCENTIVO)
+          ========================================== */}
+      {effectiveRole === 'Empresa' && adminSubTab === 'representantes' && (
+        <main className="max-w-7xl mx-auto p-4 lg:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 flex-1 w-full animate-fade-in" id="representantes-dashboard">
+          
+          {/* Top Info Banner - Explaining how the commission system works */}
+          <div className="lg:col-span-12 bg-indigo-50 border border-indigo-200 rounded-2xl p-5 flex flex-col md:flex-row justify-between items-center gap-4">
+            <div className="flex items-center gap-3.5">
+              <div className="bg-indigo-100 p-3 rounded-xl text-indigo-700 font-bold shrink-0">
+                <Coins className="w-6 h-6 animate-pulse text-indigo-600" />
+              </div>
+              <div className="font-mono">
+                <h3 className="text-sm font-black text-indigo-900 uppercase tracking-tight">💵 Programa de Indicações TorqueLog Ativo</h3>
+                <p className="text-xs text-indigo-700 mt-1 leading-relaxed">
+                  Seus representantes comerciais atuam prospectando novos parceiros (Distribuidoras B2B). Ao cadastrar uma nova distribuidora associada a um representante, ele passa a receber uma comissão fixa de de <strong>R$ 0,10 por cada entrega concluída</strong> pela distribuidora prospectada, independentemente do entregador que realize o frete.
+                </p>
+              </div>
+            </div>
+            <div className="bg-indigo-900 text-white rounded-xl px-4 py-2.5 font-mono text-center shrink-0">
+              <span className="text-[10px] block uppercase text-indigo-300 font-bold">Comissão Fixa</span>
+              <strong className="text-base font-black">R$ 0,10 / Entrega</strong>
+            </div>
+          </div>
+
+          {/* Left Column: Register & List of Representatives */}
+          <section className="lg:col-span-7 flex flex-col gap-6">
+            
+            {/* Form to Register Representative */}
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+              <div className="flex items-center justify-between mb-4 pb-2 border-b border-slate-100">
+                <div className="flex items-center gap-2">
+                  <UserCheck className="w-5 h-5 text-orange-500" />
+                  <h3 className="text-sm font-bold text-slate-900 uppercase font-mono tracking-tight">
+                    Equipe de Representantes
+                  </h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsAddingNewRepresentative(!isAddingNewRepresentative)}
+                  className="bg-slate-900 hover:bg-slate-950 text-white font-mono text-xs font-bold py-1 px-3 rounded flex items-center gap-1 cursor-pointer transition border border-slate-800"
+                >
+                  {isAddingNewRepresentative ? '✕ Ocultar Form' : '+ Novo Representante'}
+                </button>
+              </div>
+
+              {isAddingNewRepresentative && (
+                <form onSubmit={handleCriarRepresentante} className="space-y-3.5 bg-slate-50 p-4 rounded-xl border border-slate-200 mb-4 animate-fade-in font-mono">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">
+                        Nome do Representante *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={newRepNome}
+                        onChange={(e) => setNewRepNome(e.target.value)}
+                        placeholder="Ex: Carlos silva (Vendas Centro)"
+                        className="w-full bg-white text-slate-900 border border-slate-200 rounded-lg p-2 text-xs focus:ring-2 focus:ring-orange-500 font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">
+                        Chave PIX p/ Pagamento *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={newRepPix}
+                        onChange={(e) => setNewRepPix(e.target.value)}
+                        placeholder="Ex: Celular, CPF ou e-mail"
+                        className="w-full bg-white text-slate-900 border border-slate-200 rounded-lg p-2 text-xs focus:ring-2 focus:ring-orange-500 font-mono"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">
+                        Celular / WhatsApp
+                      </label>
+                      <input
+                        type="text"
+                        value={newRepTelefone}
+                        onChange={(e) => setNewRepTelefone(e.target.value)}
+                        placeholder="Ex: (35) 99999-1234"
+                        className="w-full bg-white text-slate-900 border border-slate-200 rounded-lg p-2 text-xs focus:ring-2 focus:ring-orange-500 font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">
+                        E-mail de Contato
+                      </label>
+                      <input
+                        type="email"
+                        value={newRepEmail}
+                        onChange={(e) => setNewRepEmail(e.target.value)}
+                        placeholder="Ex: carlos@torquelog.com"
+                        className="w-full bg-white text-slate-900 border border-slate-200 rounded-lg p-2 text-xs focus:ring-2 focus:ring-orange-500 font-mono"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end gap-2 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setIsAddingNewRepresentative(false)}
+                      className="bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-bold py-1.5 px-4 rounded-lg cursor-pointer font-mono"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="submit"
+                      className="bg-orange-500 hover:bg-orange-600 text-white text-xs font-black py-1.5 px-4 rounded-lg cursor-pointer shadow font-mono"
+                    >
+                      Criar Representante
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {/* List of Representatives */}
+              <div className="overflow-x-auto rounded-lg border border-slate-200">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr className="bg-slate-900 text-white font-mono uppercase text-[9px] border-b border-slate-800">
+                      <th className="p-3">Representante</th>
+                      <th className="p-3 text-center">B2B Indicados</th>
+                      <th className="p-3 text-center">Entregas das Bases</th>
+                      <th className="p-3 text-right">Repasse Acumulado</th>
+                      <th className="p-3 text-center">Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-150">
+                    {representantes.map(rep => {
+                      const repClients = clientes.filter(c => c.indicadoPorRepId === rep.id);
+                      const repClientsCount = repClients.length;
+
+                      let totalRepDeliveries = 0;
+                      repClients.forEach(cli => {
+                        const count = ordens.filter(o => o.status === 'Entregue' && o.clienteId === cli.id).length;
+                        totalRepDeliveries += count;
+                      });
+
+                      const repEarnings = totalRepDeliveries * 0.10;
+                      const isSelected = selectedRepIdForDetails === rep.id;
+
+                      return (
+                        <tr
+                          key={rep.id}
+                          className={`hover:bg-slate-50 transition-colors cursor-pointer ${
+                            isSelected ? 'bg-orange-50/70 border-l-4 border-l-orange-500 font-medium' : ''
+                          }`}
+                          onClick={() => setSelectedRepIdForDetails(rep.id)}
+                        >
+                          <td className="p-3">
+                            <div className="font-bold text-slate-900 font-sans tracking-tight">{rep.nome}</div>
+                            <div className="text-[10px] text-slate-400 font-mono mt-0.5">
+                              📱 {rep.telefone} • {rep.email}
+                            </div>
+                            <div className="text-[9.5px] text-slate-500 font-mono mt-0.5">
+                              🔑 PIX: <span className="bg-slate-100 font-bold px-1 rounded text-slate-800">{rep.pix}</span>
+                            </div>
+                          </td>
+                          <td className="p-3 text-center font-mono font-black text-slate-600">
+                            {repClientsCount} ind.
+                          </td>
+                          <td className="p-3 text-center font-mono">
+                            <span className="bg-indigo-50 border border-indigo-150 text-indigo-700 px-2 py-0.5 rounded-full font-black text-[10px]">
+                              {totalRepDeliveries} entregas
+                            </span>
+                          </td>
+                          <td className="p-3 text-right font-mono text-sm font-black text-emerald-700 bg-emerald-50/20">
+                            R$ {repEarnings.toFixed(2)}
+                          </td>
+                          <td className="p-3 text-center">
+                            <div className="flex gap-1.5 justify-center" onClick={(e) => e.stopPropagation()}>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setRepresentativeParaEditar(rep);
+                                  setEditRepNome(rep.nome);
+                                  setEditRepTelefone(rep.telefone);
+                                  setEditRepEmail(rep.email);
+                                  setEditRepPix(rep.pix);
+                                }}
+                                className="bg-white hover:bg-slate-100 text-slate-700 p-1.5 rounded border border-slate-250 cursor-pointer shadow-xs"
+                                title="Editar dados"
+                              >
+                                <Edit className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDeletarRepresentante(rep.id)}
+                                className="bg-slate-50 hover:bg-rose-50 text-rose-600 p-1.5 rounded border border-slate-250 hover:border-rose-200 cursor-pointer shadow-xs"
+                                title="Excluir representante"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+
+                    {representantes.length === 0 && (
+                      <tr>
+                        <td colSpan={5} className="p-8 text-center text-slate-500 italic font-mono uppercase">
+                          Nenhum representante cadastrado. Abra o formulário acima para registrar.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            
+          </section>
+
+          {/* Right Column: Detailed auditing of the selected representative */}
+          <section className="lg:col-span-5 flex flex-col gap-6">
+            
+            {(() => {
+              const rep = representantes.find(r => r.id === selectedRepIdForDetails);
+              if (!rep) {
+                return (
+                  <div className="bg-slate-55/60 border border-slate-200 rounded-xl p-8 text-center text-slate-500 italic font-sans flex flex-col items-center justify-center min-h-[300px]">
+                    <Search className="w-10 h-10 text-slate-300 mb-3 shrink-0" />
+                    <span>Selecione um representante ao lado para auditar suas distribuidoras indicadas e faturamento em tempo real.</span>
+                  </div>
+                );
+              }
+
+              const repClients = clientes.filter(c => c.indicadoPorRepId === rep.id);
+              const unassignedClients = clientes.filter(c => !c.indicadoPorRepId);
+
+              return (
+                <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 font-mono">
+                  
+                  {/* Header */}
+                  <div className="border-b border-slate-150 pb-3 mb-4 flex justify-between items-start">
+                    <div>
+                      <span className="text-[9.5px] font-black text-orange-500 uppercase tracking-widest block font-mono">
+                        Auditoria de Indicações de Campo
+                      </span>
+                      <h3 className="text-xs font-black text-slate-900 uppercase font-mono mt-0.5">
+                        📂 Carteira: {rep.nome.toUpperCase()}
+                      </h3>
+                    </div>
+                    <span className="bg-slate-900 text-orange-400 font-mono text-[9px] px-2 py-0.5 rounded font-black uppercase">
+                      ID: {rep.id}
+                    </span>
+                  </div>
+
+                  {/* Summary Metric Strip for Selected Representative */}
+                  <div className="grid grid-cols-2 gap-3 mb-5">
+                    <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-850 text-center">
+                      <span className="text-[9px] uppercase tracking-wider text-slate-450 font-mono block">Base de Parceiros</span>
+                      <strong className="text-lg font-mono text-white block mt-0.5">
+                        {repClients.length} <span className="text-[10px] text-slate-400">empresas</span>
+                      </strong>
+                    </div>
+                    <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-850 text-center">
+                      <span className="text-[9px] uppercase tracking-wider text-slate-450 font-mono block">Acumulado a Pagar</span>
+                      <strong className="text-lg font-mono text-emerald-400 block mt-0.5">
+                        R$ { (repClients.reduce((acc, cli) => acc + ordens.filter(o => o.status === 'Entregue' && o.clienteId === cli.id).length, 0) * 0.10).toFixed(2) }
+                      </strong>
+                    </div>
+                  </div>
+
+                  {/* Link existing client helper form */}
+                  {unassignedClients.length > 0 && (
+                    <div className="bg-slate-50 border border-slate-200 p-3.5 rounded-xl mb-4 text-xs font-mono">
+                      <h4 className="font-extrabold text-[10px] text-slate-800 uppercase flex items-center gap-1 mb-2">
+                        <Plus className="w-3.5 h-3.5 text-slate-600 shrink-0" />
+                        Vincular Distribuidora Livre
+                      </h4>
+                      <div className="flex gap-2">
+                        <select
+                          id="select-linking-client"
+                          className="flex-1 bg-white border border-slate-250 p-1 rounded-lg text-xs font-mono outline-none focus:ring-1 focus:ring-orange-500 font-bold"
+                        >
+                          <option value="">-- Escolha um Parceiro Livre --</option>
+                          {unassignedClients.map(c => (
+                            <option key={c.id} value={c.id}>
+                              {c.nome} ({c.cidade || 'Passos'})
+                            </option>
+                          ))}
+                        </select>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const selectEl = document.getElementById('select-linking-client') as HTMLSelectElement;
+                            if (selectEl && selectEl.value) {
+                              const selectedId = selectEl.value;
+                              setClientes(prev => prev.map(c => c.id === selectedId ? { ...c, indicadoPorRepId: rep.id } : c));
+                              selectEl.value = '';
+                              setSupabaseSuccessMsg(`🤝 Parceiro associado ao representante ${rep.nome} com sucesso!`);
+                              setTimeout(() => setSupabaseSuccessMsg(''), 3000);
+                            } else {
+                              alert('Por favor, selecione um parceiro válido da lista.');
+                            }
+                          }}
+                          className="bg-orange-500 hover:bg-orange-600 text-white font-bold py-1 px-3 rounded-lg cursor-pointer text-xs font-mono"
+                        >
+                          Vincular
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* List of active partners belonging to this representative */}
+                  <h4 className="text-[9.5px] font-black text-slate-550 uppercase font-mono tracking-widest mb-2">
+                    Distribuidoras & Parceiros Prospectados:
+                  </h4>
+                  <div className="space-y-2 max-h-[350px] overflow-y-auto">
+                    {repClients.map(cli => {
+                      const clientDeliveries = ordens.filter(o => o.status === 'Entregue' && o.clienteId === cli.id).length;
+                      const clientEarning = clientDeliveries * 0.10;
+
+                      return (
+                        <div key={cli.id} className="bg-slate-50/70 hover:bg-slate-100/80 p-3 rounded-lg border border-slate-200 font-sans flex items-center justify-between text-xs transition">
+                          <div>
+                            <strong className="text-slate-900 block font-bold leading-tight">{cli.nome}</strong>
+                            <span className="text-[10px] text-slate-500 font-mono block mt-0.5">
+                              🏭 {cli.ramo || 'Autopeças'} • 📍 {cli.cidade}
+                            </span>
+                          </div>
+                          
+                          <div className="text-right shrink-0 font-mono">
+                            <span className="bg-indigo-50 border border-indigo-100 text-indigo-700 px-1.5 py-0.2 rounded font-bold text-[9px]">
+                              {clientDeliveries} entregas
+                            </span>
+                            <div className="text-sm font-black text-emerald-700 mt-1">
+                              + R$ {clientEarning.toFixed(2)}
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (confirm(`Deseja desassociar a empresa ${cli.nome} do representante ${rep.nome}?`)) {
+                                  setClientes(prev => prev.map(c => c.id === cli.id ? { ...c, indicadoPorRepId: undefined } : c));
+                                  setSupabaseSuccessMsg(`💔 Vínculo de indicação removido com sucesso.`);
+                                  setTimeout(() => setSupabaseSuccessMsg(''), 3000);
+                                }
+                              }}
+                              className="text-[9.5px] text-rose-500 hover:underline block ml-auto mt-1 cursor-pointer font-bold font-mono"
+                            >
+                              [Desvincular]
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+
+                    {repClients.length === 0 && (
+                      <div className="text-center p-6 text-slate-400 italic text-[11px] bg-slate-50 rounded-xl border border-slate-200">
+                        Nenhum parceiro associado a este representante até o momento.
+                        <br />
+                        <span className="text-[9.5px] block mt-1.5 text-slate-450 leading-relaxed font-sans">
+                          Associe novos parceiros ao cadastrá-los ou use o menu vincular acima para atribuir!
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="border-t border-slate-150 pt-3 mt-4 text-[10px] bg-slate-50 p-2.5 rounded border border-slate-150 text-slate-500 leading-relaxed font-mono">
+                    👉 <strong>Conciliação p/ Pagamento:</strong> O valor do repasse é derivado das ordens com status "Entregue" no aplicativo. Ao transferir via PIX para o representante, o histórico recalculado é atualizado em tempo real.
+                  </div>
+
+                </div>
+              );
+            })()}
+
+          </section>
+
+        </main>
       )}
 
       {/* ==========================================
@@ -7608,6 +8133,24 @@ export default function App() {
                     />
                   </div>
 
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1 font-mono">
+                      Representante (Indicação da Rua)
+                    </label>
+                    <select
+                      value={newClientIndicadoPorRepId}
+                      onChange={(e) => setNewClientIndicadoPorRepId(e.target.value)}
+                      className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded-lg p-2 text-xs focus:ring-2 focus:ring-orange-500 font-mono font-semibold"
+                    >
+                      <option value="">Nenhum (Sem Indicação)</option>
+                      {representantes.map(rep => (
+                        <option key={rep.id} value={rep.id}>
+                          {rep.nome} (comissão R$ 0,10 / entrega)
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
                   <div className="text-[10px] font-extrabold text-emerald-600 font-mono bg-emerald-50 p-2 rounded border border-emerald-100 flex justify-between">
                     <span>💵 MARGEM LIQUIDA:</span>
                     <span>R$ {(newClientValorCobradoCliente - newClientValorPagoMotoboy).toFixed(2)}</span>
@@ -7867,6 +8410,24 @@ export default function App() {
                     />
                   </div>
 
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1 font-mono">
+                      Representante Comercial / Indicação
+                    </label>
+                    <select
+                      value={editClientIndicadoPorRepId}
+                      onChange={(e) => setEditClientIndicadoPorRepId(e.target.value)}
+                      className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded-lg p-2 text-xs focus:ring-2 focus:ring-orange-500 font-mono font-semibold"
+                    >
+                      <option value="">Nenhum (Sem Indicação)</option>
+                      {representantes.map(rep => (
+                        <option key={rep.id} value={rep.id}>
+                          {rep.nome} (comissão R$ 0,10 / entrega)
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
                   <div className="text-[10px] font-extrabold text-emerald-600 font-mono bg-emerald-50 p-2 rounded border border-emerald-100 flex justify-between">
                     <span>💵 MARGEM LIQUIDA:</span>
                     <span>R$ {(editClientValorCobradoCliente - editClientValorPagoMotoboy).toFixed(2)}</span>
@@ -7884,6 +8445,106 @@ export default function App() {
                   <button
                     type="submit"
                     className="flex-1 bg-orange-500 hover:bg-orange-600 text-white py-2 rounded-lg text-xs font-bold font-mono cursor-pointer shadow-md"
+                  >
+                    Salvar Alterações
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ==========================================
+          MODAL: EDIT REPRESENTATIVE (CRUD UPDATE)
+          ========================================== */}
+      <AnimatePresence>
+        {representativeParaEditar && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm" id="modal-edit-representative">
+            <motion.div 
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white rounded-xl shadow-2xl border border-slate-200 max-w-sm w-full p-5 max-h-[90vh] overflow-y-auto"
+            >
+              <div className="flex justify-between items-start mb-4 border-b border-slate-100 pb-2">
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900 uppercase font-mono tracking-tight">
+                    [Editar Representante: {representativeParaEditar.id}]
+                  </h3>
+                  <span className="text-[10px] text-slate-400 font-mono">Atualize os dados cadastrais da equipe de vendas da rua</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setRepresentativeParaEditar(null)}
+                  className="text-slate-400 hover:text-slate-600 font-bold py-1 px-2 rounded hover:bg-slate-100 cursor-pointer text-xs font-mono"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <form onSubmit={handleEditarRepresentanteSubmit} className="space-y-3.5 font-mono">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                    Nome do Representante *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={editRepNome}
+                    onChange={(e) => setEditRepNome(e.target.value)}
+                    className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded-lg p-2.5 text-xs focus:ring-2 focus:ring-orange-500 font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                    Contato Celular / WhatsApp
+                  </label>
+                  <input
+                    type="text"
+                    value={editRepTelefone}
+                    onChange={(e) => setEditRepTelefone(e.target.value)}
+                    className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded-lg p-2.5 text-xs focus:ring-2 focus:ring-orange-500 font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                    E-mail do Representante
+                  </label>
+                  <input
+                    type="email"
+                    value={editRepEmail}
+                    onChange={(e) => setEditRepEmail(e.target.value)}
+                    className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded-lg p-2.5 text-xs focus:ring-2 focus:ring-orange-500 font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                    Chave PIX Registrada *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={editRepPix}
+                    onChange={(e) => setEditRepPix(e.target.value)}
+                    className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded-lg p-2.5 text-xs focus:ring-2 focus:ring-orange-500 font-mono font-bold"
+                  />
+                </div>
+
+                <div className="flex gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setRepresentativeParaEditar(null)}
+                    className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 py-2 rounded-lg text-xs font-bold cursor-pointer"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="flex-1 bg-orange-500 hover:bg-orange-600 text-white py-2 rounded-lg text-xs font-bold cursor-pointer shadow-md"
                   >
                     Salvar Alterações
                   </button>

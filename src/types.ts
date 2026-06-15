@@ -22,6 +22,16 @@ export interface Cliente {
   criadoEm: string;
   isSelfRegistered?: boolean; // Highlight self-registered B2B clients in green
   motoboysAtivos?: number; // Quantidade de motoboys ativos cadastrados/viculados
+  indicadoPorRepId?: string; // ID do representante comercial que indicou este parceiro
+}
+
+export interface Representante {
+  id: string;
+  nome: string;
+  telefone: string;
+  email: string;
+  pix: string;
+  criadoEm: string;
 }
 
 export interface Motoboy {
