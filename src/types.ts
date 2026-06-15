@@ -23,6 +23,7 @@ export interface Cliente {
   isSelfRegistered?: boolean; // Highlight self-registered B2B clients in green
   motoboysAtivos?: number; // Quantidade de motoboys ativos cadastrados/viculados
   indicadoPorRepId?: string; // ID do representante comercial que indicou este parceiro
+  primeiroAcessoPendente?: boolean; // Se True, força o parceiro a mudar a senha provisória no primeiro acesso
 }
 
 export interface Representante {

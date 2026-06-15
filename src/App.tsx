@@ -318,6 +318,11 @@ export default function App() {
   const [firstAccessSenha, setFirstAccessSenha] = useState<string>('');
   const [firstAccessError, setFirstAccessError] = useState<string>('');
 
+  // --- STATES FOR FIRST ACCESS CHANGE PROVISIONAL PASSWORD ---
+  const [partnerNewPassword, setPartnerNewPassword] = useState<string>('');
+  const [partnerConfirmPassword, setPartnerConfirmPassword] = useState<string>('');
+  const [partnerChangePasswordError, setPartnerChangePasswordError] = useState<string>('');
+
   // --- STATE FOR CLIENT PORTAL REGISTERING NEW CLIENTS ---
   const [isClientAddingNewClient, setIsClientAddingNewClient] = useState<boolean>(false);
   const [clientNewClientNome, setClientNewClientNome] = useState<string>('');
@@ -1611,8 +1616,12 @@ export default function App() {
       alert("Por favor, preencha o E-mail de cadastro da distribuidora.");
       return;
     }
+    if (!newClientSenha.trim()) {
+      alert("Por favor, informe a Senha Provisória do parceiro para o Primeiro Acesso.");
+      return;
+    }
 
-    const tempSenha = `temp-${Math.floor(100000 + Math.random() * 900000)}`;
+    const finalSenha = newClientSenha.trim();
 
     const novoCli: Cliente = {
       id: `CLI-${newClientQuadrante}-${Math.floor(1000 + Math.random() * 9000)}`,
@@ -1624,10 +1633,11 @@ export default function App() {
       cep: newClientCEP,
       valorPagoMotoboy: Number(newClientValorPagoMotoboy) || 4.00,
       valorCobradoCliente: Number(newClientValorCobradoCliente) || 10.00,
-      senha: tempSenha, // temporary fallback password
+      senha: finalSenha, 
       email: newClientEmail,
-      emailConfirmado: false, // Will be activated/confirmed upon full registration/self activation
-      cadastroCompleto: false, // Explicitly false! Trigger B2B onboarding setup on first login/access!
+      emailConfirmado: true, // Auto-confirmed / no email activation token needed
+      cadastroCompleto: true, // Already marked as complete so they can login directly
+      primeiroAcessoPendente: true, // Marked for forcing password update on login
       criadoPor: source,
       criadoEm: new Date().toISOString(),
       motoboysAtivos: Number(newClientMotoboysAtivos) || 0,
@@ -1642,9 +1652,9 @@ export default function App() {
     const clientEmailEntry = {
       id: `EML-${Math.floor(1005 + Math.random() * 8990)}`,
       para: novoCli.email,
-      assunto: `🔑 Ativação de Cadastro B2B - ${novoCli.nome}`,
-      corpo: `Olá, ${novoCli.nome}!\n\nSua empresa foi pré-cadastrada com sucesso nas rotas agregadas da TorqueLog.\n\nPara realizar o seu auto-cadastro final, definir sua senha e habilitar o faturamento por CNPJ, acesse a área de login, selecione o Perfil "Cliente B2B", escolha o nome "${novoCli.nome}" na lista e tente entrar.\n\nO sistema abrirá a tela de Primeiro Acesso para você concluir o faturamento por CNPJ de forma descomplicada.\n\nSeu Código de Segurança / Token de Primeiro Acesso é: ${tempSenha}\n\nAtenciosamente,\nSuporte Técnico TorqueLog`,
-      codigo: tempSenha,
+      assunto: `🔑 Acesso Autorizado B2B - ${novoCli.nome}`,
+      corpo: `Olá, ${novoCli.nome}!\n\nSua empresa foi cadastrada com sucesso nas rotas agregadas da TorqueLog.\n\nSeu acesso ao Portal está liberado sem necessidade de verificação por e-mail!\n\nPara acessar seu Painel:\n1. Acesse a tela de login.\n2. Escolha o Perfil "Cliente B2B".\n3. Selecione o nome "${novoCli.nome}" na lista.\n4. Insira a Senha Provisória definida pelo administrador:\n\n🔑 Senha Provisória: ${finalSenha}\n\nAo entrar, você definirá sua senha definitiva.\n\nAtenciosamente,\nSuporte Técnico TorqueLog`,
+      codigo: finalSenha,
       data: new Date().toLocaleTimeString(),
       lido: false
     };
@@ -1661,12 +1671,12 @@ export default function App() {
         console.log(`Starting real Supabase Auth signUp pre-registration for ${novoCli.email}...`);
         const { data: authData, error: authError } = await supabase.auth.signUp({
           email: novoCli.email,
-          password: tempSenha,
+          password: finalSenha,
           options: {
             data: {
               nome: novoCli.nome,
               id_cliente: novoCli.id,
-              cadastro_completo: false
+              cadastro_completo: true
             }
           }
         });
@@ -2222,6 +2232,49 @@ export default function App() {
         setLoginError(`Senha incorreta para ${selected.nome} (Dica: ${actualPW})`);
       }
     }
+  };
+
+  const handleAtualizarSenhaPrimeiroAcesso = async () => {
+    if (!partnerNewPassword.trim()) {
+      setPartnerChangePasswordError('Por favor, informe a nova senha desejada.');
+      return;
+    }
+    if (partnerNewPassword.trim().length < 4) {
+      setPartnerChangePasswordError('A nova senha deve possuir pelo menos 4 caracteres por segurança.');
+      return;
+    }
+    if (partnerNewPassword.trim() === partnerConfirmPassword.trim()) {
+      // Validated
+    } else {
+      setPartnerChangePasswordError('As senhas digitadas não coincidem.');
+      return;
+    }
+
+    const novaSenhaLimpa = partnerNewPassword.trim();
+
+    // Update in state list
+    setClientes(prev => prev.map(c => {
+      if (c.id === activeClienteUser?.id) {
+        return {
+          ...c,
+          senha: novaSenhaLimpa,
+          primeiroAcessoPendente: false
+        };
+      }
+      return c;
+    }));
+
+    // Update active user state so the modal closes!
+    setActiveClienteUser(prev => prev ? {
+      ...prev,
+      senha: novaSenhaLimpa,
+      primeiroAcessoPendente: false
+    } : null);
+
+    setPartnerNewPassword('');
+    setPartnerConfirmPassword('');
+    setPartnerChangePasswordError('');
+    alert('Senha cadastrada com sucesso! Seu acesso definitivo está ativo e liberado.');
   };
 
   // Envia código de autenticação por e-mail para o autocadastro de cliente novo
@@ -4372,6 +4425,14 @@ export default function App() {
                         {cli.email && (
                           <div className="mt-1 ml-0.5 flex flex-wrap items-center gap-2 text-[9px] font-mono">
                             <span className="text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">📧 {cli.email}</span>
+                            <span className="text-slate-800 bg-orange-100 hover:bg-orange-200 px-1.5 py-0.5 rounded border border-orange-200 font-bold flex items-center gap-1 shrink-0" title="Senha atual do cliente no sistema">
+                              🔑 Senha: <strong className="text-slate-950 font-sans font-black tracking-wide">{cli.senha || 'Sem Senha'}</strong>
+                            </span>
+                            {cli.primeiroAcessoPendente && (
+                              <span className="bg-rose-100 text-rose-800 font-extrabold uppercase px-1.5 py-0.5 rounded text-[8px] border border-rose-300">
+                                ⏳ Temp
+                              </span>
+                            )}
                             {cli.emailConfirmado ? (
                               <span className="bg-emerald-100 text-emerald-800 font-black uppercase tracking-wider px-1.5 py-0.5 rounded text-[8px] border border-emerald-300 flex items-center gap-1">
                                 ● Ativo B2B
@@ -6160,6 +6221,78 @@ export default function App() {
           ========================================== */}
       {effectiveRole === 'Cliente' && (
         <main className="max-w-7xl mx-auto p-4 lg:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 flex-1 w-full" id="cliente-main">
+          
+          {/* MODAL PARA ATUALIZAÇÃO REQUERIDA DE SENHA NO PRIMEIRO ACESSO */}
+          {activeClienteUser?.primeiroAcessoPendente === true && (
+            <div className="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center bg-slate-900/90 backdrop-blur-md p-4 animate-fade-in" id="modal-primeiro-acesso-senha">
+              <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl border border-slate-200 overflow-hidden transform transition-all duration-300 scale-100 p-6 md:p-8 space-y-6">
+                
+                <div className="text-center space-y-2">
+                  <div className="mx-auto w-16 h-16 bg-orange-100 text-orange-600 rounded-full flex items-center justify-center text-3xl shadow-sm animate-bounce">
+                    🔑
+                  </div>
+                  <h2 className="text-xl font-extrabold text-slate-900 font-sans tracking-tight">
+                    Cadastrar Nova Senha de Acesso
+                  </h2>
+                  <p className="text-xs text-slate-500 font-mono">
+                    Parceiro {activeClienteUser?.nome} • Primeiro Acesso Requerido
+                  </p>
+                </div>
+
+                <div className="bg-orange-50 border border-orange-200 text-orange-850 rounded-xl p-3.5 text-xs font-mono leading-relaxed space-y-1">
+                  <span className="font-bold block text-[10px] uppercase">🛡️ AVISO DE CREDENCIAIS</span>
+                  <p>Por motivos de segurança cibernética, você deve substituir a senha provisória definida pelo administrador por uma nova senha definitiva e exclusiva.</p>
+                </div>
+
+                {partnerChangePasswordError && (
+                  <div className="p-3 bg-red-50 border border-red-250 text-red-750 rounded-lg text-xs font-mono font-bold leading-normal">
+                    ⚠️ {partnerChangePasswordError}
+                  </div>
+                )}
+
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 uppercase font-mono mb-1">
+                      Nova Senha Definitiva *
+                    </label>
+                    <input
+                      type="password"
+                      value={partnerNewPassword}
+                      onChange={(e) => setPartnerNewPassword(e.target.value)}
+                      placeholder="Mínimo de 4 caracteres"
+                      className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded-lg p-2.5 text-xs focus:ring-2 focus:ring-orange-500 focus:border-orange-500 font-mono outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 uppercase font-mono mb-1">
+                      Confirme sua Nova Senha *
+                    </label>
+                    <input
+                      type="password"
+                      value={partnerConfirmPassword}
+                      onChange={(e) => setPartnerConfirmPassword(e.target.value)}
+                      placeholder="Redigite a senha acima"
+                      className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded-lg p-2.5 text-xs focus:ring-2 focus:ring-orange-500 focus:border-orange-500 font-mono outline-none"
+                    />
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleAtualizarSenhaPrimeiroAcesso}
+                    className="w-full bg-slate-900 hover:bg-slate-950 text-white font-mono font-bold text-xs py-3 rounded-lg transition duration-150 cursor-pointer shadow-md uppercase tracking-wider scale-100 hover:scale-[1.01]"
+                  >
+                    Salvar Senha e Liberar Painel 🚀
+                  </button>
+                  
+                  <div className="text-center font-mono text-[9px] text-slate-400">
+                    A TorqueLog nunca solicita suas chaves de acesso fora do portal oficial.
+                  </div>
+                </div>
+
+              </div>
+            </div>
+          )}
           
           {/* Welcome and client quick stats */}
           <div className="lg:col-span-12 bg-slate-900 text-white rounded-2xl border border-slate-800 p-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 shadow-md shadow-orange-500/5">
@@ -8063,7 +8196,7 @@ export default function App() {
                       value={newClientCEP}
                       onChange={(e) => handleCEPChange(e.target.value, 'newClient')}
                       placeholder="Ex: 37900-124"
-                      className="flex-1 bg-slate-50 text-slate-900 border border-slate-200 rounded-lg p-2.5 text-xs focus:ring-2 focus:ring-orange-500 focus:border-orange-500 font-mono"
+                      className="flex-1 bg-slate-50 text-slate-900 border border-slate-205 rounded-lg p-2.5 text-xs focus:ring-2 focus:ring-orange-500 focus:border-orange-500 font-mono"
                     />
                     <button
                       type="button"
@@ -8108,21 +8241,36 @@ export default function App() {
                   <span className="text-[10px] font-black text-emerald-600 uppercase font-mono tracking-wider block">
                     📬 CONTROLE DE PRIMEIRO ACESSO DO CLIENTE
                   </span>
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 uppercase mb-1 font-mono">
-                      E-mail de Cadastro do Cliente *
-                    </label>
-                    <input
-                      type="email"
-                      required
-                      value={newClientEmail}
-                      onChange={(e) => setNewClientEmail(e.target.value)}
-                      placeholder="Ex: contato@mecanicab2b.com"
-                      className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded-lg p-2.5 text-xs focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 font-mono"
-                    />
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 uppercase mb-1 font-mono">
+                        E-mail de Cadastro do Cliente *
+                      </label>
+                      <input
+                        type="email"
+                        required
+                        value={newClientEmail}
+                        onChange={(e) => setNewClientEmail(e.target.value)}
+                        placeholder="Ex: contato@mecanicab2b.com"
+                        className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded-lg p-2.5 text-xs focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 uppercase mb-1 font-mono">
+                        Senha Provisória de Acesso *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={newClientSenha}
+                        onChange={(e) => setNewClientSenha(e.target.value)}
+                        placeholder="Ex: torque2026"
+                        className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded-lg p-2.5 text-xs focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 font-mono"
+                      />
+                    </div>
                   </div>
                   <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 text-[10px] p-2.5 rounded-lg font-mono leading-relaxed">
-                    ⚙️ <strong>Primeiro Acesso Automatizado:</strong> O cliente receberá um link de confirmação de cadastro e, ao acessar o aplicativo pela primeira vez, completará todos os dados da empresa (CNPJ, endereço, telefone) e cadastrará uma senha nova e segura de sua própria escolha para acessar o sistema.
+                    ⚙️ <strong>Sem Verificação de E-mail:</strong> O parceiro poderá fazer o login inserindo a <strong>Senha Provisória</strong> diretamente sem necessidade de confirmação por e-mail. Ao entrar pela primeira vez no painel deles, uma tela será exibida para ele cadastrar sua senha definitiva de preferência.
                   </div>
                 </div>
 
