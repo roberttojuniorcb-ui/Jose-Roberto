@@ -899,7 +899,7 @@ export default function App() {
   }, [motoboys]);
 
   // Login form field states
-  const [loginRole, setLoginRole] = useState<'Empresa' | 'Motoboy' | 'Cliente'>('Empresa');
+  const [loginRole, setLoginRole] = useState<'Empresa' | 'Motoboy' | 'Cliente'>('Cliente');
   const [selectedLoginUserId, setSelectedLoginUserId] = useState<string>('');
   const [loginPasswordInput, setLoginPasswordInput] = useState<string>('');
   const [loginError, setLoginError] = useState<string>('');
@@ -2871,14 +2871,7 @@ export default function App() {
                 {/* Tab switchers */}
                 <div>
                   <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Perfil de Acesso</label>
-                  <div className="grid grid-cols-3 gap-1 bg-slate-950 p-1.5 rounded-xl border border-slate-800">
-                    <button
-                      type="button"
-                      onClick={() => { setLoginRole('Empresa'); setIsSelfRegistering(false); }}
-                      className={`py-2 text-xs font-bold rounded-lg transition-all ${loginRole === 'Empresa' ? 'bg-orange-500 text-white shadow' : 'text-slate-400 hover:text-white'}`}
-                    >
-                      🏢 Admin
-                    </button>
+                  <div className="grid grid-cols-2 gap-1 bg-slate-950 p-1.5 rounded-xl border border-slate-800">
                     <button
                       type="button"
                       onClick={() => { setLoginRole('Motoboy'); setIsSelfRegistering(false); }}
@@ -3072,6 +3065,21 @@ export default function App() {
                     📈 Abrir Proposta e Simulador →
                   </a>
                 </div>
+
+                {/* Botão de Login Administrativo (Admin) */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setLoginRole('Empresa');
+                    setIsSelfRegistering(false);
+                    setLoginPasswordInput('');
+                    setLoginError('');
+                  }}
+                  className="w-full bg-slate-950 hover:bg-slate-900 border border-slate-850 hover:border-slate-700 text-slate-400 hover:text-white transition-all text-[11.5px] font-mono font-bold py-2 px-3 rounded-xl flex items-center justify-center gap-1.5 cursor-pointer shadow-md"
+                  id="btn-admin-login-backdoor"
+                >
+                  🛡️ Login de Administrador (Admin)
+                </button>
 
                 <div className="text-center pt-1">
                   <p className="text-[11px] text-slate-400 font-mono">Qualquer dúvida do cliente ou suporte técnico?</p>
