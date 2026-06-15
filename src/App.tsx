@@ -260,6 +260,7 @@ export default function App() {
   const [clientItemTexto, setClientItemTexto] = useState<string>('Objeto de Envio');
   const [retornoPeca, setRetornoPeca] = useState<boolean>(false);
   const [taxaReversaParam, setTaxaReversaParam] = useState<number>(15.00);
+  const [comissaoRepsPorEntrega, setComissaoRepsPorEntrega] = useState<number>(0.50);
 
   // --- FILTER & CONFIG FOR CLIENT LIST VIEW ---
   const [visualPanelQuadrant, setVisualPanelQuadrant] = useState<Quadrante>('A');
@@ -419,7 +420,7 @@ export default function App() {
 
   // --- ADMIN CITY FILTER & SEARCH ---
   const [selectedAdminCity, setSelectedAdminCity] = useState<string>('Todas');
-  const [adminSubTab, setAdminSubTab] = useState<'logistica' | 'representantes'>('logistica');
+  const [adminSubTab, setAdminSubTab] = useState<'logistica' | 'representantes' | 'taxas'>('logistica');
 
   // --- CLIENT SELF-REGISTRATION STATE ---
   const [isSelfRegistering, setIsSelfRegistering] = useState<boolean>(false);
@@ -3753,31 +3754,43 @@ export default function App() {
                 <p className="text-xs text-slate-400 font-mono">Gerencie a logística de entregas regional ou administre o programa de indicações por representantes comerciaises</p>
               </div>
             </div>
-            <div className="flex bg-slate-950 p-1.5 rounded-xl border border-slate-800 w-full md:w-auto shrink-0 select-none">
-              <button
-                type="button"
-                onClick={() => setAdminSubTab('logistica')}
-                className={`flex-1 md:flex-none px-4 py-2 text-xs font-bold font-mono rounded-lg transition-all duration-150 cursor-pointer ${
-                  adminSubTab === 'logistica'
-                    ? 'bg-orange-500 text-white shadow-md'
-                    : 'text-slate-400 hover:text-white hover:bg-slate-900'
-                }`}
-              >
-                🏍️ Despacho & Logística
-              </button>
-              <button
-                type="button"
-                onClick={() => setAdminSubTab('representantes')}
-                className={`flex-1 md:flex-none px-4 py-2 text-xs font-bold font-mono rounded-lg transition-all duration-150 cursor-pointer ${
-                  adminSubTab === 'representantes'
-                    ? 'bg-orange-500 text-white shadow-md'
-                    : 'text-slate-400 hover:text-white hover:bg-slate-900'
-                }`}
-                id="tab-admin-referrals"
-              >
-                🤝 Programa Indicações (Representative)
-              </button>
-            </div>
+             <div className="flex flex-wrap bg-slate-950 p-1.5 rounded-xl border border-slate-800 w-full md:w-auto shrink-0 select-none gap-1">
+               <button
+                 type="button"
+                 onClick={() => setAdminSubTab('logistica')}
+                 className={`flex-1 md:flex-none px-4 py-2 text-xs font-bold font-mono rounded-lg transition-all duration-150 cursor-pointer ${
+                   adminSubTab === 'logistica'
+                     ? 'bg-orange-500 text-white shadow-md'
+                     : 'text-slate-400 hover:text-white hover:bg-slate-900'
+                 }`}
+               >
+                 🏍️ Despacho & Logística
+               </button>
+               <button
+                 type="button"
+                 onClick={() => setAdminSubTab('representantes')}
+                 className={`flex-1 md:flex-none px-4 py-2 text-xs font-bold font-mono rounded-lg transition-all duration-150 cursor-pointer ${
+                   adminSubTab === 'representantes'
+                     ? 'bg-orange-500 text-white shadow-md'
+                     : 'text-slate-400 hover:text-white hover:bg-slate-900'
+                 }`}
+                 id="tab-admin-referrals"
+               >
+                 🤝 Programa Indicações
+               </button>
+               <button
+                 type="button"
+                 onClick={() => setAdminSubTab('taxas')}
+                 className={`flex-1 md:flex-none px-4 py-2 text-xs font-bold font-mono rounded-lg transition-all duration-150 cursor-pointer ${
+                   adminSubTab === 'taxas'
+                     ? 'bg-orange-500 text-white shadow-md'
+                     : 'text-slate-400 hover:text-white hover:bg-slate-900'
+                 }`}
+                 id="tab-admin-taxas"
+               >
+                 ⚙️ Taxas & Valores
+               </button>
+             </div>
           </div>
         </div>
       )}
@@ -5506,13 +5519,13 @@ export default function App() {
               <div className="font-mono">
                 <h3 className="text-sm font-black text-indigo-900 uppercase tracking-tight">💵 Programa de Indicações TorqueLog Ativo</h3>
                 <p className="text-xs text-indigo-700 mt-1 leading-relaxed">
-                  Seus representantes comerciais atuam prospectando novos parceiros (Distribuidoras B2B). Ao cadastrar uma nova distribuidora associada a um representante, ele passa a receber uma comissão fixa de de <strong>R$ 0,10 por cada entrega concluída</strong> pela distribuidora prospectada, independentemente do entregador que realize o frete.
+                  Seus representantes comerciais atuam prospectando novos parceiros (Distribuidoras B2B). Ao cadastrar uma nova distribuidora associada a um representante, ele passa a receber uma comissão fixa de R$ {comissaoRepsPorEntrega.toFixed(2)} por cada entrega concluída pela distribuidora prospectada, independentemente do entregador que realize o frete.
                 </p>
               </div>
             </div>
             <div className="bg-indigo-900 text-white rounded-xl px-4 py-2.5 font-mono text-center shrink-0">
               <span className="text-[10px] block uppercase text-indigo-300 font-bold">Comissão Fixa</span>
-              <strong className="text-base font-black">R$ 0,10 / Entrega</strong>
+              <strong className="text-base font-black">R$ {comissaoRepsPorEntrega.toFixed(2)} / Entrega</strong>
             </div>
           </div>
 
@@ -5636,7 +5649,7 @@ export default function App() {
                         totalRepDeliveries += count;
                       });
 
-                      const repEarnings = totalRepDeliveries * 0.10;
+                      const repEarnings = totalRepDeliveries * comissaoRepsPorEntrega;
                       const isSelected = selectedRepIdForDetails === rep.id;
 
                       return (
@@ -5757,7 +5770,7 @@ export default function App() {
                     <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-850 text-center">
                       <span className="text-[9px] uppercase tracking-wider text-slate-450 font-mono block">Acumulado a Pagar</span>
                       <strong className="text-lg font-mono text-emerald-400 block mt-0.5">
-                        R$ { (repClients.reduce((acc, cli) => acc + ordens.filter(o => o.status === 'Entregue' && o.clienteId === cli.id).length, 0) * 0.10).toFixed(2) }
+                        R$ { (repClients.reduce((acc, cli) => acc + ordens.filter(o => o.status === 'Entregue' && o.clienteId === cli.id).length, 0) * comissaoRepsPorEntrega).toFixed(2) }
                       </strong>
                     </div>
                   </div>
@@ -5810,7 +5823,7 @@ export default function App() {
                   <div className="space-y-2 max-h-[350px] overflow-y-auto">
                     {repClients.map(cli => {
                       const clientDeliveries = ordens.filter(o => o.status === 'Entregue' && o.clienteId === cli.id).length;
-                      const clientEarning = clientDeliveries * 0.10;
+                      const clientEarning = clientDeliveries * comissaoRepsPorEntrega;
 
                       return (
                         <div key={cli.id} className="bg-slate-50/70 hover:bg-slate-100/80 p-3 rounded-lg border border-slate-200 font-sans flex items-center justify-between text-xs transition">
@@ -5865,6 +5878,168 @@ export default function App() {
 
           </section>
 
+        </main>
+      )}
+
+      {/* ==========================================
+          TAXAS, TARIFAS & REPASSES CONFIG PANEL (VALORES TAB)
+          ========================================== */}
+      {effectiveRole === 'Empresa' && adminSubTab === 'taxas' && (
+        <main className="max-w-7xl mx-auto p-4 lg:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 flex-1 w-full animate-fade-in" id="taxas-config-dashboard">
+          {/* Header Description */}
+          <div className="lg:col-span-12 bg-indigo-950 text-white rounded-2xl border border-indigo-900 p-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 shadow-md">
+            <div>
+              <span className="bg-orange-500 text-white font-mono font-black text-[9px] px-2 py-0.5 rounded uppercase tracking-widest block w-max mb-1.5 animate-pulse">
+                Área de Tarifação
+              </span>
+              <h2 className="text-xl font-extrabold font-sans tracking-tight">
+                ⚙️ Configuração de Taxas, Tarifas e Repasses
+              </h2>
+              <p className="text-xs text-slate-300 mt-1 font-mono">
+                Ajuste os valores operacionais padrão para representantes comerciais, revendas e lógica reversa em tempo real.
+              </p>
+            </div>
+            
+            <div className="flex items-center gap-2 bg-slate-900 border border-slate-800 p-2 rounded-xl shrink-0">
+              <span className="text-xs font-mono font-bold text-slate-400 px-2 border-r border-slate-800">Moeda</span>
+              <strong className="text-sm font-mono text-emerald-400 px-1">BRL (R$)</strong>
+            </div>
+          </div>
+
+          {/* Left Column: Form Controls */}
+          <div className="lg:col-span-6 space-y-6">
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 w-full">
+              <div className="flex items-center gap-2 mb-4 pb-2 border-b border-slate-100">
+                <Coins className="w-5 h-5 text-indigo-600" />
+                <h3 className="text-sm font-bold text-slate-900 uppercase font-mono tracking-tight">Comissão de Representantes</h3>
+              </div>
+
+              <div className="space-y-4 font-mono text-xs">
+                <p className="text-slate-600 leading-relaxed">
+                  Defina o valor repassado ao representante para <strong>cada entrega com status "Entregue"</strong> realizada pelas distribuidoras vinculadas.
+                </p>
+
+                <div className="bg-slate-50 border border-slate-150 rounded-xl p-4 flex items-center justify-between gap-4">
+                  <div>
+                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wide mb-1">
+                      Valor por Entrega (R$)
+                    </label>
+                    <span className="text-[9px] text-slate-400 block mb-2 leading-none">Ajuste o valor no campo ao lado</span>
+                    <strong className="text-2xl font-black text-slate-900 tracking-tight">
+                      R$ {comissaoRepsPorEntrega.toFixed(2)}
+                    </strong>
+                  </div>
+                  <div className="w-32">
+                    <input
+                      type="number"
+                      step="0.05"
+                      min="0.00"
+                      max="10.00"
+                      value={comissaoRepsPorEntrega}
+                      onChange={(e) => {
+                        const val = parseFloat(e.target.value);
+                        setComissaoRepsPorEntrega(isNaN(val) ? 0 : val);
+                      }}
+                      className="w-full bg-white text-slate-900 border border-slate-300 font-bold p-2.5 rounded-lg text-center font-mono text-xs focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div className="bg-indigo-50 border border-indigo-100 p-3 rounded-lg text-indigo-800 font-sans text-xs leading-relaxed flex gap-2.5">
+                  <span className="text-base shrink-0">🛡️</span>
+                  <div>
+                    <strong>Alteração Instantânea:</strong> Ao mudar este valor, todos os cálculos de conciliação acumulada a pagar e relatórios para representantes serão reajustados retroativamente baseado nas ordens de serviço atuais.
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Configuração da Taxa Reversa */}
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 w-full">
+              <div className="flex items-center gap-2 mb-4 pb-2 border-b border-slate-100">
+                <Activity className="w-5 h-5 text-indigo-600" />
+                <h3 className="text-sm font-bold text-slate-900 uppercase font-mono tracking-tight">Taxa Reversa Padrão</h3>
+              </div>
+
+              <div className="space-y-4 font-mono text-xs">
+                <p className="text-slate-600 leading-relaxed">
+                  Defina o valor cobrado por faturamento de logística reversa (retorno de peças) padrão.
+                </p>
+
+                <div className="bg-slate-50 border border-slate-150 rounded-xl p-4 flex items-center justify-between gap-4">
+                  <div>
+                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wide mb-1">
+                      Valor Unitário (R$)
+                    </label>
+                    <span className="text-[9px] text-slate-400 block mb-2 leading-none">Ajuste o valor no campo ao lado</span>
+                    <strong className="text-2xl font-black text-slate-900 tracking-tight">
+                      R$ {taxaReversaParam.toFixed(2)}
+                    </strong>
+                  </div>
+                  <div className="w-32">
+                    <input
+                      type="number"
+                      step="0.5"
+                      min="0.00"
+                      value={taxaReversaParam}
+                      onChange={(e) => {
+                        const val = parseFloat(e.target.value);
+                        setTaxaReversaParam(isNaN(val) ? 0 : val);
+                      }}
+                      className="w-full bg-white text-slate-900 border border-slate-300 font-bold p-2.5 rounded-lg text-center font-mono text-xs focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Right Column: Dynamic Realtime Impact Preview */}
+          <div className="lg:col-span-6">
+            <div className="bg-slate-900 text-white rounded-xl border border-slate-800 p-5 space-y-4 h-full flex flex-col justify-between">
+              <div>
+                <span className="text-[9px] font-mono tracking-widest text-slate-500 block uppercase mb-1">Impacto Financeiro Estimado</span>
+                <h3 className="text-sm font-bold font-mono text-indigo-400 uppercase tracking-tight mb-2 pb-2 border-b border-slate-800">
+                  Simulação de Repasse por Representante
+                </h3>
+                
+                <p className="text-xs text-slate-300 font-mono leading-relaxed mb-4">
+                  Abaixo está a projeção atualizada de pagamentos com base na nova taxa definida de <strong className="text-orange-400 font-bold font-mono">R$ {comissaoRepsPorEntrega.toFixed(2)}</strong>.
+                </p>
+
+                <div className="space-y-3">
+                  {representantes.map(rep => {
+                    const repClients = clientes.filter(c => c.indicadoPorRepId === rep.id);
+                    let totalRepDeliveries = 0;
+                    repClients.forEach(cli => {
+                      const count = ordens.filter(o => o.status === 'Entregue' && o.clienteId === cli.id).length;
+                      totalRepDeliveries += count;
+                    });
+                    const repEarnings = totalRepDeliveries * comissaoRepsPorEntrega;
+
+                    return (
+                      <div key={rep.id} className="bg-slate-950 p-3 rounded-lg border border-slate-850 flex items-center justify-between text-xs font-mono">
+                        <div>
+                          <strong className="text-slate-200 block">{rep.nome}</strong>
+                          <span className="text-[10px] text-slate-500 block mt-0.5">
+                            💼 {repClients.length} distribuidora(s) • 📦 {totalRepDeliveries} entrega(s)
+                          </span>
+                        </div>
+                        <div className="text-right">
+                          <span className="text-[10px] text-slate-500 block leading-tight">Comissão acumulada</span>
+                          <span className="text-sm font-black text-emerald-400">R$ {repEarnings.toFixed(2)}</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="bg-slate-950 p-3.5 rounded-lg border border-slate-850 font-mono text-[10px] text-slate-500 leading-relaxed mt-4">
+                💡 <strong>Automação de Recálculos:</strong> O motor de faturamento do TorqueLog atualiza ciclicamente todas as projeções exibidas nesta tela sem necessidade de salvar as alterações manualmente no banco de dados local.
+              </div>
+            </div>
+          </div>
         </main>
       )}
 
@@ -8347,7 +8522,7 @@ export default function App() {
                       <option value="">Nenhum (Sem Indicação)</option>
                       {representantes.map(rep => (
                         <option key={rep.id} value={rep.id}>
-                          {rep.nome} (comissão R$ 0,10 / entrega)
+                          {rep.nome} (comissão R$ {comissaoRepsPorEntrega.toFixed(2)} / entrega)
                         </option>
                       ))}
                     </select>
@@ -8634,7 +8809,7 @@ export default function App() {
                       <option value="">Nenhum (Sem Indicação)</option>
                       {representantes.map(rep => (
                         <option key={rep.id} value={rep.id}>
-                          {rep.nome} (comissão R$ 0,10 / entrega)
+                          {rep.nome} (comissão R$ {comissaoRepsPorEntrega.toFixed(2)} / entrega)
                         </option>
                       ))}
                     </select>
