@@ -393,7 +393,7 @@ export default function App() {
   const [editMotoboyVeiculo, setEditMotoboyVeiculo] = useState<string>('Moto');
 
   // --- STATES FOR EXCLUSION CONFIRMATION ---
-  const [deleteConfirmType, setDeleteConfirmType] = useState<'cliente' | 'motoboy' | 'multiple-clientes' | 'ordem' | null>(null);
+  const [deleteConfirmType, setDeleteConfirmType] = useState<'cliente' | 'motoboy' | 'multiple-clientes' | 'ordem' | 'representante' | 'desvincular-cliente' | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [deleteConfirmName, setDeleteConfirmName] = useState<string>('');
   const [selectedClientIds, setSelectedClientIds] = useState<string[]>([]);
@@ -1813,16 +1813,9 @@ export default function App() {
   const handleDeletarRepresentante = (id: string) => {
     const rep = representantes.find(r => r.id === id);
     if (!rep) return;
-    if (confirm(`Tem certeza que deseja remover o representante ${rep.nome}? Os parceiros indicados por ele ficarão sem representante associado.`)) {
-      setRepresentantes(prev => prev.filter(r => r.id !== id));
-      // update clients who were linked to this representative to have no representative
-      setClientes(prev => prev.map(c => c.indicadoPorRepId === id ? { ...c, indicadoPorRepId: undefined } : c));
-      if (selectedRepIdForDetails === id) {
-        setSelectedRepIdForDetails('');
-      }
-      setSupabaseSuccessMsg(`🗑️ Representante excluído com sucesso!`);
-      setTimeout(() => setSupabaseSuccessMsg(''), 3000);
-    }
+    setDeleteConfirmType('representante');
+    setDeleteConfirmId(id);
+    setDeleteConfirmName(rep.nome);
   };
 
   const handleEditarRepresentanteSubmit = (e: React.FormEvent) => {
@@ -2017,6 +2010,27 @@ export default function App() {
         }
 
         setSupabaseSuccessMsg(`❌ Entrega "${ordemId}" cancelada com sucesso!`);
+        setTimeout(() => setSupabaseSuccessMsg(''), 4000);
+      }
+    } else if (deleteConfirmType === 'representante') {
+      const repId = deleteConfirmId;
+      const targetRep = representantes.find(r => r.id === repId);
+      if (targetRep) {
+        setRepresentantes(prev => prev.filter(r => r.id !== repId));
+        // update clients who were linked to this representative to have no representative
+        setClientes(prev => prev.map(c => c.indicadoPorRepId === repId ? { ...c, indicadoPorRepId: undefined } : c));
+        if (selectedRepIdForDetails === repId) {
+          setSelectedRepIdForDetails('');
+        }
+        setSupabaseSuccessMsg(`🗑️ Representante "${targetRep.nome}" excluído com sucesso!`);
+        setTimeout(() => setSupabaseSuccessMsg(''), 4000);
+      }
+    } else if (deleteConfirmType === 'desvincular-cliente') {
+      const clientId = deleteConfirmId;
+      const targetCli = clientes.find(c => c.id === clientId);
+      if (targetCli) {
+        setClientes(prev => prev.map(c => c.id === clientId ? { ...c, indicadoPorRepId: undefined } : c));
+        setSupabaseSuccessMsg(`💔 Vínculo de indicação do parceiro "${targetCli.nome}" removido com sucesso!`);
         setTimeout(() => setSupabaseSuccessMsg(''), 4000);
       }
     }
@@ -5734,11 +5748,9 @@ export default function App() {
                             <button
                               type="button"
                               onClick={() => {
-                                if (confirm(`Deseja desassociar a empresa ${cli.nome} do representante ${rep.nome}?`)) {
-                                  setClientes(prev => prev.map(c => c.id === cli.id ? { ...c, indicadoPorRepId: undefined } : c));
-                                  setSupabaseSuccessMsg(`💔 Vínculo de indicação removido com sucesso.`);
-                                  setTimeout(() => setSupabaseSuccessMsg(''), 3000);
-                                }
+                                setDeleteConfirmType('desvincular-cliente');
+                                setDeleteConfirmId(cli.id);
+                                setDeleteConfirmName(`${cli.nome} (do Representante: ${rep.nome})`);
                               }}
                               className="text-[9.5px] text-rose-500 hover:underline block ml-auto mt-1 cursor-pointer font-bold font-mono"
                             >
@@ -8775,13 +8787,24 @@ export default function App() {
                 <Trash2 className="w-6 h-6" />
               </div>
               <h3 className="text-sm font-bold text-slate-100 uppercase font-mono tracking-tight mb-2">
-                Confirmar Exclusão ⚠️
+                {deleteConfirmType === 'desvincular-cliente' ? 'Desvincular Indicação 💔' : deleteConfirmType === 'ordem' ? 'Cancelar Entrega ⚠️' : 'Confirmar Exclusão ⚠️'}
               </h3>
               <p className="text-xs text-slate-400 mb-6 font-sans text-center">
-                Tem certeza que deseja excluir permanentemente o cadastro de{" "}
+                {deleteConfirmType === 'desvincular-cliente' ? (
+                  <span>Deseja realmente desvincular as indicações e repasses futuros do parceiro:</span>
+                ) : deleteConfirmType === 'ordem' ? (
+                  <span>Tem certeza de que deseja cancelar a entrega de código:</span>
+                ) : (
+                  <span>Tem certeza que deseja excluir permanentemente o cadastro de:</span>
+                )}
                 <strong className="text-white font-mono break-all font-bold block mt-1.5 bg-slate-950 p-2 rounded border border-slate-850">
                   {deleteConfirmName || deleteConfirmId}
                 </strong>
+                {deleteConfirmType === 'representante' && (
+                  <span className="text-[10px] text-orange-400 block mt-2 font-mono">
+                    ⚠️ Atenção: Todos os parceiros indicados por este representante ficarão sem indicação associada.
+                  </span>
+                )}
               </p>
               <div className="flex gap-2.5">
                 <button
