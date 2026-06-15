@@ -261,6 +261,7 @@ export default function App() {
   const [retornoPeca, setRetornoPeca] = useState<boolean>(false);
   const [taxaReversaParam, setTaxaReversaParam] = useState<number>(15.00);
   const [comissaoRepsPorEntrega, setComissaoRepsPorEntrega] = useState<number>(0.50);
+  const [cepErrorState, setCepErrorState] = useState<{ [key: string]: string }>({});
 
   // --- FILTER & CONFIG FOR CLIENT LIST VIEW ---
   const [visualPanelQuadrant, setVisualPanelQuadrant] = useState<Quadrante>('A');
@@ -2055,7 +2056,16 @@ export default function App() {
   // --- INTEGRATED VIA CEP LOOKUP ENGINE (AUTO-RESOLVE ADRESS/CITY) ---
   const handleFetchCEP = async (cep: string, target: 'selfReg' | 'newClient' | 'editClient' | 'clientNewClient' | 'firstAccess') => {
     const cleanedCEP = cep.replace(/\D/g, '');
-    if (cleanedCEP.length !== 8) return;
+    
+    // Regex validation to ensure only digits exist and it has exactly 8 characters
+    const cepPattern = /^\d{8}$/;
+    if (!cepPattern.test(cleanedCEP)) {
+      setCepErrorState(prev => ({ ...prev, [target]: 'CEP incorreto. Deve conter exatamente 8 algarismos.' }));
+      return;
+    }
+
+    // Reset error state for this target
+    setCepErrorState(prev => ({ ...prev, [target]: '' }));
 
     if (target === 'selfReg') setIsFetchingCEP(true);
     else if (target === 'newClient') setIsFetchingNewClientCEP(true);
@@ -2065,6 +2075,9 @@ export default function App() {
 
     try {
       const response = await fetch(`https://viacep.com.br/ws/${cleanedCEP}/json/`);
+      if (!response.ok) {
+        throw new Error('Falha de resposta da API');
+      }
       const data = await response.json();
       if (!data.erro) {
         const fullAddress = `${data.logradouro}${data.bairro ? `, ${data.bairro}` : ''}`;
@@ -2087,9 +2100,11 @@ export default function App() {
           setFirstAccessCidade(cityState);
         }
       } else {
+        setCepErrorState(prev => ({ ...prev, [target]: 'CEP não cadastrado ou inexistente.' }));
         console.warn("CEP não encontrado no ViaCEP.");
       }
     } catch (err) {
+      setCepErrorState(prev => ({ ...prev, [target]: 'Falha ao consultar CEP na API ViaCEP.' }));
       console.error("Erro ao buscar CEP via ViaCEP API:", err);
     } finally {
       if (target === 'selfReg') setIsFetchingCEP(false);
@@ -2101,6 +2116,9 @@ export default function App() {
   };
 
   const handleCEPChange = (val: string, target: 'selfReg' | 'newClient' | 'editClient' | 'clientNewClient' | 'firstAccess') => {
+    // Regex validation to check for invalid characters (only allows digits, spaces, and hyphens)
+    const hasInvalidChar = /[^\d\s-]/.test(val);
+    
     let formatted = val.replace(/\D/g, '');
     if (formatted.length > 8) formatted = formatted.slice(0, 8);
     
@@ -2109,30 +2127,46 @@ export default function App() {
       displayVal = `${formatted.slice(0, 5)}-${formatted.slice(5)}`;
     }
 
+    if (hasInvalidChar) {
+      setCepErrorState(prev => ({ ...prev, [target]: 'Apenas números são permitidos para processamento.' }));
+    } else {
+      setCepErrorState(prev => ({ ...prev, [target]: '' }));
+    }
+
     if (target === 'selfReg') {
       setSelfRegCEP(displayVal);
       if (formatted.length === 8) {
         handleFetchCEP(formatted, 'selfReg');
+      } else if (formatted.length > 0 && formatted.length < 8) {
+        setCepErrorState(prev => ({ ...prev, [target]: 'Formato incorreto. O CEP deve possuir 8 dígitos.' }));
       }
     } else if (target === 'newClient') {
       setNewClientCEP(displayVal);
       if (formatted.length === 8) {
         handleFetchCEP(formatted, 'newClient');
+      } else if (formatted.length > 0 && formatted.length < 8) {
+        setCepErrorState(prev => ({ ...prev, [target]: 'Formato incorreto. O CEP deve possuir 8 dígitos.' }));
       }
     } else if (target === 'editClient') {
       setEditClientCEP(displayVal);
       if (formatted.length === 8) {
         handleFetchCEP(formatted, 'editClient');
+      } else if (formatted.length > 0 && formatted.length < 8) {
+        setCepErrorState(prev => ({ ...prev, [target]: 'Formato incorreto. O CEP deve possuir 8 dígitos.' }));
       }
     } else if (target === 'clientNewClient') {
       setClientNewClientCEP(displayVal);
       if (formatted.length === 8) {
         handleFetchCEP(formatted, 'clientNewClient');
+      } else if (formatted.length > 0 && formatted.length < 8) {
+        setCepErrorState(prev => ({ ...prev, [target]: 'Formato incorreto. O CEP deve possuir 8 dígitos.' }));
       }
     } else if (target === 'firstAccess') {
       setFirstAccessCEP(displayVal);
       if (formatted.length === 8) {
         handleFetchCEP(formatted, 'firstAccess');
+      } else if (formatted.length > 0 && formatted.length < 8) {
+        setCepErrorState(prev => ({ ...prev, [target]: 'Formato incorreto. O CEP deve possuir 8 dígitos.' }));
       }
     }
   };
@@ -2885,6 +2919,9 @@ export default function App() {
                         {isFetchingCEP ? '...' : '🔍 Buscar'}
                       </button>
                     </div>
+                    {cepErrorState['selfReg'] && (
+                      <p className="text-red-400 text-[10px] font-mono mt-1 text-left">⚠️ {cepErrorState['selfReg']}</p>
+                    )}
                   </div>
 
                   <div>
@@ -8208,6 +8245,9 @@ export default function App() {
                       {isClientFetchingNewClientCEP ? '...' : '🔍 Buscar CEP'}
                     </button>
                   </div>
+                  {cepErrorState['clientNewClient'] && (
+                    <p className="text-red-500 text-[10px] font-mono mt-1 text-left">⚠️ {cepErrorState['clientNewClient']}</p>
+                  )}
                 </div>
 
                 <div>
@@ -8382,6 +8422,9 @@ export default function App() {
                       {isFetchingNewClientCEP ? '...' : '🔍 Buscar CEP'}
                     </button>
                   </div>
+                  {cepErrorState['newClient'] && (
+                    <p className="text-red-500 text-[10px] font-mono mt-1 text-left">⚠️ {cepErrorState['newClient']}</p>
+                  )}
                 </div>
 
                 <div>
@@ -8677,6 +8720,9 @@ export default function App() {
                       {isFetchingEditClientCEP ? '...' : '🔍 Buscar CEP'}
                     </button>
                   </div>
+                  {cepErrorState['editClient'] && (
+                    <p className="text-red-500 text-[10px] font-mono mt-1 text-left">⚠️ {cepErrorState['editClient']}</p>
+                  )}
                 </div>
 
                 <div>
@@ -9447,6 +9493,9 @@ export default function App() {
                             {isFetchingFirstAccessCEP ? '...' : '🔍 Buscar'}
                           </button>
                         </div>
+                        {cepErrorState['firstAccess'] && (
+                          <p className="text-red-400 text-[10px] font-mono mt-1 text-left">⚠️ {cepErrorState['firstAccess']}</p>
+                        )}
                       </div>
                       <div>
                         <label className="block text-[10px] font-bold text-slate-300 uppercase mb-1 font-mono text-left">Cidade / UF *</label>
