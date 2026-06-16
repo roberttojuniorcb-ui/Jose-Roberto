@@ -38,6 +38,16 @@
             color: #f1f5f9;
         }
     </style>
+    <script>
+        // Imunidade à Flash de Tamanho Incorreto: Aplica o tamanho de raiz correto de forma síncrona
+        (function() {
+            const saved = localStorage.getItem('proposta_scale_mode');
+            const isDesktop = window.innerWidth >= 1024 && !('ontouchstart' in window || navigator.maxTouchPoints > 0);
+            const defaultMode = saved || (isDesktop ? 'pc' : 'mobile');
+            document.documentElement.style.fontSize = (defaultMode === 'pc') ? '18px' : '15px';
+            document.documentElement.classList.add(defaultMode === 'pc' ? 'pc-mode' : 'mobile-mode');
+        })();
+    </script>
 </head>
 <body class="min-h-screen text-slate-200 antialiased selection:bg-orange-500 selection:text-white pb-16">
 
@@ -46,7 +56,27 @@
     <div class="absolute top-1/3 right-10 w-[500px] h-[500px] rounded-full bg-emerald-600/5 blur-[150px] pointer-events-none"></div>
 
     <!-- MAIN WRAPPER CONTAINER -->
-    <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-8">
+    <div class="max-w-6xl lg:max-w-7xl xl:max-w-[1360px] 2xl:max-w-[1536px] mx-auto px-4 sm:px-6 lg:px-8 pt-6 transition-all duration-350">
+
+        <!-- ADAPTIVE DEVICE OPTIMIZATION CONTROL BAR -->
+        <div class="flex flex-col sm:flex-row justify-between items-center bg-slate-900/60 backdrop-blur-md rounded-2xl border border-slate-800/80 px-5 py-3 shadow-2xl mb-4 gap-3 text-xs w-full">
+            <div class="flex items-center gap-2.5 text-slate-300 font-mono">
+                <span class="relative flex h-2 w-2">
+                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75"></span>
+                    <span class="relative inline-flex rounded-full h-2 w-2 bg-orange-500"></span>
+                </span>
+                <span>Modo de Exibição Ativo:</span>
+                <strong id="display-detected-device" class="text-orange-400 font-bold uppercase font-mono">Detectando...</strong>
+            </div>
+            <div class="flex items-center gap-1.5 bg-slate-950 border border-slate-850 p-1 rounded-xl">
+                <button onclick="applyScaling('mobile')" id="btn-scale-mobile" class="px-3.5 py-1.5 rounded-lg text-xs font-bold font-mono transition duration-200">
+                    📱 Celular (Compacto)
+                </button>
+                <button onclick="applyScaling('pc')" id="btn-scale-pc" class="px-3.5 py-1.5 rounded-lg text-xs font-bold font-mono transition duration-200">
+                    🖥️ Computador (Ampliado)
+                </button>
+            </div>
+        </div>
 
         <!-- HEADER BRANDING -->
         <header class="flex flex-col sm:flex-row justify-between items-center bg-slate-900/80 backdrop-blur-md rounded-2xl border border-slate-800/80 p-5 shadow-2xl mb-12">
@@ -76,10 +106,18 @@
             </div>
             
             <!-- FAST CTAS -->
-            <div class="flex items-center gap-3">
+            <div class="flex flex-wrap items-center justify-center sm:justify-end gap-3">
+                <a href="/proposta_comercial.html" download="proposta_comercial_torquelog.html" class="text-xs font-mono px-4 py-2.5 rounded-xl bg-orange-600 hover:bg-orange-500 text-white font-bold transition flex items-center gap-1.5 shadow-lg shadow-orange-600/15" title="Baixar proposta em formato HTML para acesso offline">
+                    <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                    <span>Baixar Proposta 💾</span>
+                </a>
+
                 <a href="mailto:administracao@torquelog.com.br" class="text-xs font-mono px-4 py-2.5 rounded-xl bg-slate-950 hover:bg-slate-900 border border-slate-800 text-slate-300 font-bold transition">
                     📧 E-mail suporte
                 </a>
+
                 <a href="https://wa.me/5519984427748" target="_blank" rel="noopener noreferrer" class="text-xs font-mono px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold transition flex items-center gap-2 shadow-lg shadow-emerald-655/15">
                     <span>Chamar no WhatsApp</span>
                 </a>
@@ -522,6 +560,59 @@
         
         // Initial run
         calculateSavings();
+
+        // System to scale/adapt page for mobile or PC dynamically
+        function applyScaling(mode) {
+            const htmlEl = document.documentElement;
+            const btnPc = document.getElementById('btn-scale-pc');
+            const btnMobile = document.getElementById('btn-scale-mobile');
+            const displayLabel = document.getElementById('display-detected-device');
+
+            if (mode === 'pc') {
+                htmlEl.style.fontSize = '18.5px'; // Scales up everything proportionally (texts, padding, grids) by ~15% for awesome PC visibility
+                htmlEl.classList.add('pc-mode');
+                htmlEl.classList.remove('mobile-mode');
+                
+                if (btnPc) {
+                    btnPc.classList.add('bg-orange-600', 'text-white', 'shadow-md', 'shadow-orange-600/20');
+                    btnPc.classList.remove('text-slate-400', 'hover:text-white');
+                }
+                if (btnMobile) {
+                    btnMobile.classList.remove('bg-orange-600', 'text-white', 'shadow-md', 'shadow-orange-600/20');
+                    btnMobile.classList.add('text-slate-400', 'hover:text-white');
+                }
+                if (displayLabel) {
+                    displayLabel.innerHTML = '🖥️ Computador (Proporções Ampliadas) • Zoom Ideal';
+                    displayLabel.className = 'text-orange-400 font-bold uppercase font-mono';
+                }
+            } else {
+                htmlEl.style.fontSize = '15.5px'; // Standard compact spacing for mobile
+                htmlEl.classList.add('mobile-mode');
+                htmlEl.classList.remove('pc-mode');
+                
+                if (btnMobile) {
+                    btnMobile.classList.add('bg-orange-600', 'text-white', 'shadow-md', 'shadow-orange-600/20');
+                    btnMobile.classList.remove('text-slate-400', 'hover:text-white');
+                }
+                if (btnPc) {
+                    btnPc.classList.remove('bg-orange-600', 'text-white', 'shadow-md', 'shadow-orange-600/20');
+                    btnPc.classList.add('text-slate-400', 'hover:text-white');
+                }
+                if (displayLabel) {
+                    displayLabel.innerHTML = '📱 Celular / Compacto (Ajustado)';
+                    displayLabel.className = 'text-emerald-400 font-bold uppercase font-mono';
+                }
+            }
+            localStorage.setItem('proposta_scale_mode', mode);
+        }
+
+        // Run scaling setup after loading the document
+        document.addEventListener('DOMContentLoaded', () => {
+            const saved = localStorage.getItem('proposta_scale_mode');
+            const isDesktop = window.innerWidth >= 1024 && !('ontouchstart' in window || navigator.maxTouchPoints > 0);
+            const currentMode = saved || (isDesktop ? 'pc' : 'mobile');
+            applyScaling(currentMode);
+        });
     </script>
 </body>
 </html>

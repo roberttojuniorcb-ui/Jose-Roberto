@@ -484,6 +484,25 @@ export default function App() {
   });
   const [rememberPreference, setRememberPreference] = useState<boolean>(false);
 
+  // --- ADAPTIVE DEVICE LAYOUT ENGINE (PC vs MOBILE AUTOMATOR) ---
+  const [appScalingMode, setAppScalingMode] = useState<'pc' | 'mobile' | 'auto'>(() => {
+    const saved = localStorage.getItem('torquelog_app_scaling_mode');
+    return (saved as 'pc' | 'mobile' | 'auto') || 'auto';
+  });
+  const [detectedScale, setDetectedScale] = useState<'pc' | 'mobile'>('pc');
+
+  useEffect(() => {
+    const detect = () => {
+      const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+      const isNarrow = window.innerWidth < 1024;
+      // Autopeças/Admins work on PC (larger monitors/screens), while Motoboys on Street work on Mobile (narrow screens/touch)
+      setDetectedScale((isNarrow || isTouch) ? 'mobile' : 'pc');
+    };
+    detect();
+    window.addEventListener('resize', detect);
+    return () => window.removeEventListener('resize', detect);
+  }, []);
+
   useEffect(() => {
     const interval = setInterval(() => {
       setAnimationTick(prev => (prev + 1) % 100);
@@ -956,6 +975,8 @@ export default function App() {
 
   // --- STATES FOR CLIENT WORKSPACE DISPATCH FORM (CLEAN EXTRA OPTIONS) ---
   const [destinoTipo, setDestinoTipo] = useState<'endereco' | 'cliente'>('endereco');
+  const [destinoCEP, setDestinoCEP] = useState<string>('');
+  const [isFetchingDestinoCEP, setIsFetchingDestinoCEP] = useState<boolean>(false);
   const [destinoEndereco, setDestinoEndereco] = useState<string>('');
   const [destinoQuadrante, setDestinoQuadrante] = useState<Quadrante>('A');
   const [destinoClienteId, setDestinoClienteId] = useState<string>('');
@@ -2054,7 +2075,7 @@ export default function App() {
   };
 
   // --- INTEGRATED VIA CEP LOOKUP ENGINE (AUTO-RESOLVE ADRESS/CITY) ---
-  const handleFetchCEP = async (cep: string, target: 'selfReg' | 'newClient' | 'editClient' | 'clientNewClient' | 'firstAccess') => {
+  const handleFetchCEP = async (cep: string, target: 'selfReg' | 'newClient' | 'editClient' | 'clientNewClient' | 'firstAccess' | 'destino') => {
     const cleanedCEP = cep.replace(/\D/g, '');
     
     // Regex validation to ensure only digits exist and it has exactly 8 characters
@@ -2072,6 +2093,7 @@ export default function App() {
     else if (target === 'editClient') setIsFetchingEditClientCEP(true);
     else if (target === 'clientNewClient') setIsClientFetchingNewClientCEP(true);
     else if (target === 'firstAccess') setIsFetchingFirstAccessCEP(true);
+    else if (target === 'destino') setIsFetchingDestinoCEP(true);
 
     try {
       const response = await fetch(`https://viacep.com.br/ws/${cleanedCEP}/json/`);
@@ -2098,6 +2120,8 @@ export default function App() {
         } else if (target === 'firstAccess') {
           setFirstAccessEndereco(fullAddress);
           setFirstAccessCidade(cityState);
+        } else if (target === 'destino') {
+          setDestinoEndereco(fullAddress);
         }
       } else {
         setCepErrorState(prev => ({ ...prev, [target]: 'CEP não cadastrado ou inexistente.' }));
@@ -2112,10 +2136,11 @@ export default function App() {
       else if (target === 'editClient') setIsFetchingEditClientCEP(false);
       else if (target === 'clientNewClient') setIsClientFetchingNewClientCEP(false);
       else if (target === 'firstAccess') setIsFetchingFirstAccessCEP(false);
+      else if (target === 'destino') setIsFetchingDestinoCEP(false);
     }
   };
 
-  const handleCEPChange = (val: string, target: 'selfReg' | 'newClient' | 'editClient' | 'clientNewClient' | 'firstAccess') => {
+  const handleCEPChange = (val: string, target: 'selfReg' | 'newClient' | 'editClient' | 'clientNewClient' | 'firstAccess' | 'destino') => {
     // Regex validation to check for invalid characters (only allows digits, spaces, and hyphens)
     const hasInvalidChar = /[^\d\s-]/.test(val);
     
@@ -2165,6 +2190,13 @@ export default function App() {
       setFirstAccessCEP(displayVal);
       if (formatted.length === 8) {
         handleFetchCEP(formatted, 'firstAccess');
+      } else if (formatted.length > 0 && formatted.length < 8) {
+        setCepErrorState(prev => ({ ...prev, [target]: 'Formato incorreto. O CEP deve possuir 8 dígitos.' }));
+      }
+    } else if (target === 'destino') {
+      setDestinoCEP(displayVal);
+      if (formatted.length === 8) {
+        handleFetchCEP(formatted, 'destino');
       } else if (formatted.length > 0 && formatted.length < 8) {
         setCepErrorState(prev => ({ ...prev, [target]: 'Formato incorreto. O CEP deve possuir 8 dígitos.' }));
       }
@@ -2640,7 +2672,7 @@ export default function App() {
     const origem = `${cli?.endereco || ''}${origemCep}, ${deCidade}`;
     
     const destCli = clientes.find(c => c.nome.toLowerCase() === o.destinatarioNome?.toLowerCase() || c.id === o.destinatarioNome);
-    const destCep = destCli?.cep ? `, CEP ${destCli.cep}` : '';
+    const destCep = destCli?.cep ? `, CEP ${destCli.cep}` : (o.destinoCep ? `, CEP ${o.destinoCep}` : '');
     const destCidade = destCli?.cidade || deCidade;
     const destino = `${o.enderecoEntrega || ''}${destCep}, ${destCidade}`;
     
@@ -2657,7 +2689,7 @@ export default function App() {
       const origem = `${cli?.endereco || ''}${origemCep}, ${deCidade}`;
       
       const destCli = clientes.find(c => c.nome.toLowerCase() === activeOrder.destinatarioNome?.toLowerCase() || c.id === activeOrder.destinatarioNome);
-      const destCep = destCli?.cep ? `, CEP ${destCli.cep}` : '';
+      const destCep = destCli?.cep ? `, CEP ${destCli.cep}` : (activeOrder.destinoCep ? `, CEP ${activeOrder.destinoCep}` : '');
       const destCidade = destCli?.cidade || deCidade;
       const destino = `${activeOrder.enderecoEntrega || ''}${destCep}, ${destCidade}`;
       
@@ -2821,13 +2853,116 @@ export default function App() {
 
   const effectiveRole = activeSessionRole === 'Empresa' ? adminVisualPerspective : activeSessionRole;
 
+  // --- COMPUTE ENHANCED ROLE-BASED DYNAMIC SCALE FACTOR ---
+  // Motoboys work on streets (touch/compact phone screens), while Autopedais & Admins operate from front-desk PCs
+  const isMotoboySession = effectiveRole === 'Motoboy';
+  const effectiveScale = appScalingMode === 'auto'
+    ? (isMotoboySession ? 'mobile' : detectedScale)
+    : appScalingMode;
+
   return (
     <>
+      <style>{`
+        /* Dynamic Adaptation and Viewport Optimization for PC and Mobile modes */
+        ${effectiveScale === 'pc' ? `
+          html {
+            font-size: 16px !important;
+          }
+          #torquelog-app {
+            max-width: 100vw !important;
+          }
+          .scale-factor-dashboard {
+            max-width: 1600px !important;
+            padding-left: 2rem !important;
+            padding-right: 2rem !important;
+          }
+          .grid-pc-cols-3 {
+            grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+          }
+          .grid-pc-cols-4 {
+            grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+          }
+        ` : `
+          html {
+            font-size: 14px !important;
+          }
+          /* Ensure deliverers can tap easily on mobile screens */
+          button, a.cta-btn, input, select {
+            min-height: 44px;
+            touch-action: manipulation;
+          }
+          /* Force columns to stack on mobile */
+          .grid-pc-cols-3, .grid-pc-cols-4 {
+            grid-template-columns: 1fr !important;
+          }
+        `}
+        /* Soft transitions while changing scaling modes */
+        body, #torquelog-app, #login-screen {
+          transition: font-size 0.2s ease-in-out, max-width 0.2s ease-in-out;
+        }
+      `}</style>
+
       {!activeSessionRole ? (
         <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-between p-4 sm:p-6 md:p-8 font-sans selection:bg-orange-500 selection:text-white relative overflow-hidden" id="login-screen">
         
         {/* Abstract background ambient aura */}
         <div className="absolute top-[-20%] left-[-10%] w-[500px] h-[500px] rounded-full bg-orange-600/10 blur-[130px] pointer-events-none" />
+
+        {/* ADAPTIVE DEVICE OPTIMIZATION CONTROL BAR - LOGIN PAGE */}
+        <div className="max-w-4xl w-full mx-auto bg-slate-900/40 backdrop-blur-md rounded-xl border border-slate-800/85 px-4 py-2.5 flex flex-col sm:flex-row items-center justify-between gap-3 text-[11px] font-mono mb-4 relative z-50">
+          <div className="flex items-center gap-2 text-slate-300">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-orange-500"></span>
+            </span>
+            <span>Exibição Otimizada:</span>
+            <strong className={`${effectiveScale === 'pc' ? 'text-orange-400' : 'text-emerald-400'} font-bold uppercase`}>
+              {effectiveScale === 'pc' ? '🖥️ Computador (Zoom Ampliado)' : '📱 Celular / Compacto (Mobile)'}
+            </strong>
+            {appScalingMode === 'auto' && (
+              <span className="text-[9px] text-slate-500 font-normal italic">(Detecção Automática)</span>
+            )}
+          </div>
+          <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-lg border border-slate-850">
+            <button 
+              type="button"
+              onClick={() => {
+                setAppScalingMode('auto');
+                localStorage.setItem('torquelog_app_scaling_mode', 'auto');
+              }}
+              className={`px-2 py-1 rounded text-[10px] font-bold font-mono transition-all duration-155 cursor-pointer ${
+                appScalingMode === 'auto' ? 'bg-orange-500 text-slate-950 shadow-sm' : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              🔄 Auto
+            </button>
+            <button 
+              type="button"
+              onClick={() => {
+                setAppScalingMode('pc');
+                localStorage.setItem('torquelog_app_scaling_mode', 'pc');
+              }}
+              className={`px-2 py-1 rounded text-[10px] font-bold font-mono transition-all duration-155 cursor-pointer ${
+                appScalingMode === 'pc' ? 'bg-orange-500 text-slate-950 shadow-sm' : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              🖥️ PC
+            </button>
+            <button 
+              type="button"
+              onClick={() => {
+                setAppScalingMode('mobile');
+                localStorage.setItem('torquelog_app_scaling_mode', 'mobile');
+              }}
+              className={`px-2 py-1 rounded text-[10px] font-bold font-mono transition-all duration-155 cursor-pointer ${
+                appScalingMode === 'mobile' ? 'bg-orange-500 text-slate-950 shadow-sm' : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              📱 Mobile
+            </button>
+          </div>
+        </div>
+
         {/* Top header branding */}
         <header className="max-w-4xl w-full mx-auto flex flex-col md:flex-row justify-between items-center gap-4 py-6 border-b border-slate-900">
           <div className="flex items-center gap-4">
@@ -3495,7 +3630,7 @@ export default function App() {
             </div>
 
             {/* 📬 INTERACTIVE SIMULATED EMAIL INBOX POPOVER (NEXT TO CANAL DATABASE) */}
-            {(activeSessionRole === 'Empresa' || activeSessionRole === 'Cliente') && (
+            {activeSessionRole === 'Empresa' && (
               <div className="relative" id="header-central-emails-simulados">
                 <button
                   type="button"
@@ -3669,6 +3804,67 @@ export default function App() {
 
         </div>
       </header>
+
+      {/* --- REAL-TIME DEVICE ADAPTATION AND DYN-VIEWPORT CONTROLLER --- */}
+      <section className="bg-slate-900 border-b border-slate-800 py-2.5 px-4 outline-none" id="device-adaptability-bar">
+        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-3 text-xs font-mono">
+          <div className="flex flex-wrap items-center gap-2.5 text-slate-350">
+            <span className="relative flex h-2 w-2">
+              <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${effectiveScale === 'pc' ? 'bg-orange-400' : 'bg-emerald-400'}`}></span>
+              <span className={`relative inline-flex rounded-full h-2 w-2 ${effectiveScale === 'pc' ? 'bg-orange-500' : 'bg-emerald-500'}`}></span>
+            </span>
+            <span className="text-slate-400">Exibição Ativa:</span>
+            <strong className={`${effectiveScale === 'pc' ? 'text-orange-400' : 'text-emerald-400'} font-black uppercase flex items-center gap-1`}>
+              {effectiveScale === 'pc' ? '🖥️ Computador (Zoom Ampliado +15% - Autopeças & Gestão)' : '📱 Celular / Compacto (Toques Ampliados - Entregadores)'}
+            </strong>
+            {appScalingMode === 'auto' && (
+              <span className="text-[10px] text-slate-500 font-normal italic">(Sensor Ativo: {detectedScale === 'pc' ? 'Desktop' : 'Celular'})</span>
+            )}
+          </div>
+          
+          <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-850">
+            <button
+              type="button"
+              onClick={() => {
+                setAppScalingMode('auto');
+                localStorage.setItem('torquelog_app_scaling_mode', 'auto');
+              }}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold font-mono transition-all duration-150 cursor-pointer ${
+                appScalingMode === 'auto' ? 'bg-orange-500 text-slate-950 shadow-md' : 'text-slate-400 hover:text-white'
+              }`}
+              title="Detecta se é computador ou celular automaticamente por tamanho de tela e touch"
+            >
+              🔄 Auto
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setAppScalingMode('pc');
+                localStorage.setItem('torquelog_app_scaling_mode', 'pc');
+              }}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold font-mono transition-all duration-150 cursor-pointer ${
+                appScalingMode === 'pc' ? 'bg-orange-500 text-slate-950 shadow-md' : 'text-slate-400 hover:text-white'
+              }`}
+              title="Força o modo Computador com fontes maiores e tabelas expandidas para empresas de autopeças"
+            >
+              🖥️ Computador
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setAppScalingMode('mobile');
+                localStorage.setItem('torquelog_app_scaling_mode', 'mobile');
+              }}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold font-mono transition-all duration-150 cursor-pointer ${
+                appScalingMode === 'mobile' ? 'bg-orange-500 text-slate-950 shadow-md' : 'text-slate-400 hover:text-white'
+              }`}
+              title="Força o modo Celular com visual compacto e áreas de toque ampliadas para entregadores de moto"
+            >
+              📱 Celular
+            </button>
+          </div>
+        </div>
+      </section>
 
       {/* ==========================================
           STICKY SIMULATION PANEL (ADMIN PERSPECTIVES)
@@ -6714,6 +6910,7 @@ export default function App() {
                   itensDescricao: clientItemTexto.trim() || 'Objeto de Envio',
                   itensAnalistas: [], // Empty since we do not need items/cubage logic
                   enderecoEntrega: finalEndereco,
+                  destinoCep: isAddress ? destinoCEP : undefined,
                   destinatarioNome: finalDestName,
                   retornoPeca,
                   taxaReversa: retornoPeca ? 15 : undefined,
@@ -6751,6 +6948,7 @@ export default function App() {
 
                 // Reset B2B dispatch fields to empty / false defaults for the next entry
                 setDestinoEndereco('');
+                setDestinoCEP('');
                 setDestinoClienteId('');
                 setRetornoPeca(false);
                 setQuickClientNome('');
@@ -6780,6 +6978,38 @@ export default function App() {
                         placeholder="Ex: Av. da Moda, 1040 - Centro, Passos - MG"
                         className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded-lg p-2.5 text-xs focus:ring-2 focus:ring-orange-500 font-mono"
                       />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="block text-xs font-bold text-slate-700 uppercase font-mono flex items-center justify-between">
+                        <span>CEP de Destino (Opcional)</span>
+                        {isFetchingDestinoCEP && (
+                          <span className="text-emerald-600 animate-pulse text-[10px] font-mono font-bold">🔍 BUSCANDO CEP...</span>
+                        )}
+                      </label>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          placeholder="Ex: 37900-124"
+                          value={destinoCEP}
+                          onChange={(e) => handleCEPChange(e.target.value, 'destino')}
+                          className="flex-1 bg-slate-50 text-slate-900 border border-slate-200 rounded-lg p-2.5 text-xs focus:ring-2 focus:ring-orange-500 font-mono"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleFetchCEP(destinoCEP, 'destino')}
+                          disabled={isFetchingDestinoCEP || !destinoCEP}
+                          className="bg-orange-500 hover:bg-orange-600 disabled:bg-slate-200 text-slate-950 disabled:text-slate-400 text-xs font-black px-4 rounded-lg font-mono tracking-tight cursor-pointer shadow transition shrink-0"
+                        >
+                          {isFetchingDestinoCEP ? '...' : '🔍 Buscar CEP'}
+                        </button>
+                      </div>
+                      {cepErrorState['destino'] && (
+                        <p className="text-red-500 text-[10px] font-mono mt-1 text-left">⚠️ {cepErrorState['destino']}</p>
+                      )}
+                      <p className="text-[10px] text-slate-500 italic font-sans leading-tight">
+                        Se preenchido, ajuda o entregador a encontrar o local via GPS do Google Maps de forma ultra precisa!
+                      </p>
                     </div>
                     
                     <div className="space-y-1">

@@ -64,6 +64,7 @@ export interface OrdemServico {
   itensDescricao: string; // Ex: "2x Amortecedores Dianteiros LD, 1x Jogo de Pastilhas"
   itensAnalistas: PecasItem[];
   enderecoEntrega?: string; // Delivery address free text or selected client address
+  destinoCep?: string; // Optional CEP for routing on free address delivery
   destinatarioNome?: string; // Destination workshop name if any
   retornoPeca: boolean; // Retorno de Peça por Erro de Aplicação
   taxaReversa?: number; // Valor da taxa se retornoPeca for true
