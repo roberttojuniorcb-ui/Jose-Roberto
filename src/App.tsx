@@ -6967,8 +6967,8 @@ export default function App() {
               }} className="space-y-4">
                 
                 {destinoTipo === 'endereco' ? (
-                  <>
-                    <div className="space-y-1">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                    <div className="space-y-1 sm:col-span-2">
                       <label className="block text-xs font-bold text-slate-700 uppercase font-mono">Endereço de Entrega</label>
                       <input
                         type="text"
@@ -6976,7 +6976,7 @@ export default function App() {
                         value={destinoEndereco}
                         onChange={(e) => setDestinoEndereco(e.target.value)}
                         placeholder="Ex: Av. da Moda, 1040 - Centro, Passos - MG"
-                        className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded-lg p-2.5 text-xs focus:ring-2 focus:ring-orange-500 font-mono"
+                        className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded-lg p-2.5 text-xs focus:ring-2 focus:ring-orange-500 font-mono h-[38px]"
                       />
                     </div>
 
@@ -6984,7 +6984,7 @@ export default function App() {
                       <label className="block text-xs font-bold text-slate-700 uppercase font-mono flex items-center justify-between">
                         <span>CEP de Destino (Opcional)</span>
                         {isFetchingDestinoCEP && (
-                          <span className="text-emerald-600 animate-pulse text-[10px] font-mono font-bold">🔍 BUSCANDO CEP...</span>
+                          <span className="text-emerald-600 animate-pulse text-[10px] font-mono font-bold">🔍...</span>
                         )}
                       </label>
                       <div className="flex gap-2">
@@ -6993,23 +6993,21 @@ export default function App() {
                           placeholder="Ex: 37900-124"
                           value={destinoCEP}
                           onChange={(e) => handleCEPChange(e.target.value, 'destino')}
-                          className="flex-1 bg-slate-50 text-slate-900 border border-slate-200 rounded-lg p-2.5 text-xs focus:ring-2 focus:ring-orange-500 font-mono"
+                          className="flex-1 bg-slate-50 text-slate-900 border border-slate-200 rounded-lg p-2.5 text-xs focus:ring-2 focus:ring-orange-500 font-mono min-w-0 h-[38px]"
                         />
                         <button
                           type="button"
                           onClick={() => handleFetchCEP(destinoCEP, 'destino')}
                           disabled={isFetchingDestinoCEP || !destinoCEP}
-                          className="bg-orange-500 hover:bg-orange-600 disabled:bg-slate-200 text-slate-950 disabled:text-slate-400 text-xs font-black px-4 rounded-lg font-mono tracking-tight cursor-pointer shadow transition shrink-0"
+                          className="bg-orange-500 hover:bg-orange-600 disabled:bg-slate-200 text-slate-950 disabled:text-slate-400 text-xs font-black px-3 rounded-lg font-mono tracking-tight cursor-pointer shadow transition shrink-0 h-[38px] flex items-center justify-center"
+                          title="Melhora a busca no GPS do Google Maps pelo motoboy"
                         >
-                          {isFetchingDestinoCEP ? '...' : '🔍 Buscar CEP'}
+                          {isFetchingDestinoCEP ? '...' : '🔍 Buscar'}
                         </button>
                       </div>
                       {cepErrorState['destino'] && (
                         <p className="text-red-500 text-[10px] font-mono mt-1 text-left">⚠️ {cepErrorState['destino']}</p>
                       )}
-                      <p className="text-[10px] text-slate-500 italic font-sans leading-tight">
-                        Se preenchido, ajuda o entregador a encontrar o local via GPS do Google Maps de forma ultra precisa!
-                      </p>
                     </div>
                     
                     <div className="space-y-1">
@@ -7017,22 +7015,28 @@ export default function App() {
                       <select
                         value={destinoQuadrante}
                         onChange={(e) => setDestinoQuadrante(e.target.value as Quadrante)}
-                        className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded-lg p-2 text-xs font-mono"
+                        className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded-lg p-2.5 text-xs font-mono h-[38px]"
                       >
                         {(['A', 'B', 'C', 'D', 'E', 'F'] as Quadrante[]).map(q => (
                           <option key={q} value={q}>Setor {q} - Rota do Contrato</option>
                         ))}
                       </select>
                     </div>
-                  </>
+
+                    <div className="sm:col-span-2">
+                      <p className="text-[10px] text-slate-500 italic font-sans leading-tight">
+                        O preenchimento do CEP garante que a rota seja aberta no Google Maps com precisão de metros para o entregador!
+                      </p>
+                    </div>
+                  </div>
                 ) : (
-                  <>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                     <div className="space-y-1">
-                      <label className="block text-xs font-bold text-slate-700 uppercase font-mono">Filtrar Setor do Destinatário</label>
+                      <label className="block text-xs font-bold text-slate-700 uppercase font-mono">Filtrar Setor</label>
                       <select
                         value={destinoQuadrante}
                         onChange={(e) => setDestinoQuadrante(e.target.value as Quadrante)}
-                        className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded-lg p-2 text-xs font-mono"
+                        className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded-lg p-2.5 text-xs font-mono h-[38px]"
                       >
                         {(['A', 'B', 'C', 'D', 'E', 'F'] as Quadrante[]).map(q => (
                           <option key={q} value={q}>Setor {q} - Região</option>
@@ -7041,16 +7045,16 @@ export default function App() {
                     </div>
 
                     <div className="space-y-1">
-                      <div className="flex justify-between items-center">
-                        <label className="block text-xs font-bold text-slate-700 uppercase font-mono">Destinatário Credenciado</label>
+                      <div className="flex justify-between items-center h-4">
+                        <label className="block text-xs font-bold text-slate-700 uppercase font-mono">Destinatário</label>
                         {!isQuickRegisteringDestinatario && (
-                          <div className="flex gap-2">
+                          <div className="flex gap-1.5">
                             <button
                               type="button"
                               onClick={() => setIsQuickRegisteringDestinatario(true)}
-                              className="text-[10px] text-orange-650 hover:text-orange-700 font-bold font-mono uppercase tracking-tight flex items-center gap-0.5 cursor-pointer"
+                              className="text-[9px] text-orange-650 hover:text-orange-700 font-bold font-mono uppercase tracking-tight flex items-center gap-0.5 cursor-pointer"
                             >
-                              <Plus className="w-3 h-3 text-orange-500" /> Rápido
+                              <Plus className="w-2.5 h-2.5 text-orange-500" /> Rápido
                             </button>
                             <button
                               type="button"
@@ -7064,7 +7068,7 @@ export default function App() {
                                 setClientNewClientEmail('');
                                 setIsClientAddingNewClient(true);
                               }}
-                              className="text-[10px] text-emerald-650 hover:text-emerald-700 font-bold font-mono uppercase tracking-tight flex items-center gap-0.5 cursor-pointer border-l pl-2 border-slate-200"
+                              className="text-[9px] text-emerald-650 hover:text-emerald-700 font-bold font-mono uppercase tracking-tight flex items-center gap-0.5 cursor-pointer border-l pl-1.5 border-slate-200"
                             >
                               🚀 Completo
                             </button>
@@ -7077,45 +7081,47 @@ export default function App() {
                           value={destinoClienteId}
                           onChange={(e) => setDestinoClienteId(e.target.value)}
                           required={!isQuickRegisteringDestinatario}
-                          className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded-lg p-2 text-xs font-mono"
+                          className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded-lg p-2.5 text-xs font-mono h-[38px]"
                         >
                           {clientes.filter(c => c.criadoPorClienteId === activeClienteUser?.id && c.quadrante === destinoQuadrante).length === 0 ? (
-                            <option value="">Nenhum cliente cadastrado neste setor</option>
+                            <option value="">Nenhum cadastrado</option>
                           ) : (
                             clientes.filter(c => c.criadoPorClienteId === activeClienteUser?.id && c.quadrante === destinoQuadrante).map(c => (
-                              <option key={c.id} value={c.id}>{c.nome} ({c.endereco.slice(0, 25)}...)</option>
+                              <option key={c.id} value={c.id}>{c.nome} ({c.endereco.slice(0, 18)}...)</option>
                             ))
                           )}
                         </select>
                       ) : (
-                        <div className="bg-orange-50/55 p-3 rounded-xl border border-orange-200/60 space-y-2 mt-1 shadow-sm">
-                          <span className="text-[10px] font-extrabold text-orange-750 uppercase font-mono tracking-wider block">
+                        <div className="bg-orange-50/55 p-2 rounded-xl border border-orange-200/60 space-y-1.5 mt-1 shadow-sm sm:col-span-2">
+                          <span className="text-[9px] font-extrabold text-orange-750 uppercase font-mono tracking-wider block">
                             ✨ NOVO DESTINATÁRIO NO SETOR {destinoQuadrante}
                           </span>
                           
-                          <div>
-                            <input
-                              type="text"
-                              required
-                              value={quickClientNome}
-                              onChange={(e) => setQuickClientNome(e.target.value)}
-                              placeholder="Nome da Oficina / Destinatário"
-                              className="w-full bg-white text-slate-900 border border-slate-200 rounded-lg p-2 text-xs font-mono focus:ring-1 focus:ring-orange-500"
-                            />
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            <div>
+                              <input
+                                type="text"
+                                required
+                                value={quickClientNome}
+                                onChange={(e) => setQuickClientNome(e.target.value)}
+                                placeholder="Nome da Oficina / Destinatário"
+                                className="w-full bg-white text-slate-900 border border-slate-200 rounded-lg p-2 text-xs font-mono focus:ring-1 focus:ring-orange-500 h-[34px]"
+                              />
+                            </div>
+
+                            <div>
+                              <input
+                                type="text"
+                                required
+                                value={quickClientEndereco}
+                                onChange={(e) => setQuickClientEndereco(e.target.value)}
+                                placeholder="Endereço (Rua, Número, Bairro)"
+                                className="w-full bg-white text-slate-900 border border-slate-200 rounded-lg p-2 text-xs font-mono focus:ring-1 focus:ring-orange-500 h-[34px]"
+                              />
+                            </div>
                           </div>
 
-                          <div>
-                            <input
-                              type="text"
-                              required
-                              value={quickClientEndereco}
-                              onChange={(e) => setQuickClientEndereco(e.target.value)}
-                              placeholder="Endereço (Rua, Número, Bairro)"
-                              className="w-full bg-white text-slate-900 border border-slate-200 rounded-lg p-2 text-xs font-mono focus:ring-1 focus:ring-orange-500"
-                            />
-                          </div>
-
-                          <div className="flex gap-2 pt-1">
+                          <div className="flex gap-2 pt-1 justify-end">
                             <button
                               type="button"
                               onClick={() => {
@@ -7123,7 +7129,7 @@ export default function App() {
                                 setQuickClientNome('');
                                 setQuickClientEndereco('');
                               }}
-                              className="flex-1 bg-white hover:bg-slate-100 text-slate-600 border border-slate-200 py-1 px-2 rounded text-[10px] font-bold font-mono transition cursor-pointer"
+                              className="bg-white hover:bg-slate-100 text-slate-600 border border-slate-200 py-1 px-3 rounded text-[10px] font-bold font-mono transition cursor-pointer"
                             >
                               Cancelar
                             </button>
@@ -7175,7 +7181,7 @@ export default function App() {
                                 setSupabaseSuccessMsg(`✅ Destinatário "${novoCli.nome}" cadastrado, SALVO NO BANCO e selecionado!`);
                                 setTimeout(() => setSupabaseSuccessMsg(''), 5000);
                               }}
-                              className="flex-1 bg-orange-500 hover:bg-orange-600 text-white py-1 px-2 rounded text-[10px] font-bold font-mono shadow-sm transition cursor-pointer"
+                              className="bg-orange-500 hover:bg-orange-600 text-slate-950 py-1 px-3 rounded text-[10px] font-bold font-mono shadow-sm transition cursor-pointer font-black"
                             >
                               Salvar e Selecionar
                             </button>
@@ -7183,30 +7189,32 @@ export default function App() {
                         </div>
                       )}
                     </div>
-                  </>
+                  </div>
                 )}
 
-                <div className="space-y-1">
-                  <label className="block text-xs font-bold text-slate-700 uppercase font-mono">Detalhamento do Objeto de Envio (Opcional)</label>
-                  <input
-                    type="text"
-                    value={clientItemTexto}
-                    onChange={(e) => setClientItemTexto(e.target.value)}
-                    placeholder="Ex: um remédio, um lanche... (Padrão: Objeto de Envio)"
-                    className="w-full bg-slate-50 text-slate-950 border border-slate-200 rounded-lg p-2.5 text-xs focus:ring-2 focus:ring-orange-500 font-mono"
-                  />
-                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                  <div className="space-y-1">
+                    <label className="block text-xs font-bold text-slate-700 uppercase font-mono">Objeto de Envio (Opcional)</label>
+                    <input
+                      type="text"
+                      value={clientItemTexto}
+                      onChange={(e) => setClientItemTexto(e.target.value)}
+                      placeholder="Ex: um remédio, amortecedor... (Padrão: Objeto de Envio)"
+                      className="w-full bg-slate-50 text-slate-950 border border-slate-200 rounded-lg p-2.5 text-xs focus:ring-2 focus:ring-orange-500 font-mono h-[38px]"
+                    />
+                  </div>
 
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase mb-2 font-mono">Sua Tarifa de Contrato B2B</label>
-                  <div className="p-2.5 bg-slate-50 rounded-lg border border-slate-150 flex justify-between text-[11px] font-mono">
-                    <span>💵 Taxa Fixa Contratual</span>
-                    <span className="font-extrabold text-slate-900">R$ {(activeClienteUser?.valorCobradoCliente || 10.00).toFixed(2)} por envio</span>
+                  <div className="space-y-1">
+                    <label className="block text-xs font-bold text-slate-700 uppercase font-mono">Sua Tarifa de Contrato</label>
+                    <div className="p-2.5 bg-slate-50 rounded-lg border border-slate-150 flex justify-between text-[11px] font-mono h-[38px] items-center">
+                      <span>💵 Taxa Fixa</span>
+                      <span className="font-extrabold text-slate-900">R$ {(activeClienteUser?.valorCobradoCliente || 10.00).toFixed(2)} por envio</span>
+                    </div>
                   </div>
                 </div>
 
                 {/* Reversa option */}
-                <div className="flex items-center gap-2 bg-slate-50 p-2 text-xs rounded-lg border border-slate-150">
+                <div className="flex items-center gap-2 bg-slate-50 p-2.5 text-xs rounded-lg border border-slate-150">
                   <input
                     type="checkbox"
                     id="reversa-check-cliente"
