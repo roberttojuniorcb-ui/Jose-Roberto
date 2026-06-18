@@ -43,7 +43,11 @@ import {
   query, 
   collection, 
   orderBy, 
-  onSnapshot 
+  onSnapshot,
+  doc,
+  setDoc,
+  deleteDoc,
+  getDoc
 } from 'firebase/firestore';
 import {
   db as firebaseDb,
@@ -449,6 +453,11 @@ export default function App() {
   const [selectedAdminCity, setSelectedAdminCity] = useState<string>('Todas');
   const [adminSubTab, setAdminSubTab] = useState<'logistica' | 'representantes' | 'taxas'>('logistica');
 
+  // --- FIREBASE TEST SAVING STATE ---
+  const [firebaseTestStatus, setFirebaseTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
+  const [firebaseTestDetail, setFirebaseTestDetail] = useState<string>('');
+  const [firebaseCreatedTestId, setFirebaseCreatedTestId] = useState<string | null>(null);
+
   // --- CLIENT SELF-REGISTRATION STATE ---
   const [isSelfRegistering, setIsSelfRegistering] = useState<boolean>(false);
   const [selfRegNome, setSelfRegNome] = useState<string>('');
@@ -648,6 +657,94 @@ export default function App() {
   const isSupabaseBootstrappedRef = React.useRef<boolean>(false);
   const isFirebaseBootstrappedRef = React.useRef<boolean>(false);
   const isIncomingSyncRef = React.useRef<boolean>(false);
+
+  // --- INTERACTIVE FIREBASE WRITE PERSISTENCE TEST FUNCTION ---
+  const executeFirebaseSavingTest = async () => {
+    if (!isFirebaseConfigured || !firebaseDb) {
+      setFirebaseTestStatus('error');
+      setFirebaseTestDetail('O cliente Firebase não está inicializado ou configurado. Verifique os parâmetros em firebase-applet-config.json.');
+      return;
+    }
+
+    setFirebaseTestStatus('testing');
+    setFirebaseTestDetail('Instanciando registro de teste e iniciando handshake com Firebase Firestore...');
+
+    try {
+      const serial = Math.floor(1000 + Math.random() * 9000);
+      const testId = `TEST-FIREBASE-${serial}`;
+      
+      const defaultClientId = clientes[0]?.id || 'CLI-01';
+      const defaultClientNome = clientes[0]?.nome || 'Distribuidora Teste';
+
+      const testOrdemObj: OrdemServico = {
+        id: testId,
+        clienteId: defaultClientId,
+        clienteNome: defaultClientNome,
+        quadrante: 'A',
+        itensDescricao: `Entrega de teste do sistema de persistência Firebase (Serial #${serial})`,
+        itensAnalistas: [{ descricao: 'Pastilhas de Teste', quantidade: 1, tipo: 'pastilhas', cubagemPesoScore: 1 }],
+        enderecoEntrega: 'Rua de Teste Firebase, 100 - Passos MG',
+        destinatarioNome: 'Destinatário de Teste Firebase',
+        retornoPeca: false,
+        taxaReversa: 0.00,
+        valorPagoMotoboy: 4.00,
+        valorCobradoCliente: 10.00,
+        motoboyId: undefined,
+        motoboyNome: undefined,
+        status: 'Pendente',
+        grupoRotaId: undefined,
+        motivoDesmembramento: undefined,
+        travaCubagemStatus: 'Liberado - Cabe no Baú',
+        criadoEm: new Date().toISOString()
+      };
+
+      setFirebaseTestDetail(`Persistindo registro [${testId}] na coleção 'ordens_servico' do Firebase Firestore...`);
+
+      // Write document using Firebase SDK
+      const docRef = doc(firebaseDb, 'ordens_servico', testId);
+      await setDoc(docRef, testOrdemObj);
+
+      setFirebaseTestDetail(`Registro inserido com sucesso! Consultando banco remoto do Firebase Firestore de volta para validar integridade de leitura/escrita...`);
+
+      // Sleep a little bit to allow Firestore storage synchronization
+      await new Promise(resolve => setTimeout(resolve, 800));
+
+      const docSnap = await getDoc(docRef);
+
+      if (!docSnap.exists()) {
+        throw new Error('Falha crítica de integridade: Registro gravado com sucesso, mas não restou visível na consulta de retorno do Firestore!');
+      }
+
+      setFirebaseCreatedTestId(testId);
+      setFirebaseTestStatus('success');
+      setFirebaseTestDetail(`Sucesso absoluto! O registro [${testId}] foi gravado, persistido e lido de volta do banco remoto do Firebase Firestore.`);
+      
+      // Update local state instantly so the UI reflects the test record
+      setOrdens(prev => [testOrdemObj, ...prev]);
+    } catch (err: any) {
+      console.error('Firebase test saving error:', err);
+      setFirebaseTestStatus('error');
+      setFirebaseTestDetail(err?.message || 'Erro indefinido de conexão com Firebase.');
+    }
+  };
+
+  const deleteFirebaseSavingTestRecord = async () => {
+    if (!firebaseDb || !firebaseCreatedTestId) return;
+    try {
+      setFirebaseTestDetail(`Removendo registro temporário [${firebaseCreatedTestId}] para manter seu Firestore limpo...`);
+      const docRef = doc(firebaseDb, 'ordens_servico', firebaseCreatedTestId);
+      await deleteDoc(docRef);
+      
+      // Remove from local list
+      setOrdens(prev => prev.filter(o => o.id !== firebaseCreatedTestId));
+
+      setFirebaseCreatedTestId(null);
+      setFirebaseTestStatus('idle');
+      setFirebaseTestDetail('');
+    } catch (err: any) {
+      alert(`Erro ao remover registro de teste do Firebase: ${err.message}`);
+    }
+  };
 
   // Reusable query and mapper function for polling & real-time DB tracking for Supabase fallback
   const fetchLatestOrdensFromSupabase = async (isBackground = false) => {
@@ -5486,12 +5583,77 @@ export default function App() {
                   </button>
                 )}
 
+                {/* FIREBASE PERSISTENCE TEST BUTTON */}
+                <button
+                  type="button"
+                  onClick={executeFirebaseSavingTest}
+                  disabled={firebaseTestStatus === 'testing'}
+                  className={`flex items-center gap-1.5 border rounded-lg py-1.5 px-2.5 font-mono text-[10px] uppercase font-extrabold cursor-pointer hover:scale-[1.01] transition-all shadow-xs ${
+                    firebaseTestStatus === 'testing' ? 'bg-amber-100 hover:bg-amber-200 border-amber-300 text-amber-800' :
+                    firebaseTestStatus === 'success' ? 'bg-emerald-100 hover:bg-emerald-250 border-emerald-400 text-emerald-800 font-black' :
+                    firebaseTestStatus === 'error' ? 'bg-rose-100 hover:bg-rose-205 border-rose-400 text-rose-800' :
+                    'bg-slate-900 hover:bg-slate-800 border-slate-700 text-orange-400'
+                  }`}
+                  title="Testar Salvamento Supremo no Firebase"
+                >
+                  <span>🔥 Testar Salvamento (Firebase)</span>
+                </button>
+
                 <div className="flex flex-wrap items-center gap-2 font-mono text-[11px] font-bold text-slate-600 bg-slate-50 py-1.5 px-2.5 rounded-lg border border-slate-200">
                   <span>Total Geral (Entregue):</span>
                   <span className="bg-emerald-600 text-white px-2 py-0.5 rounded text-[10px]">{ordens.filter(o => o.status === 'Entregue').length} OS</span>
                 </div>
               </div>
             </div>
+
+            {/* Firebase Persistence Test Output Banner */}
+            {firebaseTestStatus !== 'idle' && (
+              <div className={`mb-6 p-4 rounded-xl border font-mono text-xs shadow-md animate-fade-in transition-all ${
+                firebaseTestStatus === 'testing' ? 'bg-amber-50 border-amber-250 text-amber-900 border-dashed animate-pulse' :
+                firebaseTestStatus === 'success' ? 'bg-emerald-50/95 border-emerald-300 text-emerald-950' :
+                'bg-red-50 border-red-300 text-red-950'
+              }`}>
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                  <div className="flex items-start gap-3">
+                    <span className="text-xl shrink-0 mt-0.5">
+                      {firebaseTestStatus === 'testing' && '⏳'}
+                      {firebaseTestStatus === 'success' && '🔥'}
+                      {firebaseTestStatus === 'error' && '❌'}
+                    </span>
+                    <div>
+                      <p className="font-black uppercase tracking-widest text-[9px] text-slate-500">
+                        Painel de Diagnóstico: Testar Gravabilidade no Firebase Firestore
+                      </p>
+                      <p className="mt-1 font-bold leading-relaxed">
+                        {firebaseTestDetail}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    {firebaseCreatedTestId && (
+                      <button
+                        type="button"
+                        onClick={deleteFirebaseSavingTestRecord}
+                        className="bg-red-650 hover:bg-red-750 text-white font-extrabold py-1.5 px-3 rounded-lg text-[9px] uppercase cursor-pointer transition-colors hover:scale-102 bg-red-600"
+                        title="Deletar registro temporário"
+                      >
+                        🗑️ Limpar Teste do Firebase
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFirebaseTestStatus('idle');
+                        setFirebaseTestDetail('');
+                      }}
+                      className="bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold px-2.5 py-1.5 rounded-lg text-[9px] uppercase cursor-pointer transition-colors"
+                    >
+                      Dispensar
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Main Interactive Grid */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">

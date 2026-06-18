@@ -23,8 +23,8 @@ export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId || undefi
 // Initialize Auth
 export const auth = getAuth();
 
-// Verification is active - DISCONNECTED by user request (only Supabase is active)
-export const isFirebaseConfigured = false;
+// Verification is active - CONNECTED by user request to use Firebase Firestore
+export const isFirebaseConfigured = true;
 
 // Validate Connection as mandated
 async function testConnection() {
