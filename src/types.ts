@@ -24,6 +24,8 @@ export interface Cliente {
   motoboysAtivos?: number; // Quantidade de motoboys ativos cadastrados/viculados
   indicadoPorRepId?: string; // ID do representante comercial que indicou este parceiro
   primeiroAcessoPendente?: boolean; // Se True, força o parceiro a mudar a senha provisória no primeiro acesso
+  notaAdmin?: string; // Observação privada que o parceiro não consegue editar ou ver
+  adminBloqueado?: boolean; // Bloqueio de faturamento/despacho controlado pelo admin
 }
 
 export interface Representante {
@@ -64,7 +66,6 @@ export interface OrdemServico {
   itensDescricao: string; // Ex: "2x Amortecedores Dianteiros LD, 1x Jogo de Pastilhas"
   itensAnalistas: PecasItem[];
   enderecoEntrega?: string; // Delivery address free text or selected client address
-  destinoCep?: string; // Optional CEP for routing on free address delivery
   destinatarioNome?: string; // Destination workshop name if any
   retornoPeca: boolean; // Retorno de Peça por Erro de Aplicação
   taxaReversa?: number; // Valor da taxa se retornoPeca for true

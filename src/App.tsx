@@ -305,6 +305,22 @@ export default function App() {
   const [editClientSenha, setEditClientSenha] = useState<string>('');
   const [editClientMotoboysAtivos, setEditClientMotoboysAtivos] = useState<number>(1);
   const [editClientRamo, setEditClientRamo] = useState<string>('Autopeças');
+  const [editClientNotaAdmin, setEditClientNotaAdmin] = useState<string>('');
+  const [editClientAdminBloqueado, setEditClientAdminBloqueado] = useState<boolean>(false);
+
+  // --- SUB-CLIENT MANAGEMENT INSIDE PARTNER EDITOR MODAL ---
+  const [subCliEditingId, setSubCliEditingId] = useState<string | null>(null);
+  const [subCliNome, setSubCliNome] = useState<string>('');
+  const [subCliEmail, setSubCliEmail] = useState<string>('');
+  const [subCliSenha, setSubCliSenha] = useState<string>('');
+  const [subCliEndereco, setSubCliEndereco] = useState<string>('');
+  const [subCliTelefone, setSubCliTelefone] = useState<string>('');
+  const [subCliRamo, setSubCliRamo] = useState<string>('Oficina mecânica');
+  const [subCliQuadrante, setSubCliQuadrante] = useState<Quadrante>('A');
+  const [subCliNotaAdmin, setSubCliNotaAdmin] = useState<string>('');
+  const [subCliAdminBloqueado, setSubCliAdminBloqueado] = useState<boolean>(false);
+  const [subCliValorCobradoCliente, setSubCliValorCobradoCliente] = useState<number>(10.00);
+  const [subCliValorPagoMotoboy, setSubCliValorPagoMotoboy] = useState<number>(4.00);
 
   // --- STATES FOR FIRST ACCESS SELF-REGISTRATION ---
   const [isFirstAccessModalOpen, setIsFirstAccessModalOpen] = useState<boolean>(false);
@@ -355,6 +371,10 @@ export default function App() {
   ]);
   const [showSimulatedInbox, setShowSimulatedInbox] = useState<boolean>(false);
   const [selectedSimulatedEmail, setSelectedSimulatedEmail] = useState<any | null>(null);
+
+  // --- LOGGED-IN SESSION HUD STATES ---
+  const [showLoggedSessionStatus, setShowLoggedSessionStatus] = useState<boolean>(false);
+  const [sessionStartTime] = useState<Date>(() => new Date());
 
   // --- FUNÇÃO PARA ENVIAR EMAIL REAL VIA SMTP ---
   const sendRealEmail = async (to: string, subject: string, body: string, html?: string) => {
@@ -484,25 +504,6 @@ export default function App() {
   });
   const [rememberPreference, setRememberPreference] = useState<boolean>(false);
 
-  // --- ADAPTIVE DEVICE LAYOUT ENGINE (PC vs MOBILE AUTOMATOR) ---
-  const [appScalingMode, setAppScalingMode] = useState<'pc' | 'mobile' | 'auto'>(() => {
-    const saved = localStorage.getItem('torquelog_app_scaling_mode');
-    return (saved as 'pc' | 'mobile' | 'auto') || 'auto';
-  });
-  const [detectedScale, setDetectedScale] = useState<'pc' | 'mobile'>('pc');
-
-  useEffect(() => {
-    const detect = () => {
-      const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-      const isNarrow = window.innerWidth < 1024;
-      // Autopeças/Admins work on PC (larger monitors/screens), while Motoboys on Street work on Mobile (narrow screens/touch)
-      setDetectedScale((isNarrow || isTouch) ? 'mobile' : 'pc');
-    };
-    detect();
-    window.addEventListener('resize', detect);
-    return () => window.removeEventListener('resize', detect);
-  }, []);
-
   useEffect(() => {
     const interval = setInterval(() => {
       setAnimationTick(prev => (prev + 1) % 100);
@@ -609,6 +610,7 @@ export default function App() {
   // --- DATABASE SYNCHRONIZATION AND PRE-POPULATION (FIREBASE & SUPABASE) ---
   const [supabaseLoading, setSupabaseLoading] = useState<boolean>(false);
   const [supabaseSuccessMsg, setSupabaseSuccessMsg] = useState<string>('');
+  const [adminFirebaseSaveMsg, setAdminFirebaseSaveMsg] = useState<string | null>(null);
   const [dbSyncStatus, setDbSyncStatus] = useState<'synced' | 'connecting' | 'updating' | 'local'>(
     (isFirebaseConfigured || isSupabaseConfigured) ? 'connecting' : 'local'
   );
@@ -975,8 +977,6 @@ export default function App() {
 
   // --- STATES FOR CLIENT WORKSPACE DISPATCH FORM (CLEAN EXTRA OPTIONS) ---
   const [destinoTipo, setDestinoTipo] = useState<'endereco' | 'cliente'>('endereco');
-  const [destinoCEP, setDestinoCEP] = useState<string>('');
-  const [isFetchingDestinoCEP, setIsFetchingDestinoCEP] = useState<boolean>(false);
   const [destinoEndereco, setDestinoEndereco] = useState<string>('');
   const [destinoQuadrante, setDestinoQuadrante] = useState<Quadrante>('A');
   const [destinoClienteId, setDestinoClienteId] = useState<string>('');
@@ -1227,6 +1227,31 @@ export default function App() {
 
     return { hojeCount, hojeBilling, mesCount, mesBilling };
   }, [activeClienteUser, ordens]);
+
+  // --- ONLINE / LOGGED-IN USERS REAL-TIME AGGREGATOR ---
+  const onlineUsersInfo = useMemo(() => {
+    // Pick unique partners that are simulated as online
+    const onlineClientes = clientes.filter((c, idx) => {
+      if (!c.criadoPorClienteId && idx % 3 === 0) return true;
+      if (activeClienteUser && c.id === activeClienteUser.id) return true;
+      return false;
+    });
+
+    // Pick unique motoboys that are simulated as online
+    const onlineMotoboys = motoboys.filter((m, idx) => {
+      if (idx % 2 === 0) return true;
+      if (activeMotoboyUser && m.id === activeMotoboyUser.id) return true;
+      return false;
+    });
+
+    const totalOnlineCount = 1 + onlineClientes.length + onlineMotoboys.length;
+
+    return {
+      onlineClientes,
+      onlineMotoboys,
+      totalOnlineCount,
+    };
+  }, [clientes, motoboys, activeClienteUser, activeMotoboyUser]);
 
   // Financial calculation per client for daily and monthly billing (Invoicing/NF Control)
   const clientBillingStats = useMemo(() => {
@@ -1671,6 +1696,14 @@ export default function App() {
     setClientes(prev => [novoCli, ...prev]);
     setIsAddingNewClient(false);
 
+    if (supabase) {
+      syncClientesToSupabase([novoCli]).catch(err => console.error(err));
+    }
+    if (isFirebaseConfigured) {
+      syncSingleClienteToFirebase(novoCli).catch(err => console.error(err));
+    }
+    setAdminFirebaseSaveMsg(`O novo parceiro "${novoCli.nome}" foi pré-registrado e sincronizado com sucesso no Firebase e no Supabase!`);
+
     // Simulated Inbox Dispatch
     const clientEmailEntry = {
       id: `EML-${Math.floor(1005 + Math.random() * 8990)}`,
@@ -1780,14 +1813,150 @@ export default function App() {
       senha: editClientSenha || clienteParaEditar.senha,
       motoboysAtivos: Number(editClientMotoboysAtivos) || 0,
       ramo: editClientRamo,
-      indicadoPorRepId: editClientIndicadoPorRepId || undefined
+      indicadoPorRepId: editClientIndicadoPorRepId || undefined,
+      notaAdmin: editClientNotaAdmin,
+      adminBloqueado: editClientAdminBloqueado
     };
 
     setClientes(prev => prev.map(c => c.id === clienteParaEditar.id ? updatedCli : c));
+    syncClientesToSupabase([updatedCli]).catch(err => console.error(err));
+    if (isFirebaseConfigured) {
+      syncSingleClienteToFirebase(updatedCli).catch(err => console.error(err));
+    }
     setClienteParaEditar(null);
 
+    setAdminFirebaseSaveMsg(`Os dados do parceiro "${updatedCli.nome}" foram salvos e sincronizados com sucesso no Firebase e no Supabase!`);
     setSupabaseSuccessMsg(`✅ Cadastro de "${updatedCli.nome}" atualizado com sucesso!`);
     setTimeout(() => setSupabaseSuccessMsg(''), 4000);
+  };
+
+  // --- SUB-CLIENT (OFICINA) HANDLERS INSIDE PARTNER EDIT MODAL ---
+  const handleSaveSubClient = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!clienteParaEditar) return;
+    if (!subCliNome.trim()) {
+      alert("Por favor, informe o nome do cliente.");
+      return;
+    }
+    if (!subCliEmail.trim()) {
+      alert("Por favor, preencha o E-mail de cadastro do cliente.");
+      return;
+    }
+
+    if (subCliEditingId) {
+      // Edit existing
+      const updatedList = clientes.map(c => {
+        if (c.id === subCliEditingId) {
+          return {
+            ...c,
+            nome: subCliNome,
+            email: subCliEmail,
+            senha: subCliSenha || c.senha,
+            endereco: subCliEndereco,
+            telefone: subCliTelefone,
+            ramo: subCliRamo,
+            quadrante: subCliQuadrante,
+            valorCobradoCliente: Number(subCliValorCobradoCliente),
+            valorPagoMotoboy: Number(subCliValorPagoMotoboy),
+            notaAdmin: subCliNotaAdmin,
+            adminBloqueado: subCliAdminBloqueado,
+          };
+        }
+        return c;
+      });
+      setClientes(updatedList);
+      const updatedObj = updatedList.find(c => c.id === subCliEditingId);
+      if (updatedObj && syncClientesToSupabase) {
+        await syncClientesToSupabase([updatedObj]).catch(err => console.error(err));
+      }
+      if (updatedObj && isFirebaseConfigured) {
+        syncSingleClienteToFirebase(updatedObj).catch(err => console.error(err));
+      }
+      setAdminFirebaseSaveMsg(`As alterações no cliente/oficina "${subCliNome}" foram gravadas com sucesso no Firebase e no Supabase!`);
+      setSupabaseSuccessMsg(`✅ Cliente do Parceiro "${subCliNome}" atualizado com sucesso!`);
+    } else {
+      // Create new
+      const novoId = `CLI-${subCliQuadrante}-${Math.floor(1000 + Math.random() * 9000)}`;
+      const novoSubCli: Cliente = {
+        id: novoId,
+        nome: subCliNome,
+        quadrante: subCliQuadrante,
+        endereco: subCliEndereco || 'Pendente - Preencher no 1º Acesso',
+        telefone: subCliTelefone || 'Pendente - Preencher no 1º Acesso',
+        cidade: clienteParaEditar.cidade || 'Passos - MG',
+        valorPagoMotoboy: Number(subCliValorPagoMotoboy) || 4.00,
+        valorCobradoCliente: Number(subCliValorCobradoCliente) || 10.00,
+        senha: subCliSenha || 'mecanica123',
+        email: subCliEmail,
+        emailConfirmado: true,
+        cadastroCompleto: true,
+        primeiroAcessoPendente: false,
+        criadoPor: 'Cliente',
+        criadoEm: new Date().toISOString(),
+        criadoPorClienteId: clienteParaEditar.id, // Linked to the partner
+        ramo: subCliRamo,
+        notaAdmin: subCliNotaAdmin,
+        adminBloqueado: subCliAdminBloqueado
+      };
+
+      setClientes(prev => [novoSubCli, ...prev]);
+
+      if (syncClientesToSupabase) {
+        await syncClientesToSupabase([novoSubCli]).catch(err => console.error(err));
+      }
+      if (isFirebaseConfigured) {
+        syncSingleClienteToFirebase(novoSubCli).catch(err => console.error(err));
+      }
+
+      // Simulated e-mail dispatch to the new subclient
+      const clientEmailEntry = {
+        id: `EML-${Math.floor(1005 + Math.random() * 8990)}`,
+        para: novoSubCli.email,
+        assunto: `🔑 Canal B2B Ativado - Parceiro: ${clienteParaEditar.nome}`,
+        corpo: `Olá, ${novoSubCli.nome}!\n\nSeu cadastro sob indicação do Parceiro e distribuidor parceiro "${clienteParaEditar.nome}" foi finalizado com sucesso no TorqueLog.\n\nSeu login está pronto sem necessidade de validações.\n\n🔑 Credenciais de Acesso:\n• Painel: Cliente B2B\n• Senha: ${novoSubCli.senha}\n\nEntre no TorqueLog para utilizar entregas expressas gratuitas e acompanhar seus produtos em tempo real.\n\nAtenciosamente,\nSuporte Técnico TorqueLog`,
+        codigo: novoSubCli.senha,
+        data: new Date().toLocaleTimeString(),
+        lido: false
+      };
+      setSimulatedEmails(prev => [clientEmailEntry, ...prev]);
+      if (novoSubCli.email && sendRealEmail) {
+        sendRealEmail(novoSubCli.email, clientEmailEntry.assunto, clientEmailEntry.corpo);
+      }
+
+      setAdminFirebaseSaveMsg(`O novo cliente/oficina "${subCliNome}" foi cadastrado no banco de dados e sincronizado com sucesso no Firebase e no Supabase!`);
+      setSupabaseSuccessMsg(`🚀 Cliente do Parceiro "${subCliNome}" cadastrado e associado!`);
+    }
+
+    // Reset sub-form fields
+    setSubCliEditingId(null);
+    setSubCliNome('');
+    setSubCliEmail('');
+    setSubCliSenha('');
+    setSubCliEndereco('');
+    setSubCliTelefone('');
+    setSubCliRamo('Oficina mecânica');
+    setSubCliQuadrante(clienteParaEditar.quadrante || 'A');
+    setSubCliNotaAdmin('');
+    setSubCliAdminBloqueado(false);
+    setSubCliValorCobradoCliente(10.00);
+    setSubCliValorPagoMotoboy(4.00);
+
+    setTimeout(() => setSupabaseSuccessMsg(''), 4500);
+  };
+
+  const handleEditSubClientInsideModal = (sub: Cliente) => {
+    setSubCliEditingId(sub.id);
+    setSubCliNome(sub.nome);
+    setSubCliEmail(sub.email || '');
+    setSubCliSenha(sub.senha || '');
+    setSubCliEndereco(sub.endereco || '');
+    setSubCliTelefone(sub.telefone || '');
+    setSubCliRamo(sub.ramo || 'Oficina mecânica');
+    setSubCliQuadrante(sub.quadrante || 'A');
+    setSubCliNotaAdmin(sub.notaAdmin || '');
+    setSubCliAdminBloqueado(!!sub.adminBloqueado);
+    setSubCliValorCobradoCliente(sub.valorCobradoCliente || 10.00);
+    setSubCliValorPagoMotoboy(sub.valorPagoMotoboy || 4.00);
   };
 
   // Delete client (CRUD delete) - Open confirmation modal
@@ -1909,6 +2078,7 @@ export default function App() {
     setMotoboyParaEditar(null);
     setEditMotoboyEmpresaExclusiva('');
 
+    setAdminFirebaseSaveMsg(`A atualização cadastral do motoboy "${updatedMb.nome}" foi gravada e sincronizada com sucesso no Firebase e no Supabase!`);
     setSupabaseSuccessMsg(`✅ Cadastro do motoboy "${updatedMb.nome}" atualizado com sucesso e refletido no painel! 🏍️`);
     setTimeout(() => setSupabaseSuccessMsg(''), 4000);
   };
@@ -2075,7 +2245,7 @@ export default function App() {
   };
 
   // --- INTEGRATED VIA CEP LOOKUP ENGINE (AUTO-RESOLVE ADRESS/CITY) ---
-  const handleFetchCEP = async (cep: string, target: 'selfReg' | 'newClient' | 'editClient' | 'clientNewClient' | 'firstAccess' | 'destino') => {
+  const handleFetchCEP = async (cep: string, target: 'selfReg' | 'newClient' | 'editClient' | 'clientNewClient' | 'firstAccess') => {
     const cleanedCEP = cep.replace(/\D/g, '');
     
     // Regex validation to ensure only digits exist and it has exactly 8 characters
@@ -2093,7 +2263,6 @@ export default function App() {
     else if (target === 'editClient') setIsFetchingEditClientCEP(true);
     else if (target === 'clientNewClient') setIsClientFetchingNewClientCEP(true);
     else if (target === 'firstAccess') setIsFetchingFirstAccessCEP(true);
-    else if (target === 'destino') setIsFetchingDestinoCEP(true);
 
     try {
       const response = await fetch(`https://viacep.com.br/ws/${cleanedCEP}/json/`);
@@ -2120,8 +2289,6 @@ export default function App() {
         } else if (target === 'firstAccess') {
           setFirstAccessEndereco(fullAddress);
           setFirstAccessCidade(cityState);
-        } else if (target === 'destino') {
-          setDestinoEndereco(fullAddress);
         }
       } else {
         setCepErrorState(prev => ({ ...prev, [target]: 'CEP não cadastrado ou inexistente.' }));
@@ -2136,11 +2303,10 @@ export default function App() {
       else if (target === 'editClient') setIsFetchingEditClientCEP(false);
       else if (target === 'clientNewClient') setIsClientFetchingNewClientCEP(false);
       else if (target === 'firstAccess') setIsFetchingFirstAccessCEP(false);
-      else if (target === 'destino') setIsFetchingDestinoCEP(false);
     }
   };
 
-  const handleCEPChange = (val: string, target: 'selfReg' | 'newClient' | 'editClient' | 'clientNewClient' | 'firstAccess' | 'destino') => {
+  const handleCEPChange = (val: string, target: 'selfReg' | 'newClient' | 'editClient' | 'clientNewClient' | 'firstAccess') => {
     // Regex validation to check for invalid characters (only allows digits, spaces, and hyphens)
     const hasInvalidChar = /[^\d\s-]/.test(val);
     
@@ -2190,13 +2356,6 @@ export default function App() {
       setFirstAccessCEP(displayVal);
       if (formatted.length === 8) {
         handleFetchCEP(formatted, 'firstAccess');
-      } else if (formatted.length > 0 && formatted.length < 8) {
-        setCepErrorState(prev => ({ ...prev, [target]: 'Formato incorreto. O CEP deve possuir 8 dígitos.' }));
-      }
-    } else if (target === 'destino') {
-      setDestinoCEP(displayVal);
-      if (formatted.length === 8) {
-        handleFetchCEP(formatted, 'destino');
       } else if (formatted.length > 0 && formatted.length < 8) {
         setCepErrorState(prev => ({ ...prev, [target]: 'Formato incorreto. O CEP deve possuir 8 dígitos.' }));
       }
@@ -2672,7 +2831,7 @@ export default function App() {
     const origem = `${cli?.endereco || ''}${origemCep}, ${deCidade}`;
     
     const destCli = clientes.find(c => c.nome.toLowerCase() === o.destinatarioNome?.toLowerCase() || c.id === o.destinatarioNome);
-    const destCep = destCli?.cep ? `, CEP ${destCli.cep}` : (o.destinoCep ? `, CEP ${o.destinoCep}` : '');
+    const destCep = destCli?.cep ? `, CEP ${destCli.cep}` : '';
     const destCidade = destCli?.cidade || deCidade;
     const destino = `${o.enderecoEntrega || ''}${destCep}, ${destCidade}`;
     
@@ -2689,7 +2848,7 @@ export default function App() {
       const origem = `${cli?.endereco || ''}${origemCep}, ${deCidade}`;
       
       const destCli = clientes.find(c => c.nome.toLowerCase() === activeOrder.destinatarioNome?.toLowerCase() || c.id === activeOrder.destinatarioNome);
-      const destCep = destCli?.cep ? `, CEP ${destCli.cep}` : (activeOrder.destinoCep ? `, CEP ${activeOrder.destinoCep}` : '');
+      const destCep = destCli?.cep ? `, CEP ${destCli.cep}` : '';
       const destCidade = destCli?.cidade || deCidade;
       const destino = `${activeOrder.enderecoEntrega || ''}${destCep}, ${destCidade}`;
       
@@ -2853,116 +3012,13 @@ export default function App() {
 
   const effectiveRole = activeSessionRole === 'Empresa' ? adminVisualPerspective : activeSessionRole;
 
-  // --- COMPUTE ENHANCED ROLE-BASED DYNAMIC SCALE FACTOR ---
-  // Motoboys work on streets (touch/compact phone screens), while Autopedais & Admins operate from front-desk PCs
-  const isMotoboySession = effectiveRole === 'Motoboy';
-  const effectiveScale = appScalingMode === 'auto'
-    ? (isMotoboySession ? 'mobile' : detectedScale)
-    : appScalingMode;
-
   return (
     <>
-      <style>{`
-        /* Dynamic Adaptation and Viewport Optimization for PC and Mobile modes */
-        ${effectiveScale === 'pc' ? `
-          html {
-            font-size: 16px !important;
-          }
-          #torquelog-app {
-            max-width: 100vw !important;
-          }
-          .scale-factor-dashboard {
-            max-width: 1600px !important;
-            padding-left: 2rem !important;
-            padding-right: 2rem !important;
-          }
-          .grid-pc-cols-3 {
-            grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
-          }
-          .grid-pc-cols-4 {
-            grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
-          }
-        ` : `
-          html {
-            font-size: 14px !important;
-          }
-          /* Ensure deliverers can tap easily on mobile screens */
-          button, a.cta-btn, input, select {
-            min-height: 44px;
-            touch-action: manipulation;
-          }
-          /* Force columns to stack on mobile */
-          .grid-pc-cols-3, .grid-pc-cols-4 {
-            grid-template-columns: 1fr !important;
-          }
-        `}
-        /* Soft transitions while changing scaling modes */
-        body, #torquelog-app, #login-screen {
-          transition: font-size 0.2s ease-in-out, max-width 0.2s ease-in-out;
-        }
-      `}</style>
-
       {!activeSessionRole ? (
         <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-between p-4 sm:p-6 md:p-8 font-sans selection:bg-orange-500 selection:text-white relative overflow-hidden" id="login-screen">
         
         {/* Abstract background ambient aura */}
         <div className="absolute top-[-20%] left-[-10%] w-[500px] h-[500px] rounded-full bg-orange-600/10 blur-[130px] pointer-events-none" />
-
-        {/* ADAPTIVE DEVICE OPTIMIZATION CONTROL BAR - LOGIN PAGE */}
-        <div className="max-w-4xl w-full mx-auto bg-slate-900/40 backdrop-blur-md rounded-xl border border-slate-800/85 px-4 py-2.5 flex flex-col sm:flex-row items-center justify-between gap-3 text-[11px] font-mono mb-4 relative z-50">
-          <div className="flex items-center gap-2 text-slate-300">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-orange-500"></span>
-            </span>
-            <span>Exibição Otimizada:</span>
-            <strong className={`${effectiveScale === 'pc' ? 'text-orange-400' : 'text-emerald-400'} font-bold uppercase`}>
-              {effectiveScale === 'pc' ? '🖥️ Computador (Zoom Ampliado)' : '📱 Celular / Compacto (Mobile)'}
-            </strong>
-            {appScalingMode === 'auto' && (
-              <span className="text-[9px] text-slate-500 font-normal italic">(Detecção Automática)</span>
-            )}
-          </div>
-          <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-lg border border-slate-850">
-            <button 
-              type="button"
-              onClick={() => {
-                setAppScalingMode('auto');
-                localStorage.setItem('torquelog_app_scaling_mode', 'auto');
-              }}
-              className={`px-2 py-1 rounded text-[10px] font-bold font-mono transition-all duration-155 cursor-pointer ${
-                appScalingMode === 'auto' ? 'bg-orange-500 text-slate-950 shadow-sm' : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              🔄 Auto
-            </button>
-            <button 
-              type="button"
-              onClick={() => {
-                setAppScalingMode('pc');
-                localStorage.setItem('torquelog_app_scaling_mode', 'pc');
-              }}
-              className={`px-2 py-1 rounded text-[10px] font-bold font-mono transition-all duration-155 cursor-pointer ${
-                appScalingMode === 'pc' ? 'bg-orange-500 text-slate-950 shadow-sm' : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              🖥️ PC
-            </button>
-            <button 
-              type="button"
-              onClick={() => {
-                setAppScalingMode('mobile');
-                localStorage.setItem('torquelog_app_scaling_mode', 'mobile');
-              }}
-              className={`px-2 py-1 rounded text-[10px] font-bold font-mono transition-all duration-155 cursor-pointer ${
-                appScalingMode === 'mobile' ? 'bg-orange-500 text-slate-950 shadow-sm' : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              📱 Mobile
-            </button>
-          </div>
-        </div>
-
         {/* Top header branding */}
         <header className="max-w-4xl w-full mx-auto flex flex-col md:flex-row justify-between items-center gap-4 py-6 border-b border-slate-900">
           <div className="flex items-center gap-4">
@@ -3554,7 +3610,7 @@ export default function App() {
               <div>
                 {effectiveRole === 'Empresa' ? (
                   <>
-                    <span className="block text-[9px] text-slate-400 leading-none">Distribuidoras Cadastradas</span>
+                    <span className="block text-[9px] text-slate-400 leading-none">Parceiros Cadastrados</span>
                     <span className="text-sm font-bold text-white">
                       {clientes.filter(c => !c.criadoPorClienteId).length}{' '}
                       <span className="text-[10px] text-slate-400">ativas</span>
@@ -3629,7 +3685,23 @@ export default function App() {
               </div>
             </div>
 
-            {/* 📬 INTERACTIVE SIMULATED EMAIL INBOX POPOVER (NEXT TO CANAL DATABASE) */}
+            {/* 🟢 HUD ONLINE USERS METER (ADMIN VIEW ONLY) */}
+            {activeSessionRole === 'Empresa' && (
+              <div className="bg-slate-800/80 px-3 py-1.5 rounded border border-emerald-500/25 font-mono text-xs flex items-center gap-2" id="header-admin-online-indicator">
+                <span className="relative flex h-2.5 w-2.5">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                </span>
+                <div className="text-left font-mono">
+                  <span className="block text-[8.5px] text-emerald-400 leading-none">Usuários Online</span>
+                  <span className="text-xs font-bold text-white block uppercase tracking-tight">
+                    {onlineUsersInfo.totalOnlineCount} Logados
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* 📬 INTERACTIVE SIMULATED EMAIL INBOX POPOVER (ADMIN ONLY) */}
             {activeSessionRole === 'Empresa' && (
               <div className="relative" id="header-central-emails-simulados">
                 <button
@@ -3800,71 +3872,115 @@ export default function App() {
                 )}
               </div>
             )}
+
+            {/* 🟢 INTERACTIVE ACTIVE SESSION ACCOUNT WIDGET FOR PARTNER AND DRIVERS */}
+            {(activeSessionRole === 'Cliente' || activeSessionRole === 'Motoboy') && (
+              <div className="relative" id="header-user-status-section">
+                <button
+                  type="button"
+                  onClick={() => setShowLoggedSessionStatus(!showLoggedSessionStatus)}
+                  className="px-3 py-1.5 rounded border border-emerald-500/30 hover:border-emerald-500/60 bg-emerald-950/30 text-emerald-300 font-mono text-xs flex items-center gap-2 cursor-pointer transition-all hover:scale-[1.02] shadow-sm uppercase font-bold"
+                >
+                  <div className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                  </div>
+                  <div className="text-left font-mono">
+                    <span className="block text-[8.5px] text-emerald-400 leading-none">Sessão Ativa</span>
+                    <span className="text-xs font-bold text-white block uppercase tracking-tight">
+                      CONECTADO 🟢
+                    </span>
+                  </div>
+                </button>
+
+                {showLoggedSessionStatus && (
+                  <div className="absolute right-0 top-12 z-50 bg-slate-900 border border-slate-800 rounded-xl shadow-2xl w-[310px] p-4 flex flex-col gap-3 font-mono animate-in fade-in slide-in-from-top-2 duration-150">
+                    {/* Header info */}
+                    <div className="border-b border-slate-800 pb-2 flex items-center gap-2 justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                        <div>
+                          <h4 className="text-[10px] font-black text-white uppercase tracking-wider leading-none">Conta Conectada</h4>
+                          <span className="text-[8px] text-slate-400 leading-none">Canal de Segurança SLS</span>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setShowLoggedSessionStatus(false)}
+                        className="text-slate-400 hover:text-white font-mono text-[10px] font-black hover:bg-slate-850 w-5 h-5 rounded flex items-center justify-center cursor-pointer transition"
+                      >
+                        ✕
+                      </button>
+                    </div>
+
+                    {/* Main Session Card details */}
+                    <div className="bg-slate-950/90 border border-slate-850 p-3 rounded-lg space-y-2 text-[11px] text-slate-350">
+                      <p className="flex justify-between items-center border-b border-slate-850/40 pb-1.5">
+                        <span className="text-slate-500">Nome:</span>
+                        <span className="font-bold text-white tracking-tight text-right truncate max-w-[170px]">
+                          {activeSessionRole === 'Cliente' ? activeClienteUser?.nome : activeMotoboyUser?.nome}
+                        </span>
+                      </p>
+                      <p className="flex justify-between items-center border-b border-slate-850/40 pb-1.5">
+                        <span className="text-slate-500">Setor/Perfil:</span>
+                        <span className="font-bold text-orange-400">
+                          {activeSessionRole === 'Cliente' ? '🏢 Parceiro B2B' : '🏍️ Entregador MEI'}
+                        </span>
+                      </p>
+                      <p className="flex justify-between items-center border-b border-slate-850/40 pb-1.5">
+                        <span className="text-slate-500">Segurança:</span>
+                        <span className="font-mono text-emerald-400 font-bold uppercase text-[9.5px]">Encriptado TLS</span>
+                      </p>
+                      <p className="flex justify-between items-center pr-0.5">
+                        <span className="text-slate-500 text-[10px]">Banco Integrado:</span>
+                        <span className="text-slate-300 font-mono text-[9px] uppercase font-bold">
+                          {isFirebaseConfigured ? 'Firebase' : (isSupabaseConfigured ? 'Supabase' : 'Modo Simulador')}
+                        </span>
+                      </p>
+                    </div>
+
+                    {/* Dynamic uptime stats */}
+                    <div className="bg-slate-950/50 p-2.5 rounded-lg border border-slate-850 space-y-2 text-[10px]">
+                      <p className="flex justify-between">
+                        <span className="text-slate-500">Sessão Iniciada:</span>
+                        <span className="text-slate-300">{sessionStartTime.toLocaleTimeString()}</span>
+                      </p>
+                      <p className="flex justify-between">
+                        <span className="text-slate-500">IP de Conexão:</span>
+                        <span className="text-slate-300 font-mono">186.222.10{Math.floor(Math.random() * 9)}.{Math.floor(100 + Math.random() * 100)}</span>
+                      </p>
+                      <p className="flex justify-between">
+                        <span className="text-slate-500">Tempo de Atividade:</span>
+                        <span className="text-emerald-400 font-bold animate-pulse">
+                          {(() => {
+                            const diffSecs = Math.floor((Date.now() - sessionStartTime.getTime()) / 1000);
+                            const m = Math.floor(diffSecs / 60);
+                            const s = diffSecs % 60;
+                            return `${m.toString().padStart(2, '0')}m ${s.toString().padStart(2, '0')}s`;
+                          })()}
+                        </span>
+                      </p>
+                    </div>
+
+                    {/* Log out action */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowLoggedSessionStatus(false);
+                        handleLogout();
+                      }}
+                      className="w-full bg-red-950 hover:bg-red-900 border border-red-900/40 text-red-400 hover:text-white py-1.5 rounded-lg text-[9.5px] font-bold tracking-widest cursor-pointer font-mono uppercase text-center"
+                    >
+                      Desconectar Conta
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
         </div>
       </header>
-
-      {/* --- REAL-TIME DEVICE ADAPTATION AND DYN-VIEWPORT CONTROLLER --- */}
-      <section className="bg-slate-900 border-b border-slate-800 py-2.5 px-4 outline-none" id="device-adaptability-bar">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-3 text-xs font-mono">
-          <div className="flex flex-wrap items-center gap-2.5 text-slate-350">
-            <span className="relative flex h-2 w-2">
-              <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${effectiveScale === 'pc' ? 'bg-orange-400' : 'bg-emerald-400'}`}></span>
-              <span className={`relative inline-flex rounded-full h-2 w-2 ${effectiveScale === 'pc' ? 'bg-orange-500' : 'bg-emerald-500'}`}></span>
-            </span>
-            <span className="text-slate-400">Exibição Ativa:</span>
-            <strong className={`${effectiveScale === 'pc' ? 'text-orange-400' : 'text-emerald-400'} font-black uppercase flex items-center gap-1`}>
-              {effectiveScale === 'pc' ? '🖥️ Computador (Zoom Ampliado +15% - Autopeças & Gestão)' : '📱 Celular / Compacto (Toques Ampliados - Entregadores)'}
-            </strong>
-            {appScalingMode === 'auto' && (
-              <span className="text-[10px] text-slate-500 font-normal italic">(Sensor Ativo: {detectedScale === 'pc' ? 'Desktop' : 'Celular'})</span>
-            )}
-          </div>
-          
-          <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-850">
-            <button
-              type="button"
-              onClick={() => {
-                setAppScalingMode('auto');
-                localStorage.setItem('torquelog_app_scaling_mode', 'auto');
-              }}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold font-mono transition-all duration-150 cursor-pointer ${
-                appScalingMode === 'auto' ? 'bg-orange-500 text-slate-950 shadow-md' : 'text-slate-400 hover:text-white'
-              }`}
-              title="Detecta se é computador ou celular automaticamente por tamanho de tela e touch"
-            >
-              🔄 Auto
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setAppScalingMode('pc');
-                localStorage.setItem('torquelog_app_scaling_mode', 'pc');
-              }}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold font-mono transition-all duration-150 cursor-pointer ${
-                appScalingMode === 'pc' ? 'bg-orange-500 text-slate-950 shadow-md' : 'text-slate-400 hover:text-white'
-              }`}
-              title="Força o modo Computador com fontes maiores e tabelas expandidas para empresas de autopeças"
-            >
-              🖥️ Computador
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setAppScalingMode('mobile');
-                localStorage.setItem('torquelog_app_scaling_mode', 'mobile');
-              }}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold font-mono transition-all duration-150 cursor-pointer ${
-                appScalingMode === 'mobile' ? 'bg-orange-500 text-slate-950 shadow-md' : 'text-slate-400 hover:text-white'
-              }`}
-              title="Força o modo Celular com visual compacto e áreas de toque ampliadas para entregadores de moto"
-            >
-              📱 Celular
-            </button>
-          </div>
-        </div>
-      </section>
 
       {/* ==========================================
           STICKY SIMULATION PANEL (ADMIN PERSPECTIVES)
@@ -3900,7 +4016,7 @@ export default function App() {
                     : 'bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-755'
                 }`}
               >
-                🏢 Portal da Distribuidora B2B
+                🏢 Portal do Parceiro B2B
               </button>
               <button
                 onClick={() => {
@@ -4024,6 +4140,57 @@ export default function App() {
                  ⚙️ Taxas & Valores
                </button>
              </div>
+          </div>
+
+          {/* --- REAL-TIME ACTIVE SESSIONS / ONLINE USERS AUDIT STRIP --- */}
+          <div className="mt-3.5 bg-slate-900/95 text-white border border-slate-800 rounded-2xl p-4 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 shadow-lg font-mono animate-in fade-in slide-in-from-top-2 duration-200">
+            <div className="flex items-center gap-3">
+              <span className="flex h-3 w-3 relative">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+              </span>
+              <div>
+                <span className="text-[10px] text-emerald-400 uppercase tracking-widest font-black leading-none block">Monitoramento de Conexões</span>
+                <h3 className="text-white font-extrabold text-sm flex items-center gap-1.5 mt-1">
+                  <span>{onlineUsersInfo.totalOnlineCount} SESSÕES ATIVAS</span>
+                  <span className="text-[10px] bg-emerald-950/80 text-emerald-400 px-2 py-0.5 rounded border border-emerald-500/20 font-bold uppercase shrink-0">Server Online</span>
+                </h3>
+              </div>
+            </div>
+
+            {/* Break down of logged status */}
+            <div className="flex flex-wrap items-center gap-2 text-xs font-mono">
+              <div className="bg-slate-950/90 border border-slate-800 px-3 py-1.5 rounded-xl flex items-center gap-2">
+                <span className="text-sm">🛡️</span>
+                <div>
+                  <span className="text-[9px] text-slate-500 block leading-none">ADMINISTRADOR</span>
+                  <p className="font-extrabold text-white text-[11px] mt-0.5">1 Online</p>
+                </div>
+              </div>
+              <div className="bg-slate-950/90 border border-slate-800 px-3 py-1.5 rounded-xl flex items-center gap-2">
+                <span className="text-sm">🏢</span>
+                <div>
+                  <span className="text-[9px] text-slate-500 block leading-none">PARCEIROS B2B</span>
+                  <p className="font-extrabold text-emerald-400 text-[11px] mt-0.5">
+                    {onlineUsersInfo.onlineClientes.length} Logados
+                  </p>
+                </div>
+              </div>
+              <div className="bg-slate-950/90 border border-slate-800 px-3 py-1.5 rounded-xl flex items-center gap-2">
+                <span className="text-sm">🏍️</span>
+                <div>
+                  <span className="text-[9px] text-slate-500 block leading-none">ENTREGADORES MEI</span>
+                  <p className="font-extrabold text-emerald-400 text-[11px] mt-0.5">
+                    {onlineUsersInfo.onlineMotoboys.length} Simulados
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="text-[10px] text-slate-400 bg-slate-950 border border-slate-850 px-3 py-1.5 rounded-xl flex flex-col justify-center items-end self-stretch lg:self-auto min-w-[130px]">
+              <span className="text-[8px] text-slate-500 uppercase leading-none block">Status Gateway</span>
+              <span className="font-bold text-white mt-0.5">Passos-MG (HTTPS)</span>
+            </div>
           </div>
         </div>
       )}
@@ -4506,7 +4673,7 @@ export default function App() {
             <div className="flex items-center justify-between mb-3.5">
               <div>
                 <h3 className="text-sm font-bold text-slate-800 uppercase font-mono tracking-tight">Catálogo de Clientes Separados</h3>
-                <p className="text-xs text-slate-400">Classificação: as Distribuidoras (clientes da TorqueLog) vs Clientes (oficinas) delas</p>
+                <p className="text-xs text-slate-400">Classificação: os Parceiros (clientes da TorqueLog) vs Clientes (oficinas) delas</p>
               </div>
               <button
                 onClick={() => {
@@ -4517,7 +4684,7 @@ export default function App() {
                 id="btn-add-client-distributor"
               >
                 <Plus className="w-3.5 h-3.5 text-orange-400" />
-                Nova Distribuidora (Cliente Torque)
+                Novo Parceiro (Cliente Torque)
               </button>
             </div>
 
@@ -4532,7 +4699,7 @@ export default function App() {
                     : 'text-slate-650 hover:bg-slate-200 hover:text-slate-900'
                 }`}
               >
-                🏢 Distribuidoras ({clientes.filter(c => !c.criadoPorClienteId).length})
+                🏢 Parceiros ({clientes.filter(c => !c.criadoPorClienteId).length})
               </button>
               <button
                 type="button"
@@ -4563,7 +4730,7 @@ export default function App() {
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               <input
                 type="text"
-                placeholder={adminClientFilterTab === 'distributors' ? "Pesquisar distribuidora TorqueLog..." : adminClientFilterTab === 'subclients' ? "Pesquisar clientes / oficinas registradas..." : "Pesquisar distribuidora ou oficina..."}
+                placeholder={adminClientFilterTab === 'distributors' ? "Pesquisar parceiro TorqueLog..." : adminClientFilterTab === 'subclients' ? "Pesquisar clientes / oficinas registradas..." : "Pesquisar parceiro ou oficina..."}
                 value={clienteSearchTerm}
                 onChange={(e) => setClienteSearchTerm(e.target.value)}
                 className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded-lg pl-8.5 pr-3 py-1.5 text-xs font-mono"
@@ -4749,6 +4916,22 @@ export default function App() {
                             setEditClientMotoboysAtivos(cli.motoboysAtivos || 0);
                             setEditClientRamo(cli.ramo || 'Autopeças');
                             setEditClientIndicadoPorRepId(cli.indicadoPorRepId || '');
+                            setEditClientNotaAdmin(cli.notaAdmin || '');
+                            setEditClientAdminBloqueado(!!cli.adminBloqueado);
+                            
+                            // Reset sub-client creation form states
+                            setSubCliEditingId(null);
+                            setSubCliNome('');
+                            setSubCliEmail('');
+                            setSubCliSenha('');
+                            setSubCliEndereco('');
+                            setSubCliTelefone('');
+                            setSubCliRamo('Oficina mecânica');
+                            setSubCliQuadrante(cli.quadrante || 'A');
+                            setSubCliNotaAdmin('');
+                            setSubCliAdminBloqueado(false);
+                            setSubCliValorCobradoCliente(10.00);
+                            setSubCliValorPagoMotoboy(4.00);
                           }}
                           className="bg-slate-100 hover:bg-slate-200 text-slate-705 p-1 rounded transition border border-slate-250 cursor-pointer"
                           title="Editar cadastro do cliente"
@@ -5307,14 +5490,14 @@ export default function App() {
                 {/* Distributor Selection Filter */}
                 <div className="bg-white border border-slate-200 rounded-lg p-3 space-y-2 shadow-xs">
                   <label className="block text-[10px] font-mono font-black text-slate-500 uppercase tracking-widest flex items-center gap-1.5">
-                    🏢 Filtrar por Distribuidora B2B
+                    🏢 Filtrar por Parceiro B2B
                   </label>
                   <select
                     value={calendarSelectedDistributorId}
                     onChange={(e) => setCalendarSelectedDistributorId(e.target.value)}
                     className="w-full bg-slate-50 border border-slate-250 text-slate-850 rounded-md p-1.5 text-xs font-bold focus:outline-none focus:border-orange-505 cursor-pointer"
                   >
-                    <option value="Todas">📊 Todas as Distribuidoras (Geral)</option>
+                    <option value="Todas">📊 Todos os Parceiros (Geral)</option>
                     {clientes.filter(c => !c.criadoPorClienteId).map(dist => (
                       <option key={dist.id} value={dist.id}>
                         🏢 {dist.nome} ({dist.cidade})
@@ -5323,7 +5506,7 @@ export default function App() {
                   </select>
                   {calendarSelectedDistributorId !== 'Todas' && (
                     <p className="text-[9.5px] text-orange-600 font-mono font-semibold">
-                      ⚡ Exibindo apenas a base histórica para esta distribuidora.
+                      ⚡ Exibindo apenas a base histórica para este parceiro.
                     </p>
                   )}
                 </div>
@@ -5643,7 +5826,7 @@ export default function App() {
                 <div>
                   <h4 className="text-sm font-black text-slate-800 uppercase font-mono tracking-wider flex items-center gap-2">
                     <FileText className="w-4 h-4 text-orange-505 animate-pulse" />
-                    Balanço por Distribuidora & Emissão de Nota Fiscal (B2B)
+                    Balanço por Parceiro B2B & Emissão de Nota Fiscal
                   </h4>
                   <p className="text-xs text-slate-450 mt-0.5">Valores apurados em tempo real para as entregas de status <strong className="text-emerald-700 font-mono">"Entregue"</strong> na competência selecionada.</p>
                 </div>
@@ -5656,7 +5839,7 @@ export default function App() {
                 <table className="w-full text-left border-collapse text-xs">
                   <thead>
                     <tr className="bg-slate-100/90 border-b border-slate-250 text-slate-600 font-mono text-[9px] uppercase font-extrabold tracking-wider">
-                      <th className="p-3">🏢 Distribuidora</th>
+                      <th className="p-3">🏢 Parceiro</th>
                       <th className="p-3 text-center">Setor</th>
                       <th className="p-3 text-center">Faturamento Hoje</th>
                       <th className="p-3 text-center">Entregas no Mês</th>
@@ -5752,7 +5935,7 @@ export default function App() {
               <div className="font-mono">
                 <h3 className="text-sm font-black text-indigo-900 uppercase tracking-tight">💵 Programa de Indicações TorqueLog Ativo</h3>
                 <p className="text-xs text-indigo-700 mt-1 leading-relaxed">
-                  Seus representantes comerciais atuam prospectando novos parceiros (Distribuidoras B2B). Ao cadastrar uma nova distribuidora associada a um representante, ele passa a receber uma comissão fixa de R$ {comissaoRepsPorEntrega.toFixed(2)} por cada entrega concluída pela distribuidora prospectada, independentemente do entregador que realize o frete.
+                  Seus representantes comerciais atuam prospectando novos parceiros (Parceiros B2B). Ao cadastrar um novo parceiro associado a um representante, ele passa a receber uma comissão fixa de R$ {comissaoRepsPorEntrega.toFixed(2)} por cada entrega concluída pelo parceiro prospectado, independentemente do entregador que realize o frete.
                 </p>
               </div>
             </div>
@@ -6013,7 +6196,7 @@ export default function App() {
                     <div className="bg-slate-50 border border-slate-200 p-3.5 rounded-xl mb-4 text-xs font-mono">
                       <h4 className="font-extrabold text-[10px] text-slate-800 uppercase flex items-center gap-1 mb-2">
                         <Plus className="w-3.5 h-3.5 text-slate-600 shrink-0" />
-                        Vincular Distribuidora Livre
+                        Vincular Parceiro Livre
                       </h4>
                       <div className="flex gap-2">
                         <select
@@ -6051,7 +6234,7 @@ export default function App() {
 
                   {/* List of active partners belonging to this representative */}
                   <h4 className="text-[9.5px] font-black text-slate-550 uppercase font-mono tracking-widest mb-2">
-                    Distribuidoras & Parceiros Prospectados:
+                    Parceiros & Clientes Prospectados:
                   </h4>
                   <div className="space-y-2 max-h-[350px] overflow-y-auto">
                     {repClients.map(cli => {
@@ -6910,7 +7093,6 @@ export default function App() {
                   itensDescricao: clientItemTexto.trim() || 'Objeto de Envio',
                   itensAnalistas: [], // Empty since we do not need items/cubage logic
                   enderecoEntrega: finalEndereco,
-                  destinoCep: isAddress ? destinoCEP : undefined,
                   destinatarioNome: finalDestName,
                   retornoPeca,
                   taxaReversa: retornoPeca ? 15 : undefined,
@@ -6948,7 +7130,6 @@ export default function App() {
 
                 // Reset B2B dispatch fields to empty / false defaults for the next entry
                 setDestinoEndereco('');
-                setDestinoCEP('');
                 setDestinoClienteId('');
                 setRetornoPeca(false);
                 setQuickClientNome('');
@@ -6967,8 +7148,8 @@ export default function App() {
               }} className="space-y-4">
                 
                 {destinoTipo === 'endereco' ? (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                    <div className="space-y-1 sm:col-span-2">
+                  <>
+                    <div className="space-y-1">
                       <label className="block text-xs font-bold text-slate-700 uppercase font-mono">Endereço de Entrega</label>
                       <input
                         type="text"
@@ -6976,38 +7157,8 @@ export default function App() {
                         value={destinoEndereco}
                         onChange={(e) => setDestinoEndereco(e.target.value)}
                         placeholder="Ex: Av. da Moda, 1040 - Centro, Passos - MG"
-                        className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded-lg p-2.5 text-xs focus:ring-2 focus:ring-orange-500 font-mono h-[38px]"
+                        className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded-lg p-2.5 text-xs focus:ring-2 focus:ring-orange-500 font-mono"
                       />
-                    </div>
-
-                    <div className="space-y-1">
-                      <label className="block text-xs font-bold text-slate-700 uppercase font-mono flex items-center justify-between">
-                        <span>CEP de Destino (Opcional)</span>
-                        {isFetchingDestinoCEP && (
-                          <span className="text-emerald-600 animate-pulse text-[10px] font-mono font-bold">🔍...</span>
-                        )}
-                      </label>
-                      <div className="flex gap-2">
-                        <input
-                          type="text"
-                          placeholder="Ex: 37900-124"
-                          value={destinoCEP}
-                          onChange={(e) => handleCEPChange(e.target.value, 'destino')}
-                          className="flex-1 bg-slate-50 text-slate-900 border border-slate-200 rounded-lg p-2.5 text-xs focus:ring-2 focus:ring-orange-500 font-mono min-w-0 h-[38px]"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => handleFetchCEP(destinoCEP, 'destino')}
-                          disabled={isFetchingDestinoCEP || !destinoCEP}
-                          className="bg-orange-500 hover:bg-orange-600 disabled:bg-slate-200 text-slate-950 disabled:text-slate-400 text-xs font-black px-3 rounded-lg font-mono tracking-tight cursor-pointer shadow transition shrink-0 h-[38px] flex items-center justify-center"
-                          title="Melhora a busca no GPS do Google Maps pelo motoboy"
-                        >
-                          {isFetchingDestinoCEP ? '...' : '🔍 Buscar'}
-                        </button>
-                      </div>
-                      {cepErrorState['destino'] && (
-                        <p className="text-red-500 text-[10px] font-mono mt-1 text-left">⚠️ {cepErrorState['destino']}</p>
-                      )}
                     </div>
                     
                     <div className="space-y-1">
@@ -7015,28 +7166,22 @@ export default function App() {
                       <select
                         value={destinoQuadrante}
                         onChange={(e) => setDestinoQuadrante(e.target.value as Quadrante)}
-                        className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded-lg p-2.5 text-xs font-mono h-[38px]"
+                        className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded-lg p-2 text-xs font-mono"
                       >
                         {(['A', 'B', 'C', 'D', 'E', 'F'] as Quadrante[]).map(q => (
                           <option key={q} value={q}>Setor {q} - Rota do Contrato</option>
                         ))}
                       </select>
                     </div>
-
-                    <div className="sm:col-span-2">
-                      <p className="text-[10px] text-slate-500 italic font-sans leading-tight">
-                        O preenchimento do CEP garante que a rota seja aberta no Google Maps com precisão de metros para o entregador!
-                      </p>
-                    </div>
-                  </div>
+                  </>
                 ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                  <>
                     <div className="space-y-1">
-                      <label className="block text-xs font-bold text-slate-700 uppercase font-mono">Filtrar Setor</label>
+                      <label className="block text-xs font-bold text-slate-700 uppercase font-mono">Filtrar Setor do Destinatário</label>
                       <select
                         value={destinoQuadrante}
                         onChange={(e) => setDestinoQuadrante(e.target.value as Quadrante)}
-                        className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded-lg p-2.5 text-xs font-mono h-[38px]"
+                        className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded-lg p-2 text-xs font-mono"
                       >
                         {(['A', 'B', 'C', 'D', 'E', 'F'] as Quadrante[]).map(q => (
                           <option key={q} value={q}>Setor {q} - Região</option>
@@ -7045,16 +7190,16 @@ export default function App() {
                     </div>
 
                     <div className="space-y-1">
-                      <div className="flex justify-between items-center h-4">
-                        <label className="block text-xs font-bold text-slate-700 uppercase font-mono">Destinatário</label>
+                      <div className="flex justify-between items-center">
+                        <label className="block text-xs font-bold text-slate-700 uppercase font-mono">Destinatário Credenciado</label>
                         {!isQuickRegisteringDestinatario && (
-                          <div className="flex gap-1.5">
+                          <div className="flex gap-2">
                             <button
                               type="button"
                               onClick={() => setIsQuickRegisteringDestinatario(true)}
-                              className="text-[9px] text-orange-650 hover:text-orange-700 font-bold font-mono uppercase tracking-tight flex items-center gap-0.5 cursor-pointer"
+                              className="text-[10px] text-orange-650 hover:text-orange-700 font-bold font-mono uppercase tracking-tight flex items-center gap-0.5 cursor-pointer"
                             >
-                              <Plus className="w-2.5 h-2.5 text-orange-500" /> Rápido
+                              <Plus className="w-3 h-3 text-orange-500" /> Rápido
                             </button>
                             <button
                               type="button"
@@ -7068,7 +7213,7 @@ export default function App() {
                                 setClientNewClientEmail('');
                                 setIsClientAddingNewClient(true);
                               }}
-                              className="text-[9px] text-emerald-650 hover:text-emerald-700 font-bold font-mono uppercase tracking-tight flex items-center gap-0.5 cursor-pointer border-l pl-1.5 border-slate-200"
+                              className="text-[10px] text-emerald-650 hover:text-emerald-700 font-bold font-mono uppercase tracking-tight flex items-center gap-0.5 cursor-pointer border-l pl-2 border-slate-200"
                             >
                               🚀 Completo
                             </button>
@@ -7081,47 +7226,45 @@ export default function App() {
                           value={destinoClienteId}
                           onChange={(e) => setDestinoClienteId(e.target.value)}
                           required={!isQuickRegisteringDestinatario}
-                          className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded-lg p-2.5 text-xs font-mono h-[38px]"
+                          className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded-lg p-2 text-xs font-mono"
                         >
                           {clientes.filter(c => c.criadoPorClienteId === activeClienteUser?.id && c.quadrante === destinoQuadrante).length === 0 ? (
-                            <option value="">Nenhum cadastrado</option>
+                            <option value="">Nenhum cliente cadastrado neste setor</option>
                           ) : (
                             clientes.filter(c => c.criadoPorClienteId === activeClienteUser?.id && c.quadrante === destinoQuadrante).map(c => (
-                              <option key={c.id} value={c.id}>{c.nome} ({c.endereco.slice(0, 18)}...)</option>
+                              <option key={c.id} value={c.id}>{c.nome} ({c.endereco.slice(0, 25)}...)</option>
                             ))
                           )}
                         </select>
                       ) : (
-                        <div className="bg-orange-50/55 p-2 rounded-xl border border-orange-200/60 space-y-1.5 mt-1 shadow-sm sm:col-span-2">
-                          <span className="text-[9px] font-extrabold text-orange-750 uppercase font-mono tracking-wider block">
+                        <div className="bg-orange-50/55 p-3 rounded-xl border border-orange-200/60 space-y-2 mt-1 shadow-sm">
+                          <span className="text-[10px] font-extrabold text-orange-750 uppercase font-mono tracking-wider block">
                             ✨ NOVO DESTINATÁRIO NO SETOR {destinoQuadrante}
                           </span>
                           
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                            <div>
-                              <input
-                                type="text"
-                                required
-                                value={quickClientNome}
-                                onChange={(e) => setQuickClientNome(e.target.value)}
-                                placeholder="Nome da Oficina / Destinatário"
-                                className="w-full bg-white text-slate-900 border border-slate-200 rounded-lg p-2 text-xs font-mono focus:ring-1 focus:ring-orange-500 h-[34px]"
-                              />
-                            </div>
-
-                            <div>
-                              <input
-                                type="text"
-                                required
-                                value={quickClientEndereco}
-                                onChange={(e) => setQuickClientEndereco(e.target.value)}
-                                placeholder="Endereço (Rua, Número, Bairro)"
-                                className="w-full bg-white text-slate-900 border border-slate-200 rounded-lg p-2 text-xs font-mono focus:ring-1 focus:ring-orange-500 h-[34px]"
-                              />
-                            </div>
+                          <div>
+                            <input
+                              type="text"
+                              required
+                              value={quickClientNome}
+                              onChange={(e) => setQuickClientNome(e.target.value)}
+                              placeholder="Nome da Oficina / Destinatário"
+                              className="w-full bg-white text-slate-900 border border-slate-200 rounded-lg p-2 text-xs font-mono focus:ring-1 focus:ring-orange-500"
+                            />
                           </div>
 
-                          <div className="flex gap-2 pt-1 justify-end">
+                          <div>
+                            <input
+                              type="text"
+                              required
+                              value={quickClientEndereco}
+                              onChange={(e) => setQuickClientEndereco(e.target.value)}
+                              placeholder="Endereço (Rua, Número, Bairro)"
+                              className="w-full bg-white text-slate-900 border border-slate-200 rounded-lg p-2 text-xs font-mono focus:ring-1 focus:ring-orange-500"
+                            />
+                          </div>
+
+                          <div className="flex gap-2 pt-1">
                             <button
                               type="button"
                               onClick={() => {
@@ -7129,7 +7272,7 @@ export default function App() {
                                 setQuickClientNome('');
                                 setQuickClientEndereco('');
                               }}
-                              className="bg-white hover:bg-slate-100 text-slate-600 border border-slate-200 py-1 px-3 rounded text-[10px] font-bold font-mono transition cursor-pointer"
+                              className="flex-1 bg-white hover:bg-slate-100 text-slate-600 border border-slate-200 py-1 px-2 rounded text-[10px] font-bold font-mono transition cursor-pointer"
                             >
                               Cancelar
                             </button>
@@ -7181,7 +7324,7 @@ export default function App() {
                                 setSupabaseSuccessMsg(`✅ Destinatário "${novoCli.nome}" cadastrado, SALVO NO BANCO e selecionado!`);
                                 setTimeout(() => setSupabaseSuccessMsg(''), 5000);
                               }}
-                              className="bg-orange-500 hover:bg-orange-600 text-slate-950 py-1 px-3 rounded text-[10px] font-bold font-mono shadow-sm transition cursor-pointer font-black"
+                              className="flex-1 bg-orange-500 hover:bg-orange-600 text-white py-1 px-2 rounded text-[10px] font-bold font-mono shadow-sm transition cursor-pointer"
                             >
                               Salvar e Selecionar
                             </button>
@@ -7189,32 +7332,30 @@ export default function App() {
                         </div>
                       )}
                     </div>
-                  </div>
+                  </>
                 )}
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                  <div className="space-y-1">
-                    <label className="block text-xs font-bold text-slate-700 uppercase font-mono">Objeto de Envio (Opcional)</label>
-                    <input
-                      type="text"
-                      value={clientItemTexto}
-                      onChange={(e) => setClientItemTexto(e.target.value)}
-                      placeholder="Ex: um remédio, amortecedor... (Padrão: Objeto de Envio)"
-                      className="w-full bg-slate-50 text-slate-950 border border-slate-200 rounded-lg p-2.5 text-xs focus:ring-2 focus:ring-orange-500 font-mono h-[38px]"
-                    />
-                  </div>
+                <div className="space-y-1">
+                  <label className="block text-xs font-bold text-slate-700 uppercase font-mono">Detalhamento do Objeto de Envio (Opcional)</label>
+                  <input
+                    type="text"
+                    value={clientItemTexto}
+                    onChange={(e) => setClientItemTexto(e.target.value)}
+                    placeholder="Ex: um remédio, um lanche... (Padrão: Objeto de Envio)"
+                    className="w-full bg-slate-50 text-slate-950 border border-slate-200 rounded-lg p-2.5 text-xs focus:ring-2 focus:ring-orange-500 font-mono"
+                  />
+                </div>
 
-                  <div className="space-y-1">
-                    <label className="block text-xs font-bold text-slate-700 uppercase font-mono">Sua Tarifa de Contrato</label>
-                    <div className="p-2.5 bg-slate-50 rounded-lg border border-slate-150 flex justify-between text-[11px] font-mono h-[38px] items-center">
-                      <span>💵 Taxa Fixa</span>
-                      <span className="font-extrabold text-slate-900">R$ {(activeClienteUser?.valorCobradoCliente || 10.00).toFixed(2)} por envio</span>
-                    </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-2 font-mono">Sua Tarifa de Contrato B2B</label>
+                  <div className="p-2.5 bg-slate-50 rounded-lg border border-slate-150 flex justify-between text-[11px] font-mono">
+                    <span>💵 Taxa Fixa Contratual</span>
+                    <span className="font-extrabold text-slate-900">R$ {(activeClienteUser?.valorCobradoCliente || 10.00).toFixed(2)} por envio</span>
                   </div>
                 </div>
 
                 {/* Reversa option */}
-                <div className="flex items-center gap-2 bg-slate-50 p-2.5 text-xs rounded-lg border border-slate-150">
+                <div className="flex items-center gap-2 bg-slate-50 p-2 text-xs rounded-lg border border-slate-150">
                   <input
                     type="checkbox"
                     id="reversa-check-cliente"
@@ -8572,9 +8713,9 @@ export default function App() {
               <div className="flex justify-between items-start mb-4 border-b border-slate-100 pb-2">
                 <div>
                   <h3 className="text-sm font-bold text-slate-900 uppercase font-mono tracking-tight">
-                    [Cadastro de Distribuidora]
+                    [Cadastro de Novo Parceiro]
                   </h3>
-                  <span className="text-[10px] text-slate-400 font-mono">Sincronização Ativa Distribuidor & Entregador</span>
+                  <span className="text-[10px] text-slate-400 font-mono">Sincronização Ativa Parceiro & Entregador</span>
                 </div>
                 <button
                   type="button"
@@ -8588,14 +8729,14 @@ export default function App() {
               <div className="space-y-3.5">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 uppercase mb-1 font-mono">
-                    Nome da Distribuidora *
+                    Nome do Parceiro B2B *
                   </label>
                   <input
                     type="text"
                     required
                     value={newClientNome}
                     onChange={(e) => setNewClientNome(e.target.value)}
-                    placeholder="Ex: Distribuidora de Autopeças Passos"
+                    placeholder="Ex: Moto Peças Diamante"
                     className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded-lg p-2.5 text-xs focus:ring-2 focus:ring-orange-500 focus:border-orange-500 font-mono"
                   />
                 </div>
@@ -8667,7 +8808,7 @@ export default function App() {
 
                 <div>
                   <label className="block text-xs font-bold text-slate-700 uppercase mb-1 font-mono">
-                    Endereço Completo da Distribuidora *
+                    Endereço Completo do Parceiro *
                   </label>
                   <input
                     type="text"
@@ -8852,14 +8993,18 @@ export default function App() {
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-white rounded-xl shadow-2xl border border-slate-200 max-w-sm w-full p-5 max-h-[90vh] overflow-y-auto"
+              className={`bg-white rounded-xl shadow-2xl border border-slate-200 w-full p-5 max-h-[92vh] overflow-y-auto transition-all duration-300 ${
+                !clienteParaEditar.criadoPorClienteId ? 'max-w-4xl' : 'max-w-md'
+              }`}
             >
               <div className="flex justify-between items-start mb-4 border-b border-slate-100 pb-2">
                 <div>
                   <h3 className="text-sm font-bold text-slate-900 uppercase font-mono tracking-tight">
-                    [Editar Cliente: {clienteParaEditar.id}]
+                    {!clienteParaEditar.criadoPorClienteId ? `[⚙️ Gestão de Parceiro: ${clienteParaEditar.id}]` : `[Editar Cliente: ${clienteParaEditar.id}]`}
                   </h3>
-                  <span className="text-[10px] text-slate-400 font-mono">Sincronização Ativa Distribuidor & Entregador</span>
+                  <span className="text-[10px] text-slate-400 font-mono">
+                    {!clienteParaEditar.criadoPorClienteId ? 'Painel de Controle de Parceiro e Sub-Clientes B2B' : 'Sincronização Ativa Distribuidor & Entregador'}
+                  </span>
                 </div>
                 <button
                   type="button"
@@ -8870,7 +9015,12 @@ export default function App() {
                 </button>
               </div>
 
-              <form onSubmit={handleUpdateCliente} className="space-y-3.5">
+              <div className={!clienteParaEditar.criadoPorClienteId ? "grid grid-cols-1 lg:grid-cols-2 gap-6 items-start" : ""}>
+                <div className="space-y-3">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase font-mono tracking-wider block border-b border-slate-100 pb-1">
+                    ℹ️ CADASTRO GERAL DO PARCEIRO
+                  </span>
+                  <form onSubmit={handleUpdateCliente} className="space-y-3.5">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 uppercase mb-1 font-mono">
                     Nome do Estabelecimento / Oficina
@@ -8919,20 +9069,22 @@ export default function App() {
                   )}
                 </div>
 
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1 font-mono">
-                    Atribuir à Região (Quadrante Geográfico)
-                  </label>
-                  <select
-                    value={editClientQuadrante}
-                    onChange={(e) => setEditClientQuadrante(e.target.value as Quadrante)}
-                    className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded-lg p-2.5 text-xs focus:ring-2 focus:ring-orange-500 font-mono"
-                  >
-                    {(['A', 'B', 'C', 'D', 'E', 'F'] as Quadrante[]).map((q) => (
-                      <option key={q} value={q}>Quadrante {q}</option>
-                    ))}
-                  </select>
-                </div>
+                {!!clienteParaEditar.criadoPorClienteId && (
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 uppercase mb-1 font-mono">
+                      Atribuir à Região (Quadrante Geográfico)
+                    </label>
+                    <select
+                      value={editClientQuadrante}
+                      onChange={(e) => setEditClientQuadrante(e.target.value as Quadrante)}
+                      className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded-lg p-2.5 text-xs focus:ring-2 focus:ring-orange-500 font-mono"
+                    >
+                      {(['A', 'B', 'C', 'D', 'E', 'F'] as Quadrante[]).map((q) => (
+                        <option key={q} value={q}>Quadrante {q}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
 
                 <div>
                   <label className="block text-xs font-bold text-slate-700 uppercase mb-1 font-mono flex items-center justify-between">
@@ -9103,6 +9255,37 @@ export default function App() {
                     <span>💵 MARGEM LIQUIDA:</span>
                     <span>R$ {(editClientValorCobradoCliente - editClientValorPagoMotoboy).toFixed(2)}</span>
                   </div>
+
+                  {/* EXCLUSIVE ADMIN CONTROLS FOR THE PARTNER */}
+                  <div className="border-t border-slate-200 mt-2.5 pt-2.5 bg-amber-500/5 p-2.5 rounded-lg border border-amber-500/10 space-y-2">
+                    <span className="text-[9px] font-black text-amber-800 uppercase font-mono flex items-center gap-1">
+                      🔒 ÁREA DE AUDITORIA EXCLUSIVA DO ADMIN (O parceiro não vê)
+                    </span>
+                    
+                    <div>
+                      <label className="block text-[8.5px] font-bold text-amber-905 uppercase font-mono">Nota Interna sobre este Parceiro</label>
+                      <input
+                        type="text"
+                        value={editClientNotaAdmin}
+                        onChange={(e) => setEditClientNotaAdmin(e.target.value)}
+                        placeholder="Ex: Contrato assinado. Enviar fatura quinzenal."
+                        className="w-full bg-white text-slate-950 border border-amber-200 rounded p-1.5 text-xs font-mono"
+                      />
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        id="partner-admin-block"
+                        checked={editClientAdminBloqueado}
+                        onChange={(e) => setEditClientAdminBloqueado(e.target.checked)}
+                        className="rounded text-red-600 h-3.5 w-3.5 bg-white border border-slate-250 cursor-pointer"
+                      />
+                      <label htmlFor="partner-admin-block" className="text-[9px] font-extrabold text-red-955 uppercase font-mono cursor-pointer">
+                        Bloquear faturamento do parceiro (Admin)
+                      </label>
+                    </div>
+                  </div>
                 </div>
 
                 <div className="flex gap-2 pt-2">
@@ -9121,10 +9304,227 @@ export default function App() {
                   </button>
                 </div>
               </form>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+            </div> {/* Closes the <div className="space-y-3"> containing the first form */}
+
+            {/* --- SECOND COLUMN: SUB-CLIENT MANAGEMENT PANEL (ONLY FOR PARTNERS/DISTRIBUTORS) --- */}
+            {!clienteParaEditar.criadoPorClienteId && (
+              <div className="space-y-4 border-t lg:border-t-0 lg:border-l border-slate-150 pt-5 lg:pt-0 lg:pl-6 max-h-[80vh] overflow-y-auto">
+                <div>
+                  <h4 className="text-xs font-black text-slate-800 uppercase font-mono tracking-wider border-b border-slate-100 pb-1 mb-1 flex justify-between items-center bg-slate-50 p-2 rounded">
+                    <span>👥 Clientes / Oficinas Atreladas ({clientes.filter(c => c.criadoPorClienteId === clienteParaEditar.id).length})</span>
+                    <span className="text-[10px] text-slate-400 capitalize font-normal">Controle de Carteira B2B</span>
+                  </h4>
+                  
+                  {/* Sub-Client List */}
+                  <div className="space-y-2 mt-2 max-h-[30vh] overflow-y-auto pr-1">
+                    {clientes.filter(c => c.criadoPorClienteId === clienteParaEditar.id).map(sub => (
+                      <div key={sub.id} className="bg-slate-50 border border-slate-200 rounded-lg p-2 flex justify-between items-center text-xs">
+                        <div className="font-mono">
+                          <div className="font-bold text-slate-900 flex items-center gap-1.5">
+                            {sub.adminBloqueado && <span className="bg-red-100 text-red-700 text-[8px] px-1 rounded uppercase font-black">🚫 Bloqueado</span>}
+                            {sub.nome}
+                          </div>
+                          <div className="text-[9px] text-slate-500 whitespace-nowrap overflow-hidden text-ellipsis max-w-xs">
+                            📩 {sub.email} • 📞 {sub.telefone}
+                          </div>
+                          <div className="text-[9px] text-slate-650 mt-0.5">
+                            Região: <span className="font-semibold">Q{sub.quadrante}</span> • Cobrado: <span className="font-semibold text-emerald-800">R$ {(sub.valorCobradoCliente || 0).toFixed(2)}</span>
+                          </div>
+                          {sub.notaAdmin && (
+                            <div className="text-[8px] bg-amber-50 text-amber-800 p-1 rounded mt-1 border border-amber-150">
+                              🔒 Nota Admin: {sub.notaAdmin}
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex gap-1.5 shrink-0 ml-2">
+                          <button
+                            type="button"
+                            onClick={() => handleEditSubClientInsideModal(sub)}
+                            className="bg-white border border-slate-300 hover:bg-slate-150 text-slate-800 p-1 rounded text-[10px] font-mono cursor-pointer"
+                            title="Editar dados/valores deste cliente"
+                          >
+                            ✏️
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                    {clientes.filter(c => c.criadoPorClienteId === clienteParaEditar.id).length === 0 && (
+                      <div className="text-[11px] text-slate-400 py-3 text-center border-2 border-dashed border-slate-150 rounded-lg font-mono">
+                        Nenhum cliente associado ainda. Cadastre um abaixo!
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Sub-Client Creation/Edition Form */}
+                <div className="bg-slate-50/50 border border-slate-200 rounded-xl p-3.5 mt-2 shadow-inner">
+                  <span className="text-[10px] font-extrabold text-indigo-600 uppercase font-mono tracking-widest block mb-2 pb-1 border-b border-indigo-100 flex justify-between">
+                    <span>{subCliEditingId ? `✏️ EDITAR CLIENTE DO PARCEIRO` : `➕ CADASTRAR NOVO CLIENTE DO PARCEIRO`}</span>
+                    {subCliEditingId && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSubCliEditingId(null);
+                          setSubCliNome('');
+                          setSubCliEmail('');
+                          setSubCliSenha('');
+                          setSubCliEndereco('');
+                          setSubCliTelefone('');
+                          setSubCliRamo('Oficina mecânica');
+                          setSubCliQuadrante(clienteParaEditar.quadrante || 'A');
+                          setSubCliNotaAdmin('');
+                          setSubCliAdminBloqueado(false);
+                          setSubCliValorCobradoCliente(10.00);
+                          setSubCliValorPagoMotoboy(4.00);
+                        }}
+                        className="text-red-500 hover:underline text-[9px] font-normal"
+                      >
+                        Cancelar Edição
+                      </button>
+                    )}
+                  </span>
+                  
+                  <form onSubmit={handleSaveSubClient} className="space-y-2.5">
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-[9px] font-bold text-slate-705 uppercase font-mono mb-0.5">Nome do Cliente *</label>
+                        <input
+                          type="text"
+                          required
+                          value={subCliNome}
+                          onChange={(e) => setSubCliNome(e.target.value)}
+                          placeholder="Ex: Oficina Mecânica Sul"
+                          className="w-full bg-white text-slate-950 border border-slate-250 rounded p-1.5 text-xs font-mono"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[9px] font-bold text-slate-705 uppercase font-mono mb-0.5">E-mail de Cadastro *</label>
+                        <input
+                          type="email"
+                          required
+                          value={subCliEmail}
+                          onChange={(e) => setSubCliEmail(e.target.value)}
+                          placeholder="Ex: b2b@canal-parceiro.com"
+                          className="w-full bg-white text-slate-950 border border-slate-250 rounded p-1.5 text-xs font-mono"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-2 flex-wrap">
+                      <div>
+                        <label className="block text-[9px] font-bold text-slate-705 uppercase font-mono mb-0.5">Senha</label>
+                        <input
+                          type="text"
+                          value={subCliSenha}
+                          onChange={(e) => setSubCliSenha(e.target.value)}
+                          placeholder="Fica padrão se vazio"
+                          className="w-full bg-white text-slate-950 border border-slate-250 rounded p-1.5 text-xs font-mono"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[9px] font-bold text-slate-705 uppercase font-mono mb-0.5">Telefone</label>
+                        <input
+                          type="text"
+                          value={subCliTelefone}
+                          onChange={(e) => setSubCliTelefone(e.target.value)}
+                          placeholder="Ex: (35) 99123-4567"
+                          className="w-full bg-white text-slate-950 border border-slate-250 rounded p-1.5 text-xs font-mono"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[9px] font-bold text-slate-705 uppercase font-mono mb-0.5">Região (Quadrante)</label>
+                        <select
+                          value={subCliQuadrante}
+                          onChange={(e) => setSubCliQuadrante(e.target.value as Quadrante)}
+                          className="w-full bg-white text-slate-950 border border-slate-250 rounded p-1.5 text-xs font-mono font-semibold"
+                        >
+                          {(['A', 'B', 'C', 'D', 'E', 'F'] as Quadrante[]).map((q) => (
+                            <option key={q} value={q}>Q - {q}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-[9px] font-bold text-slate-705 uppercase font-mono mb-0.5">Fixo Cobrado Cliente</label>
+                        <input
+                          type="number"
+                          step="0.50"
+                          value={subCliValorCobradoCliente}
+                          onChange={(e) => setSubCliValorCobradoCliente(parseFloat(e.target.value) || 0)}
+                          className="w-full bg-white text-slate-950 border border-slate-250 rounded p-1.5 text-xs font-mono font-bold"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[9px] font-bold text-slate-705 uppercase font-mono mb-0.5">Repasse Pago Motoboy</label>
+                        <input
+                          type="number"
+                          step="0.50"
+                          value={subCliValorPagoMotoboy}
+                          onChange={(e) => setSubCliValorPagoMotoboy(parseFloat(e.target.value) || 0)}
+                          className="w-full bg-white text-slate-950 border border-slate-250 rounded p-1.5 text-xs font-mono font-bold"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-[9px] font-bold text-slate-705 uppercase font-mono mb-0.5">Endereço de Entrega</label>
+                      <input
+                        type="text"
+                        value={subCliEndereco}
+                        onChange={(e) => setSubCliEndereco(e.target.value)}
+                        placeholder="Ex: Rua das Flores, 450 - Centro"
+                        className="w-full bg-white text-slate-950 border border-slate-250 rounded p-1.5 text-xs font-mono"
+                      />
+                    </div>
+
+                    {/* EXCLUSIVE ADMIN CONTROLS THAT THE PARTNER CANNOT EDIT/SEE */}
+                    <div className="border-t border-slate-200 mt-2 pt-2 bg-amber-500/5 p-2 rounded-lg border border-amber-500/10 space-y-2">
+                      <span className="text-[9px] font-black text-amber-800 uppercase font-mono flex items-center gap-1">
+                        🔒 ÁREA ADMIN MODERADOR (Parceiro não visualiza ou altera)
+                      </span>
+                      
+                      <div>
+                        <label className="block text-[8.5px] font-bold text-amber-900 uppercase font-mono">Nota Interna de Auditoria Private</label>
+                        <input
+                          type="text"
+                          value={subCliNotaAdmin}
+                          onChange={(e) => setSubCliNotaAdmin(e.target.value)}
+                          placeholder="Observações de faturamento, restrições"
+                          className="w-full bg-white text-slate-950 border border-amber-200 rounded p-1.5 text-xs font-mono"
+                        />
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          id="sub-cli-admin-block"
+                          checked={subCliAdminBloqueado}
+                          onChange={(e) => setSubCliAdminBloqueado(e.target.checked)}
+                          className="rounded text-red-600 focus:ring-red-500 cursor-pointer h-3.5 w-3.5 bg-white border border-slate-250"
+                        />
+                        <label htmlFor="sub-cli-admin-block" className="text-[9px] font-extrabold text-red-955 cursor-pointer uppercase font-mono select-none">
+                          Bloquear Despacho / Faturamento deste cliente
+                        </label>
+                      </div>
+                    </div>
+
+                    <button
+                      type="submit"
+                      className="w-full bg-indigo-650 hover:bg-indigo-700 text-white font-extrabold py-2 rounded text-xs font-mono uppercase tracking-wider transition cursor-pointer shadow-md"
+                    >
+                      {subCliEditingId ? 'Salvar Alterações do Cliente' : 'Associar Novo Cliente'}
+                    </button>
+                  </form>
+                </div>
+              </div>
+            )}
+          </div> {/* Closes the grid configuration or split-screen container */}
+        </motion.div>
+      </div>
+    )}
+  </AnimatePresence>
 
       {/* ==========================================
           MODAL: EDIT REPRESENTATIVE (CRUD UPDATE)
@@ -9930,6 +10330,47 @@ export default function App() {
           </p>
         </div>
       )}
+
+      {/* ==========================================
+          MODAL: ADMIN FIREBASE SYNC SAVE POPUP
+          ========================================== */}
+      <AnimatePresence>
+        {adminFirebaseSaveMsg && (
+          <div className="fixed inset-0 z-55 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-xs" id="modal-firebase-save" style={{ zIndex: 100 }}>
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-slate-950 text-white rounded-2xl shadow-2xl border border-orange-500/40 p-6 max-w-sm w-full text-center relative overflow-hidden"
+            >
+              {/* Decorative top pulse badge */}
+              <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-orange-500 to-amber-500" />
+              
+              <div className="mx-auto w-14 h-14 bg-gradient-to-br from-orange-500/20 to-amber-500/20 border border-orange-500/30 rounded-full flex items-center justify-center text-orange-400 mb-4 animate-bounce">
+                <svg className="w-7 h-7 fill-current animate-pulse text-amber-500" viewBox="0 0 24 24" referrerPolicy="no-referrer">
+                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" />
+                </svg>
+              </div>
+
+              <h3 className="text-sm font-black font-mono text-orange-400 uppercase tracking-wider mb-2">
+                🔥 Sincronização Firebase Realizada!
+              </h3>
+              
+              <p className="text-xs text-slate-300 font-mono leading-relaxed mb-5">
+                {adminFirebaseSaveMsg}
+              </p>
+
+              <button
+                type="button"
+                onClick={() => setAdminFirebaseSaveMsg(null)}
+                className="w-full bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-500 hover:to-amber-500 text-white font-mono font-bold text-xs py-2.5 rounded-xl cursor-pointer shadow-md transition duration-150 transform hover:scale-[1.01]"
+              >
+                Ótimo, Entendido! 👍
+              </button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
   </>
   );
 
