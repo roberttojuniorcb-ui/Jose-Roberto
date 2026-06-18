@@ -658,6 +658,50 @@ export default function App() {
   const isFirebaseBootstrappedRef = React.useRef<boolean>(false);
   const isIncomingSyncRef = React.useRef<boolean>(false);
 
+  // Track previous arrays of entities to optimize Firestore write calls and avoid quota exhaustion
+  const prevClientesRef = React.useRef<Cliente[]>([]);
+  const prevOrdensRef = React.useRef<OrdemServico[]>([]);
+  const prevMotoboysRef = React.useRef<Motoboy[]>([]);
+
+  const hasClienteChanged = (a: Cliente, b: Cliente) => {
+    const keys: (keyof Cliente)[] = [
+      'nome', 'quadrante', 'endereco', 'telefone', 'cidade', 'valorPagoMotoboy', 
+      'valorCobradoCliente', 'senha', 'email', 'emailConfirmado', 'cadastroCompleto', 
+      'cnpj', 'inscricaoEstadual', 'notaAdmin', 'adminBloqueado', 'indicadoPorRepId'
+    ];
+    return keys.some(k => {
+      const valA = a[k] ?? '';
+      const valB = b[k] ?? '';
+      return (typeof valA === 'object' ? JSON.stringify(valA) : valA) !== (typeof valB === 'object' ? JSON.stringify(valB) : valB);
+    });
+  };
+
+  const hasOrdemChanged = (a: OrdemServico, b: OrdemServico) => {
+    const keys: (keyof OrdemServico)[] = [
+      'clienteId', 'clienteNome', 'quadrante', 'itensDescricao', 'enderecoEntrega', 
+      'destinatarioNome', 'retornoPeca', 'taxaReversa', 'valorPagoMotoboy', 
+      'valorCobradoCliente', 'motoboyId', 'motoboyNome', 'status', 'grupoRotaId', 
+      'motivoDesmembramento', 'travaCubagemStatus'
+    ];
+    return keys.some(k => {
+      const valA = a[k] ?? '';
+      const valB = b[k] ?? '';
+      return (typeof valA === 'object' ? JSON.stringify(valA) : valA) !== (typeof valB === 'object' ? JSON.stringify(valB) : valB);
+    });
+  };
+
+  const hasMotoboyChanged = (a: Motoboy, b: Motoboy) => {
+    const keys: (keyof Motoboy)[] = [
+      'nome', 'telefone', 'cidade', 'senha', 'valorRepasseFixo', 'situacao', 
+      'empresaExclusiva', 'veiculo'
+    ];
+    return keys.some(k => {
+      const valA = a[k] ?? '';
+      const valB = b[k] ?? '';
+      return (typeof valA === 'object' ? JSON.stringify(valA) : valA) !== (typeof valB === 'object' ? JSON.stringify(valB) : valB);
+    });
+  };
+
   // --- INTERACTIVE FIREBASE WRITE PERSISTENCE TEST FUNCTION ---
   const executeFirebaseSavingTest = async () => {
     if (!isFirebaseConfigured || !firebaseDb) {
@@ -795,6 +839,7 @@ export default function App() {
           };
         });
 
+        prevOrdensRef.current = mappedOrdem;
         setOrdens(mappedOrdem);
         setDbSyncStatus('synced');
       }
@@ -819,27 +864,36 @@ export default function App() {
           if (active) {
             if (loaded) {
               if (loaded.clientes && loaded.clientes.length > 0) {
+                prevClientesRef.current = loaded.clientes;
                 setClientes(loaded.clientes);
               } else {
                 await syncClientesToFirebase(clientes);
+                prevClientesRef.current = clientes;
               }
 
               if (loaded.motoboys && loaded.motoboys.length > 0) {
+                prevMotoboysRef.current = loaded.motoboys;
                 setMotoboys(loaded.motoboys);
               } else {
                 await syncMotoboysToFirebase(motoboys);
+                prevMotoboysRef.current = motoboys;
               }
 
               if (loaded.ordens && loaded.ordens.length > 0) {
+                prevOrdensRef.current = loaded.ordens;
                 setOrdens(loaded.ordens);
               } else {
                 await syncOrdensToFirebase(ordens);
+                prevOrdensRef.current = ordens;
               }
             } else {
               // Firebase response was empty or null, seed the data
               await syncClientesToFirebase(clientes);
               await syncMotoboysToFirebase(motoboys);
               await syncOrdensToFirebase(ordens);
+              prevClientesRef.current = clientes;
+              prevMotoboysRef.current = motoboys;
+              prevOrdensRef.current = ordens;
             }
 
             isFirebaseBootstrappedRef.current = true;
@@ -907,9 +961,11 @@ export default function App() {
                 criadoPorClienteId: c.criado_por_cliente_id || undefined,
                 criadoEm: c.criado_em
               }));
+              prevClientesRef.current = mappedCli;
               setClientes(mappedCli);
             } else {
               await syncClientesToSupabase(clientes);
+              prevClientesRef.current = clientes;
             }
 
             // Process Motoboys fallback or load
@@ -923,9 +979,11 @@ export default function App() {
                 valorRepasseFixo: Number(m.valor_repasse_fixo),
                 criadoEm: m.criado_em
               }));
+              prevMotoboysRef.current = mappedMoto;
               setMotoboys(mappedMoto);
             } else {
               await syncMotoboysToSupabase(motoboys);
+              prevMotoboysRef.current = motoboys;
             }
 
             // Load Ordens via our central reusable fetching method
@@ -983,6 +1041,7 @@ export default function App() {
         });
         if (mapped.length > 0) {
           isIncomingSyncRef.current = true;
+          prevOrdensRef.current = mapped;
           setOrdens(mapped);
         }
         setDbSyncStatus('synced');
@@ -1046,36 +1105,151 @@ export default function App() {
     setDbSyncStatus('local');
   }, []);
 
-  // Post-bootstrap local-state modifications automated syncing
+  // Post-bootstrap local-state modifications automated fine-grained syncing (optimized to prevent quota / rate limit issues)
   useEffect(() => {
     if (isFirebaseConfigured && isFirebaseBootstrappedRef.current) {
-      syncClientesToFirebase(clientes);
+      const prev = prevClientesRef.current;
+      const changedOrNew = clientes.filter(currItem => {
+        const matchingPrev = prev.find(p => p.id === currItem.id);
+        if (!matchingPrev) return true;
+        return hasClienteChanged(matchingPrev, currItem);
+      });
+      const deleted = prev.filter(prevItem => !clientes.some(c => c.id === prevItem.id));
+
+      if (changedOrNew.length > 0) {
+        changedOrNew.forEach(item => {
+          syncSingleClienteToFirebase(item).catch(err => console.error("Firebase customer fine-grained sync error:", err));
+        });
+      }
+      if (deleted.length > 0) {
+        deleted.forEach(item => {
+          deleteClienteFromFirebase(item.id).catch(err => console.error("Firebase customer delete error:", err));
+        });
+      }
     }
     if (supabase && isSupabaseBootstrappedRef.current) {
-      syncClientesToSupabase(clientes);
+      const prev = prevClientesRef.current;
+      const changedOrNew = clientes.filter(currItem => {
+        const matchingPrev = prev.find(p => p.id === currItem.id);
+        if (!matchingPrev) return true;
+        return hasClienteChanged(matchingPrev, currItem);
+      });
+      const deleted = prev.filter(prevItem => !clientes.some(c => c.id === prevItem.id));
+
+      if (changedOrNew.length > 0) {
+        syncClientesToSupabase(changedOrNew).catch(err => console.error("Supabase customer sync error:", err));
+      }
+      if (deleted.length > 0) {
+        deleted.forEach(async (item) => {
+          try {
+            const { error } = await supabase.from('clientes').delete().eq('id', item.id);
+            if (error) console.error("Supabase customer delete error:", error.message);
+          } catch (err) {
+            console.error("Supabase customer delete crash:", err);
+          }
+        });
+      }
     }
+    prevClientesRef.current = clientes;
   }, [clientes]);
 
   useEffect(() => {
     if (isIncomingSyncRef.current) {
       isIncomingSyncRef.current = false;
+      prevOrdensRef.current = ordens;
       return;
     }
     if (isFirebaseConfigured && isFirebaseBootstrappedRef.current) {
-      syncOrdensToFirebase(ordens);
+      const prev = prevOrdensRef.current;
+      const changedOrNew = ordens.filter(currItem => {
+        const matchingPrev = prev.find(p => p.id === currItem.id);
+        if (!matchingPrev) return true;
+        return hasOrdemChanged(matchingPrev, currItem);
+      });
+      const deleted = prev.filter(prevItem => !ordens.some(o => o.id === prevItem.id));
+
+      if (changedOrNew.length > 0) {
+        changedOrNew.forEach(item => {
+          syncSingleOrdemToFirebase(item).catch(err => console.error("Firebase order fine-grained sync error:", err));
+        });
+      }
+      if (deleted.length > 0) {
+        deleted.forEach(item => {
+          deleteOrdemFromFirebase(item.id).catch(err => console.error("Firebase order delete error:", err));
+        });
+      }
     }
     if (supabase && isSupabaseBootstrappedRef.current) {
-      syncOrdensToSupabase(ordens);
+      const prev = prevOrdensRef.current;
+      const changedOrNew = ordens.filter(currItem => {
+        const matchingPrev = prev.find(p => p.id === currItem.id);
+        if (!matchingPrev) return true;
+        return hasOrdemChanged(matchingPrev, currItem);
+      });
+      const deleted = prev.filter(prevItem => !ordens.some(o => o.id === prevItem.id));
+
+      if (changedOrNew.length > 0) {
+        syncOrdensToSupabase(changedOrNew).catch(err => console.error("Supabase order sync error:", err));
+      }
+      if (deleted.length > 0) {
+        deleted.forEach(async (item) => {
+          try {
+            const { error } = await supabase.from('ordens_servico').delete().eq('id', item.id);
+            if (error) console.error("Supabase order delete error:", error.message);
+          } catch (err) {
+            console.error("Supabase order delete crash:", err);
+          }
+        });
+      }
     }
+    prevOrdensRef.current = ordens;
   }, [ordens]);
 
   useEffect(() => {
     if (isFirebaseConfigured && isFirebaseBootstrappedRef.current) {
-      syncMotoboysToFirebase(motoboys);
+      const prev = prevMotoboysRef.current;
+      const changedOrNew = motoboys.filter(currItem => {
+        const matchingPrev = prev.find(p => p.id === currItem.id);
+        if (!matchingPrev) return true;
+        return hasMotoboyChanged(matchingPrev, currItem);
+      });
+      const deleted = prev.filter(prevItem => !motoboys.some(m => m.id === prevItem.id));
+
+      if (changedOrNew.length > 0) {
+        changedOrNew.forEach(item => {
+          syncSingleMotoboyToFirebase(item).catch(err => console.error("Firebase courier fine-grained sync error:", err));
+        });
+      }
+      if (deleted.length > 0) {
+        deleted.forEach(item => {
+          deleteMotoboyFromFirebase(item.id).catch(err => console.error("Firebase courier delete error:", err));
+        });
+      }
     }
     if (supabase && isSupabaseBootstrappedRef.current) {
-      syncMotoboysToSupabase(motoboys);
+      const prev = prevMotoboysRef.current;
+      const changedOrNew = motoboys.filter(currItem => {
+        const matchingPrev = prev.find(p => p.id === currItem.id);
+        if (!matchingPrev) return true;
+        return hasMotoboyChanged(matchingPrev, currItem);
+      });
+      const deleted = prev.filter(prevItem => !motoboys.some(m => m.id === prevItem.id));
+
+      if (changedOrNew.length > 0) {
+        syncMotoboysToSupabase(changedOrNew).catch(err => console.error("Supabase courier sync error:", err));
+      }
+      if (deleted.length > 0) {
+        deleted.forEach(async (item) => {
+          try {
+            const { error } = await supabase.from('motoboys').delete().eq('id', item.id);
+            if (error) console.error("Supabase courier delete error:", error.message);
+          } catch (err) {
+            console.error("Supabase courier delete crash:", err);
+          }
+        });
+      }
     }
+    prevMotoboysRef.current = motoboys;
   }, [motoboys]);
 
   // Login form field states
@@ -3380,20 +3554,7 @@ export default function App() {
                     </div>
                   </form>
 
-                  {/* Simulated Mailbox client helper */}
-                  <div className="p-3 bg-slate-950 border border-orange-500/10 rounded-lg">
-                    <span className="text-[10px] font-bold text-orange-400 flex items-center gap-1 uppercase block mb-1">
-                      <span className="w-1.5 h-1.5 rounded-full bg-orange-500 animate-ping"></span>
-                      📬 SIMULADOR DE E-MAIL ADIANTADO (LOCAL):
-                    </span>
-                    <div className="text-[11px] leading-relaxed text-slate-350 border-t border-slate-900 pt-2 font-mono space-y-1">
-                      <p>Para: <span className="text-white text-[10px]">{selfRegEmail}</span></p>
-                      <p>Assunto: <span className="text-white text-[10px]">Ativação de Cadastro TorqueLog</span></p>
-                      <div className="bg-emerald-950/15 border border-emerald-500/20 p-2 rounded mt-2 text-slate-250">
-                        O código de ativação do seu auto-cadastro é: <strong className="text-emerald-400 text-xs bg-slate-900 px-1.5 py-0.2 rounded border border-emerald-500/30">{correctSelfRegCode}</strong>
-                      </div>
-                    </div>
-                  </div>
+
                 </div>
               )}
             </div>
@@ -6743,33 +6904,7 @@ export default function App() {
                     DASHBOARD DO ENTREGADOR
                   </span>
 
-                  {/* SIMULATION TOGGLE OVERRIDE PILL */}
-                  <div className="flex gap-1.5 bg-slate-950/55 p-0.5 rounded-lg border border-slate-800/80 text-[8px] font-bold font-mono">
-                    <button
-                      type="button"
-                      onClick={() => setOverrideExclusivity('auto')}
-                      className={`px-1.5 py-0.5 rounded cursor-pointer transition ${overrideExclusivity === 'auto' ? 'bg-orange-500 text-white font-black' : 'text-slate-400 hover:text-white'}`}
-                      title="Horário automático baseado no relógio"
-                    >
-                      AUTOMÁTICO ⏱️
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setOverrideExclusivity('force_exclusive')}
-                      className={`px-1.5 py-0.5 rounded cursor-pointer transition ${overrideExclusivity === 'force_exclusive' ? 'bg-amber-500 text-slate-950 font-black' : 'text-slate-400 hover:text-white'}`}
-                      title="Forçar horário comercial exclusivo"
-                    >
-                      FORÇAR EXCLUSIVO 🔒
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setOverrideExclusivity('force_free')}
-                      className={`px-1.5 py-0.5 rounded cursor-pointer transition ${overrideExclusivity === 'force_free' ? 'bg-emerald-500 text-slate-950 font-black' : 'text-slate-400 hover:text-white'}`}
-                      title="Forçar modo freelancer liberado"
-                    >
-                      FORÇAR LIVRE 🔓
-                    </button>
-                  </div>
+                  {/* Removed exclusivity override buttons by user request - locked to AUTOMÁTICO */}
                 </div>
 
                 <h1 className="text-xl font-black mt-1">Olá, {activeMotoboyUser?.nome}!</h1>
@@ -10260,16 +10395,9 @@ export default function App() {
 
                 {firstAccessEmailStep === 'verify_code' && (
                   <div className="space-y-4 text-left">
-                    <div className="bg-orange-950/20 border border-orange-900/40 p-3 rounded-lg text-xs leading-normal font-mono mb-2">
-                      <p className="text-orange-400 font-bold mb-1">📬 NOTIFICAÇÃO DO PROVEDOR (Simulação de E-mail)</p>
-                      <p className="text-slate-300 text-[11px]">
-                        Servidor TorqueLog gerou o token de segurança para {firstAccessEmail}:
-                      </p>
-                      <div className="mt-2 text-center bg-slate-950 p-2 rounded border border-orange-500">
-                        <p className="text-[10px] text-slate-400">TorqueLog B2B Verification Token:</p>
-                        <p className="text-sm font-black text-white tracking-widest">{correctFirstAccessCode}</p>
-                      </div>
-                    </div>
+                    <p className="text-xs text-slate-300 leading-relaxed font-mono">
+                      Um código de ativação exclusivo foi gerado e enviado para <strong className="text-orange-400">{firstAccessEmail}</strong>. Verifique sua caixa de e-mail corporativo.
+                    </p>
 
                     <div>
                       <label className="block text-xs font-bold text-slate-300 uppercase mb-1.5 font-mono">
@@ -10292,7 +10420,7 @@ export default function App() {
                           setFirstAccessEmailStep('completed_form');
                           setFirstAccessError('');
                         } else {
-                          setFirstAccessError('Código de segurança incorreto. Verifique o simulador azul e tente novamente.');
+                          setFirstAccessError('Código de segurança incorreto. Verifique o código recebido no seu e-mail e tente novamente.');
                         }
                       }}
                       className="w-full bg-emerald-600 hover:bg-emerald-700 hover:scale-[1.02] active:scale-[0.98] transition text-white font-mono font-bold text-xs py-2.5 rounded-lg flex items-center justify-center gap-2 cursor-pointer shadow-md"
