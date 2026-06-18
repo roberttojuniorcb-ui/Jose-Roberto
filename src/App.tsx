@@ -62,7 +62,8 @@ import {
   loadInitialDataFromFirebase,
   syncSingleClienteToFirebase,
   syncSingleOrdemToFirebase,
-  syncSingleMotoboyToFirebase
+  syncSingleMotoboyToFirebase,
+  isQuotaExceededError
 } from './utils/firebaseClient';
 import { 
   supabase,
@@ -1118,12 +1119,20 @@ export default function App() {
 
       if (changedOrNew.length > 0) {
         changedOrNew.forEach(item => {
-          syncSingleClienteToFirebase(item).catch(err => console.error("Firebase customer fine-grained sync error:", err));
+          syncSingleClienteToFirebase(item).catch(err => {
+            if (!isQuotaExceededError(err)) {
+              console.error("Firebase customer fine-grained sync error:", err);
+            }
+          });
         });
       }
       if (deleted.length > 0) {
         deleted.forEach(item => {
-          deleteClienteFromFirebase(item.id).catch(err => console.error("Firebase customer delete error:", err));
+          deleteClienteFromFirebase(item.id).catch(err => {
+            if (!isQuotaExceededError(err)) {
+              console.error("Firebase customer delete error:", err);
+            }
+          });
         });
       }
     }
@@ -1170,12 +1179,20 @@ export default function App() {
 
       if (changedOrNew.length > 0) {
         changedOrNew.forEach(item => {
-          syncSingleOrdemToFirebase(item).catch(err => console.error("Firebase order fine-grained sync error:", err));
+          syncSingleOrdemToFirebase(item).catch(err => {
+            if (!isQuotaExceededError(err)) {
+              console.error("Firebase order fine-grained sync error:", err);
+            }
+          });
         });
       }
       if (deleted.length > 0) {
         deleted.forEach(item => {
-          deleteOrdemFromFirebase(item.id).catch(err => console.error("Firebase order delete error:", err));
+          deleteOrdemFromFirebase(item.id).catch(err => {
+            if (!isQuotaExceededError(err)) {
+              console.error("Firebase order delete error:", err);
+            }
+          });
         });
       }
     }
@@ -1217,12 +1234,20 @@ export default function App() {
 
       if (changedOrNew.length > 0) {
         changedOrNew.forEach(item => {
-          syncSingleMotoboyToFirebase(item).catch(err => console.error("Firebase courier fine-grained sync error:", err));
+          syncSingleMotoboyToFirebase(item).catch(err => {
+            if (!isQuotaExceededError(err)) {
+              console.error("Firebase courier fine-grained sync error:", err);
+            }
+          });
         });
       }
       if (deleted.length > 0) {
         deleted.forEach(item => {
-          deleteMotoboyFromFirebase(item.id).catch(err => console.error("Firebase courier delete error:", err));
+          deleteMotoboyFromFirebase(item.id).catch(err => {
+            if (!isQuotaExceededError(err)) {
+              console.error("Firebase courier delete error:", err);
+            }
+          });
         });
       }
     }

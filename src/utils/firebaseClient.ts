@@ -70,6 +70,39 @@ export interface FirestoreErrorInfo {
   };
 }
 
+export function isQuotaExceededError(error: unknown): boolean {
+  if (!error) return false;
+  const msg = error instanceof Error ? error.message : String(error);
+  const code = (error && typeof error === 'object' && 'code' in error) ? (error as any).code : '';
+  return msg.includes('resource-exhausted') || 
+         msg.includes('Quota limit exceeded') || 
+         msg.includes('quota-exceeded') ||
+         msg.includes('Quota exceeded') ||
+         String(code).includes('resource-exhausted') ||
+         msg.includes('firebase-quota-exceeded-silent');
+}
+
+// Global window event interceptors for quota errors to suppress unhandled warnings/errors in the browser console
+if (typeof window !== 'undefined') {
+  window.addEventListener('unhandledrejection', (event) => {
+    const reason = event.reason;
+    if (isQuotaExceededError(reason)) {
+      event.preventDefault();
+      console.warn("[Firebase Client] Ignored unhandled quota rejection.");
+      window.dispatchEvent(new CustomEvent('firebase-quota-exceeded'));
+    }
+  });
+
+  window.addEventListener('error', (event) => {
+    const error = event.error;
+    if (isQuotaExceededError(error)) {
+      event.preventDefault();
+      console.warn("[Firebase Client] Ignored quota error event.");
+      window.dispatchEvent(new CustomEvent('firebase-quota-exceeded'));
+    }
+  });
+}
+
 export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
   const errInfo: FirestoreErrorInfo = {
     error: error instanceof Error ? error.message : String(error),
@@ -88,16 +121,14 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
     path
   };
 
-  const isQuota = (error instanceof Error && (
-    error.message.includes('resource-exhausted') || 
-    error.message.includes('Quota limit exceeded') || 
-    error.message.includes('quota-exceeded')
-  )) || (error && typeof error === 'object' && ('code' in error) && (error as any).code === 'resource-exhausted');
+  const isQuota = isQuotaExceededError(error);
 
   if (isQuota) {
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('firebase-quota-exceeded', { detail: errInfo }));
     }
+    console.warn('[Firebase Client] Operation failed due to Quota Limit Exceeded. App fallback active. Path: ', path);
+    throw new Error('firebase-quota-exceeded-silent');
   }
 
   console.error('Firestore Error Details: ', JSON.stringify(errInfo));
