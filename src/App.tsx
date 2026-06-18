@@ -63,7 +63,8 @@ import {
   syncSingleClienteToFirebase,
   syncSingleOrdemToFirebase,
   syncSingleMotoboyToFirebase,
-  isQuotaExceededError
+  isQuotaExceededError,
+  isFirebaseBlocked
 } from './utils/firebaseClient';
 import { 
   supabase,
@@ -643,7 +644,9 @@ export default function App() {
   const [dbSyncStatus, setDbSyncStatus] = useState<'synced' | 'connecting' | 'updating' | 'local'>(
     (isFirebaseConfigured || isSupabaseConfigured) ? 'connecting' : 'local'
   );
-  const [firebaseQuotaExceeded, setFirebaseQuotaExceeded] = useState<boolean>(false);
+  const [firebaseQuotaExceeded, setFirebaseQuotaExceeded] = useState<boolean>(() => {
+    return isFirebaseBlocked();
+  });
 
   useEffect(() => {
     const handleQuota = () => {
@@ -1011,7 +1014,7 @@ export default function App() {
   // --- REUSABLE REAL-TIME & POLLING SETUP FOR CALENDAR REFRESH ---
   useEffect(() => {
     // 1. Firebase snapshot stream is primary
-    if (isFirebaseConfigured) {
+    if (isFirebaseConfigured && !firebaseQuotaExceeded) {
       setDbSyncStatus('synced');
       const q = query(collection(firebaseDb, 'ordens_servico'), orderBy('criadoEm', 'desc'));
       const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -3844,10 +3847,23 @@ export default function App() {
           <div className="flex items-center gap-2">
             <span className="text-sm">⚠️</span>
             <span>
-              <strong>Limite de Quota Diária do Firebase Excedido:</strong> Os limites de gravação do banco de dados gratuito (Spark Plan) foram temporariamente recarregados/excedidos. O TorqueLog continuará operando 100% via modo Offline/Local e Supabase para evitar qualquer interrupção.
+              <strong>Limite de Quota Diária do Firebase Excedido:</strong> Os limites de gravação do banco de dados gratuito (Spark Plan) foram temporariamente excedidos. O TorqueLog continuará operando via modo Offline/Local e Supabase para evitar qualquer interrupção.
             </span>
           </div>
           <div className="flex items-center gap-3 w-full md:w-auto justify-end mt-2 md:mt-0">
+            <button 
+              onClick={() => {
+                if (typeof window !== 'undefined') {
+                  localStorage.removeItem('firebase_quota_blocked');
+                }
+                setFirebaseQuotaExceeded(false);
+                window.location.reload();
+              }}
+              className="bg-orange-500 hover:bg-orange-600 border border-orange-400 text-[10.5px] font-black px-3 py-1 rounded transition-all uppercase whitespace-nowrap active:scale-95 flex items-center gap-1 cursor-pointer"
+              type="button"
+            >
+              🔄 Re-tentar Conectar
+            </button>
             <a 
               href="https://console.firebase.google.com/project/deft-theater-qw1xt/firestore/databases/ai-studio-d6760809-7ca1-4a14-bd81-e0c03bad38d1/data?openUpgradeDialog=true"
               target="_blank" 
@@ -3857,7 +3873,12 @@ export default function App() {
               Liberar no Console 🚀
             </a>
             <button 
-              onClick={() => setFirebaseQuotaExceeded(false)}
+              onClick={() => {
+                if (typeof window !== 'undefined') {
+                  localStorage.setItem('firebase_quota_blocked', 'true');
+                }
+                setFirebaseQuotaExceeded(false);
+              }}
               className="text-amber-200 hover:text-white font-black px-2 cursor-pointer transition-all"
               type="button"
             >

@@ -26,9 +26,16 @@ export const auth = getAuth();
 // Verification is active - CONNECTED by user request to use Firebase Firestore
 export const isFirebaseConfigured = true;
 
+export function isFirebaseBlocked(): boolean {
+  if (typeof window !== 'undefined') {
+    return localStorage.getItem('firebase_quota_blocked') === 'true';
+  }
+  return false;
+}
+
 // Validate Connection as mandated
 async function testConnection() {
-  if (!isFirebaseConfigured) return;
+  if (!isFirebaseConfigured || isFirebaseBlocked()) return;
   try {
     await getDocFromServer(doc(db, 'test', 'connection'));
   } catch (error) {
@@ -88,6 +95,9 @@ if (typeof window !== 'undefined') {
     const reason = event.reason;
     if (isQuotaExceededError(reason)) {
       event.preventDefault();
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('firebase_quota_blocked', 'true');
+      }
       console.warn("[Firebase Client] Ignored unhandled quota rejection.");
       window.dispatchEvent(new CustomEvent('firebase-quota-exceeded'));
     }
@@ -97,6 +107,9 @@ if (typeof window !== 'undefined') {
     const error = event.error;
     if (isQuotaExceededError(error)) {
       event.preventDefault();
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('firebase_quota_blocked', 'true');
+      }
       console.warn("[Firebase Client] Ignored quota error event.");
       window.dispatchEvent(new CustomEvent('firebase-quota-exceeded'));
     }
@@ -125,6 +138,7 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
 
   if (isQuota) {
     if (typeof window !== 'undefined') {
+      localStorage.setItem('firebase_quota_blocked', 'true');
       window.dispatchEvent(new CustomEvent('firebase-quota-exceeded', { detail: errInfo }));
     }
     console.warn('[Firebase Client] Operation failed due to Quota Limit Exceeded. App fallback active. Path: ', path);
@@ -141,7 +155,7 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
  * Single document writes to optimize Firebase quota usage
  */
 export async function syncSingleClienteToFirebase(c: any) {
-  if (!isFirebaseConfigured) return null;
+  if (!isFirebaseConfigured || isFirebaseBlocked()) return null;
   try {
     const docRef = doc(db, 'clientes', c.id);
     const payload = {
@@ -172,7 +186,7 @@ export async function syncSingleClienteToFirebase(c: any) {
 }
 
 export async function syncSingleOrdemToFirebase(o: any) {
-  if (!isFirebaseConfigured) return null;
+  if (!isFirebaseConfigured || isFirebaseBlocked()) return null;
   try {
     const docRef = doc(db, 'ordens_servico', o.id);
     const payload = {
@@ -205,7 +219,7 @@ export async function syncSingleOrdemToFirebase(o: any) {
 }
 
 export async function syncSingleMotoboyToFirebase(m: any) {
-  if (!isFirebaseConfigured) return null;
+  if (!isFirebaseConfigured || isFirebaseBlocked()) return null;
   try {
     const docRef = doc(db, 'motoboys', m.id);
     const payload = {
@@ -232,7 +246,7 @@ export async function syncSingleMotoboyToFirebase(m: any) {
  * Bulk writes/updates active Clientes in Firebase Firestore
  */
 export async function syncClientesToFirebase(clientes: any[]) {
-  if (!isFirebaseConfigured) return null;
+  if (!isFirebaseConfigured || isFirebaseBlocked()) return null;
   try {
     const batch = writeBatch(db);
     clientes.forEach(c => {
@@ -270,7 +284,7 @@ export async function syncClientesToFirebase(clientes: any[]) {
  * Deletes a Cliente from Firebase Firestore
  */
 export async function deleteClienteFromFirebase(clientId: string) {
-  if (!isFirebaseConfigured) return null;
+  if (!isFirebaseConfigured || isFirebaseBlocked()) return null;
   try {
     const docRef = doc(db, 'clientes', clientId);
     await deleteDoc(docRef);
@@ -285,7 +299,7 @@ export async function deleteClienteFromFirebase(clientId: string) {
  * Deletes a Motoboy from Firebase Firestore
  */
 export async function deleteMotoboyFromFirebase(motoboyId: string) {
-  if (!isFirebaseConfigured) return null;
+  if (!isFirebaseConfigured || isFirebaseBlocked()) return null;
   try {
     const docRef = doc(db, 'motoboys', motoboyId);
     await deleteDoc(docRef);
@@ -300,7 +314,7 @@ export async function deleteMotoboyFromFirebase(motoboyId: string) {
  * Bulk writes/updates Ordens de Serviço in Firebase Firestore
  */
 export async function syncOrdensToFirebase(ordens: any[]) {
-  if (!isFirebaseConfigured) return null;
+  if (!isFirebaseConfigured || isFirebaseBlocked()) return null;
   try {
     const batch = writeBatch(db);
     ordens.forEach(o => {
@@ -340,7 +354,7 @@ export async function syncOrdensToFirebase(ordens: any[]) {
  * Deletes an Ordem de Serviço from Firebase Firestore
  */
 export async function deleteOrdemFromFirebase(ordemId: string) {
-  if (!isFirebaseConfigured) return null;
+  if (!isFirebaseConfigured || isFirebaseBlocked()) return null;
   try {
     const docRef = doc(db, 'ordens_servico', ordemId);
     await deleteDoc(docRef);
@@ -355,7 +369,7 @@ export async function deleteOrdemFromFirebase(ordemId: string) {
  * Bulk writes/updates Motoboys in Firebase Firestore
  */
 export async function syncMotoboysToFirebase(motoboys: any[]) {
-  if (!isFirebaseConfigured) return null;
+  if (!isFirebaseConfigured || isFirebaseBlocked()) return null;
   try {
     const batch = writeBatch(db);
     motoboys.forEach(m => {
@@ -386,7 +400,7 @@ export async function syncMotoboysToFirebase(motoboys: any[]) {
  * Bulk writes/updates Rotas Agrupadas in Firebase Firestore
  */
 export async function syncRotasToFirebase(rotas: any[]) {
-  if (!isFirebaseConfigured) return null;
+  if (!isFirebaseConfigured || isFirebaseBlocked()) return null;
   try {
     const batch = writeBatch(db);
     rotas.forEach(r => {
@@ -414,7 +428,7 @@ export async function syncRotasToFirebase(rotas: any[]) {
  * Pulls all data from Firebase Firestore to initialize local state
  */
 export async function loadInitialDataFromFirebase() {
-  if (!isFirebaseConfigured) return null;
+  if (!isFirebaseConfigured || isFirebaseBlocked()) return null;
   try {
     const clientesSnapshot = await getDocs(collection(db, 'clientes'));
     const ordensSnapshot = await getDocs(collection(db, 'ordens_servico'));
