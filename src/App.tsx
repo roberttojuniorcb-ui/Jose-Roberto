@@ -431,7 +431,13 @@ export default function App() {
   const [activeMotoboyUser, setActiveMotoboyUser] = useState<Motoboy | null>(null);
   const [activeClienteUser, setActiveClienteUser] = useState<Cliente | null>(null);
 
-  const isExclusiveNow = checkIsExclusiveTime(activeMotoboyUser?.empresaExclusiva);
+  const [overrideExclusivity, setOverrideExclusivity] = useState<'auto' | 'force_exclusive' | 'force_free'>('auto');
+
+  const isExclusiveNow = useMemo(() => {
+    if (overrideExclusivity === 'force_exclusive') return true;
+    if (overrideExclusivity === 'force_free') return false;
+    return checkIsExclusiveTime(activeMotoboyUser?.empresaExclusiva);
+  }, [overrideExclusivity, activeMotoboyUser]);
 
   const filteredMotoboysForClient = useMemo(() => {
     if (!activeClienteUser) return motoboys;
@@ -516,38 +522,34 @@ export default function App() {
   const [activeDriverAlerts, setActiveDriverAlerts] = useState<OrdemServico[]>([]);
 
   // Web Audio synth double beep/chime generator for browser safety & speed
-  const playNotificationSound = () => {
+  const playNotificationSound = (isExclusiveAlarm: boolean = false) => {
     try {
       const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
       if (!AudioContextClass) return;
       const ctx = new AudioContextClass();
       const now = ctx.currentTime;
       
-      // Note 1: E5 (659.25 Hz)
-      const osc1 = ctx.createOscillator();
-      const gain1 = ctx.createGain();
-      osc1.type = 'sine';
-      osc1.frequency.setValueAtTime(659.25, now);
-      gain1.gain.setValueAtTime(0, now);
-      gain1.gain.linearRampToValueAtTime(0.15, now + 0.05);
-      gain1.gain.exponentialRampToValueAtTime(0.0001, now + 0.35);
-      osc1.connect(gain1);
-      gain1.connect(ctx.destination);
-      osc1.start(now);
-      osc1.stop(now + 0.4);
+      const numBeeps = isExclusiveAlarm ? 4 : 2;
+      const delayBetweenBeeps = 0.25;
 
-      // Note 2: A5 (880.00 Hz)
-      const osc2 = ctx.createOscillator();
-      const gain2 = ctx.createGain();
-      osc2.type = 'sine';
-      osc2.frequency.setValueAtTime(880.00, now + 0.12);
-      gain2.gain.setValueAtTime(0, now + 0.12);
-      gain2.gain.linearRampToValueAtTime(0.20, now + 0.17);
-      gain2.gain.exponentialRampToValueAtTime(0.0001, now + 0.5);
-      osc2.connect(gain2);
-      gain2.connect(ctx.destination);
-      osc2.start(now + 0.12);
-      osc2.stop(now + 0.6);
+      for (let i = 0; i < numBeeps; i++) {
+        const beepStart = now + (i * delayBetweenBeeps);
+        const osc = ctx.createOscillator();
+        const gainNode = ctx.createGain();
+        
+        // Slightly higher and more penetrating frequency for priority delivery alarms
+        osc.frequency.setValueAtTime(isExclusiveAlarm ? 980 : 750, beepStart);
+        osc.type = 'sine';
+        
+        gainNode.gain.setValueAtTime(0, beepStart);
+        gainNode.gain.linearRampToValueAtTime(isExclusiveAlarm ? 0.40 : 0.20, beepStart + 0.05);
+        gainNode.gain.exponentialRampToValueAtTime(0.0001, beepStart + 0.22);
+        
+        osc.connect(gainNode);
+        gainNode.connect(ctx.destination);
+        osc.start(beepStart);
+        osc.stop(beepStart + 0.25);
+      }
     } catch (error) {
       console.error("Erro ao gerar som de notificação:", error);
     }
@@ -571,8 +573,6 @@ export default function App() {
       });
       return;
     }
-
-    const isExclusiveNow = checkIsExclusiveTime(activeMotoboyUser?.empresaExclusiva);
 
     // Filter incoming real-time synchronized orders available for this specific driver and base city
     const newAvailableOrders = ordens.filter(o => {
@@ -602,10 +602,29 @@ export default function App() {
         return [...nonDuplicated, ...prev];
       });
 
-      // Play the chime beep alert!
-      playNotificationSound();
+      // Verify if order belongs to the exclusive distributor to sound a dedicated priority alarm
+      const containsExclusive = newAvailableOrders.some(o => 
+        activeMotoboyUser?.empresaExclusiva && 
+        (o.clienteNome.toLowerCase() === activeMotoboyUser.empresaExclusiva.toLowerCase() || o.clienteId === activeMotoboyUser.empresaExclusiva)
+      );
+
+      playNotificationSound(containsExclusive);
+
+      // Trigger standard system push message if supported for locked screen visibility
+      if ('Notification' in window && Notification.permission === 'granted') {
+        const firstOrder = newAvailableOrders[0];
+        const titleText = containsExclusive 
+          ? `🔒 EXCLUSIVIDADE: Entrega para ${firstOrder.clienteNome}` 
+          : `🏍️ TorqueLog: Corrida Co-Faturada em ${firstOrder.clienteNome}`;
+
+        new Notification(titleText, {
+          body: `Destino: ${firstOrder.enderecoEntrega || firstOrder.destinatarioNome}. Toque para abrir e aceitar!`,
+          requireInteraction: true,
+          silent: true // Custom Web Audio generates sound
+        });
+      }
     }
-  }, [ordens, activeSessionRole, activeMotoboyUser]);
+  }, [ordens, activeSessionRole, activeMotoboyUser, isExclusiveNow]);
 
   // --- DATABASE SYNCHRONIZATION AND PRE-POPULATION (FIREBASE & SUPABASE) ---
   const [supabaseLoading, setSupabaseLoading] = useState<boolean>(false);
@@ -3655,35 +3674,39 @@ export default function App() {
               </div>
             )}
 
-            <div className="bg-slate-800/80 px-3 py-1.5 rounded border border-slate-700 font-mono text-xs flex items-center gap-2">
-              <Clock className="w-4 h-4 text-orange-400" />
-              <div>
-                <span className="block text-[9px] text-slate-400 leading-none">Varredura Sweep</span>
-                <span className="text-sm font-bold text-white">15 Minutos</span>
-              </div>
-            </div>
+            {activeSessionRole !== 'Motoboy' && (
+              <>
+                <div className="bg-slate-800/80 px-3 py-1.5 rounded border border-slate-700 font-mono text-xs flex items-center gap-2">
+                  <Clock className="w-4 h-4 text-orange-400" />
+                  <div>
+                    <span className="block text-[9px] text-slate-400 leading-none">Varredura Sweep</span>
+                    <span className="text-sm font-bold text-white">15 Minutos</span>
+                  </div>
+                </div>
 
-            {/* Database Integration Live Status Pill */}
-            <div className={`px-3 py-1.5 rounded border font-mono text-xs flex items-center gap-2 transition-all ${
-              (isFirebaseConfigured || isSupabaseConfigured) 
-                ? 'bg-emerald-950/20 border-emerald-500/20 text-emerald-300' 
-                : 'bg-amber-950/20 border-amber-550/20 text-amber-300'
-            }`}>
-              <span className="relative flex h-2 w-2">
-                <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
-                  (isFirebaseConfigured || isSupabaseConfigured) ? 'bg-emerald-400' : 'bg-amber-400'
-                }`}></span>
-                <span className={`relative inline-flex rounded-full h-2 w-2 ${
-                  (isFirebaseConfigured || isSupabaseConfigured) ? 'bg-emerald-500' : 'bg-amber-500'
-                }`}></span>
-              </span>
-              <div>
-                <span className="block text-[9px] text-slate-400 leading-none">Canal Database</span>
-                <span className="text-sm font-bold block uppercase tracking-tight">
-                  {isFirebaseConfigured ? 'Firebase On' : (isSupabaseConfigured ? 'Supabase On' : 'Simulador Local')}
-                </span>
-              </div>
-            </div>
+                {/* Database Integration Live Status Pill */}
+                <div className={`px-3 py-1.5 rounded border font-mono text-xs flex items-center gap-2 transition-all ${
+                  (isFirebaseConfigured || isSupabaseConfigured) 
+                    ? 'bg-emerald-950/20 border-emerald-500/20 text-emerald-300' 
+                    : 'bg-amber-950/20 border-amber-550/20 text-amber-300'
+                }`}>
+                  <span className="relative flex h-2 w-2">
+                    <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
+                      (isFirebaseConfigured || isSupabaseConfigured) ? 'bg-emerald-400' : 'bg-amber-400'
+                    }`}></span>
+                    <span className={`relative inline-flex rounded-full h-2 w-2 ${
+                      (isFirebaseConfigured || isSupabaseConfigured) ? 'bg-emerald-500' : 'bg-amber-500'
+                    }`}></span>
+                  </span>
+                  <div>
+                    <span className="block text-[9px] text-slate-400 leading-none">Canal Database</span>
+                    <span className="text-sm font-bold block uppercase tracking-tight">
+                      {isFirebaseConfigured ? 'Firebase On' : (isSupabaseConfigured ? 'Supabase On' : 'Simulador Local')}
+                    </span>
+                  </div>
+                </div>
+              </>
+            )}
 
             {/* 🟢 HUD ONLINE USERS METER (ADMIN VIEW ONLY) */}
             {activeSessionRole === 'Empresa' && (
@@ -4075,18 +4098,7 @@ export default function App() {
         </div>
       )}
 
-      {/* --- RECRUITING & EMERGENCY NOTICES (COMPLIANCE VERIFICATION) --- */}
-      <div className="bg-orange-50 border-b border-orange-200 py-2.5 px-4 text-xs font-mono text-orange-850" id="compliance-ribbon">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <Shield className="w-4 h-4 text-orange-650 shrink-0" />
-            <span><strong>Filtro Antiprocesso Ativo:</strong> Comunicações estruturadas para o prestador MEI de forma autônoma (livre de subordinação ou jornada fixa).</span>
-          </div>
-          <div className="text-[10px] bg-orange-200/50 text-orange-900 border border-orange-300 py-0.5 px-2 rounded font-bold">
-            Frota: 100% Motocicletas Parceiras
-          </div>
-        </div>
-      </div>
+      {/* --- COMPLIANCE VERIFICATION SECTION HIDDEN --- */}
       {effectiveRole === 'Empresa' && (
         <div className="max-w-7xl mx-auto px-4 lg:px-6 pt-4">
           {/* --- ADMIN MASTER SUB-TAB NAVIGATION --- */}
@@ -6537,100 +6549,158 @@ export default function App() {
           )}
           
           {/* Welcome section & Quick stats */}
-          <div className="lg:col-span-12 bg-slate-900 text-white rounded-2xl border border-slate-800 p-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 shadow-md shadow-orange-500/5">
-            <div className="flex-1">
-              <span className="text-xs bg-orange-550/20 text-orange-400 font-bold px-3 py-1 rounded-full uppercase tracking-widest font-mono">DASHBOARD DO ENTREGADOR</span>
-              <h1 className="text-2xl font-black mt-2">Olá, {activeMotoboyUser?.nome}!</h1>
-              <p className="text-xs text-slate-400 font-mono mt-1">
-                Região de atuação contratual: <strong className="text-orange-400">{activeMotoboyUser?.cidade || 'Passos - MG'}</strong> • {' '}
-                {activeMotoboyUser?.empresaExclusiva ? (
-                  isExclusiveNow ? (
-                    <span>Contrato: <strong className="text-amber-400">Exclusivo B2B</strong> • Ganho: <strong className="text-emerald-400">R$ {(activeMotoboyUser?.valorRepasseFixo || 4.00).toFixed(2)}</strong> fixos por entrega</span>
-                  ) : (
-                    <span>Contrato: <strong className="text-emerald-400">Freelancer Liberado</strong> • Ganho acordado com parceiro: <strong className="text-emerald-400">R$ {(activeMotoboyUser?.valorRepasseFixo || 4.00).toFixed(2)}</strong> por entrega</span>
-                  )
-                ) : (
-                  <span>Contrato: <strong className="text-emerald-400">Freelancer Geral</strong> • Tarifa variável por cliente local</span>
-                )}
-              </p>
-              
-              {activeMotoboyUser?.empresaExclusiva && (
-                <div className="mt-3.5 p-3.5 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-xs font-mono font-bold transition-all shadow-inner bg-slate-950/80 border-slate-800">
-                  <div className="flex items-center gap-2">
-                    <span className="text-base">🏢</span>
-                    <div>
-                      <span className="text-slate-440 text-[9px] block">Parceiro Exclusivo</span>
-                      <span className="text-orange-400 font-black uppercase text-xs">{activeMotoboyUser.empresaExclusiva}</span>
-                    </div>
-                  </div>
-                  <div>
-                    {isExclusiveNow ? (
-                      <div className="flex flex-col items-end gap-1">
-                        <span className="inline-flex items-center gap-1.5 bg-amber-500/15 text-amber-400 border border-amber-500/30 px-2.5 py-1 rounded-lg text-[10px] tracking-wider font-extrabold">
-                          <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping" />
-                          EXCLUSIVO (Até 18h Seg-Sex | Até 12h Sáb)
-                        </span>
-                        <span className="text-[10px] text-slate-350 font-mono">Valor de ganho por entrega: <strong className="text-emerald-400 text-xs">R$ {(activeMotoboyUser.valorRepasseFixo || 4.00).toFixed(2)}</strong></span>
-                      </div>
-                    ) : (
-                      <div className="flex flex-col items-end gap-1">
-                        <span className="inline-flex items-center gap-1.5 bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 px-2.5 py-1 rounded-lg text-[10px] tracking-wider font-extrabold text-right">
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                          FREELANCER LIBERADO PODEMOS PEGAR OUTROS!
-                        </span>
-                        <span className="text-[10px] text-slate-350 font-mono text-right">Valor acordado com {activeMotoboyUser.empresaExclusiva}: <strong className="text-emerald-450 text-emerald-400 text-xs">R$ {(activeMotoboyUser.valorRepasseFixo || 4.00).toFixed(2)}</strong> por entrega</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              <div className="mt-4 flex flex-wrap gap-3 items-center">
-                <button
-                  type="button"
-                  onClick={() => handleAbrirRelatorio('Motoboy')}
-                  className="bg-orange-500 hover:bg-orange-650 text-white text-xs font-black font-mono py-1.5 px-4 rounded-xl flex items-center gap-2 shadow transition-all cursor-pointer hover:scale-[1.02]"
-                >
-                  📊 CONFERÊNCIA & FECHAMENTO SEMANA/MÊS 🧾
-                </button>
-
-                {/* Preferência do Maps */}
-                <div className="bg-slate-950/85 border border-slate-800 rounded-xl px-3 py-1.5 flex items-center gap-2 shadow font-mono text-[10px]">
-                  <span className="text-orange-400 font-bold block whitespace-nowrap">🗺️ Google Maps:</span>
-                  <select
-                    value={mapsPreference}
-                    onChange={(e) => {
-                      const val = e.target.value as any;
-                      setMapsPreference(val);
-                      localStorage.setItem('torque_log_maps_pref', val);
-                    }}
-                    className="bg-slate-900 border border-slate-755 rounded px-2 py-1 text-[10px] text-slate-100 font-sans font-bold focus:outline-none focus:ring-1 focus:ring-orange-500 cursor-pointer"
-                  >
-                    <option value="always_ask">Perguntar sempre</option>
-                    <option value="always_open">Abrir Rota direto 🏍️</option>
-                    <option value="always_skip_maps">Não abrir Mapa 👍</option>
-                  </select>
-                </div>
+          <div className="lg:col-span-12 bg-slate-900 text-white rounded-2xl border border-slate-800 p-4 sm:p-6 flex flex-col gap-4 shadow-md shadow-orange-500/5">
+            {/* Daily vs Monthly freights details - NOW PLACED AT THE TOP AND HIGHLY COMPACT FOR MOBILE */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 w-full">
+              <div className="bg-slate-950/80 p-2.5 text-center rounded-xl border border-slate-805">
+                <span className="block text-[8px] text-slate-400 uppercase tracking-wider mb-0.5 font-bold">Entregas Diárias</span>
+                <span className="text-xl font-mono font-black text-orange-400">{motoboyStats.hojeCount}</span>
+              </div>
+              <div className="bg-slate-950/80 p-2.5 text-center rounded-xl border border-slate-805">
+                <span className="block text-[8px] text-emerald-400 uppercase tracking-wider mb-0.5 font-bold">Ganho Hoje</span>
+                <span className="text-sm font-black font-mono text-emerald-400">R$ {motoboyStats.hojeEarnings.toFixed(2)}</span>
+              </div>
+              <div className="bg-slate-950/80 p-2.5 text-center rounded-xl border border-slate-805">
+                <span className="block text-[8px] text-slate-400 uppercase tracking-wider mb-0.5 font-bold">Entregas do Mês</span>
+                <span className="text-xl font-black font-mono text-slate-300">{motoboyStats.mesCount}</span>
+              </div>
+              <div className="bg-slate-950/80 p-2.5 text-center rounded-xl border border-slate-805">
+                <span className="block text-[8px] text-emerald-400 uppercase tracking-wider mb-0.5 font-bold">Ganho Mensal</span>
+                <span className="text-sm font-black font-mono text-emerald-400">R$ {motoboyStats.mesEarnings.toFixed(2)}</span>
               </div>
             </div>
-            
-            {/* Daily vs Monthly freights details */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 w-full md:w-auto">
-              <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 text-center">
-                <span className="block text-[9px] text-slate-400 uppercase tracking-wider mb-1">Entregas Diárias</span>
-                <span className="text-2xl font-mono font-black text-orange-405">{motoboyStats.hojeCount}</span>
-              </div>
-              <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 text-center">
-                <span className="block text-[9px] text-emerald-400 uppercase tracking-wider mb-1">Ganho Hoje</span>
-                <span className="text-base font-black font-mono text-emerald-400">R$ {motoboyStats.hojeEarnings.toFixed(2)}</span>
-              </div>
-              <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 text-center">
-                <span className="block text-[9px] text-slate-400 uppercase tracking-wider mb-1">Entregas do Mês</span>
-                <span className="text-2xl font-black font-mono text-slate-300">{motoboyStats.mesCount}</span>
-              </div>
-              <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 text-center">
-                <span className="block text-[9px] text-emerald-400 tracking-wider mb-1 uppercase">Ganho Mensal</span>
-                <span className="text-base font-black font-mono text-emerald-400">R$ {motoboyStats.mesEarnings.toFixed(2)}</span>
+
+            {/* Subtle Divider */}
+            <div className="border-t border-slate-800/50 w-full" />
+
+            {/* Welcome message and controls grouped together */}
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 w-full">
+              <div className="flex-1 w-full animate-fade-in">
+                <div className="flex items-center gap-2 flex-wrap mb-1.5">
+                  <span className="text-[9px] bg-orange-550/20 text-orange-400 border border-orange-550/20 font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider font-mono">
+                    DASHBOARD DO ENTREGADOR
+                  </span>
+
+                  {/* SIMULATION TOGGLE OVERRIDE PILL */}
+                  <div className="flex gap-1.5 bg-slate-950/55 p-0.5 rounded-lg border border-slate-800/80 text-[8px] font-bold font-mono">
+                    <button
+                      type="button"
+                      onClick={() => setOverrideExclusivity('auto')}
+                      className={`px-1.5 py-0.5 rounded cursor-pointer transition ${overrideExclusivity === 'auto' ? 'bg-orange-500 text-white font-black' : 'text-slate-400 hover:text-white'}`}
+                      title="Horário automático baseado no relógio"
+                    >
+                      AUTOMÁTICO ⏱️
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setOverrideExclusivity('force_exclusive')}
+                      className={`px-1.5 py-0.5 rounded cursor-pointer transition ${overrideExclusivity === 'force_exclusive' ? 'bg-amber-500 text-slate-950 font-black' : 'text-slate-400 hover:text-white'}`}
+                      title="Forçar horário comercial exclusivo"
+                    >
+                      FORÇAR EXCLUSIVO 🔒
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setOverrideExclusivity('force_free')}
+                      className={`px-1.5 py-0.5 rounded cursor-pointer transition ${overrideExclusivity === 'force_free' ? 'bg-emerald-500 text-slate-950 font-black' : 'text-slate-400 hover:text-white'}`}
+                      title="Forçar modo freelancer liberado"
+                    >
+                      FORÇAR LIVRE 🔓
+                    </button>
+                  </div>
+                </div>
+
+                <h1 className="text-xl font-black mt-1">Olá, {activeMotoboyUser?.nome}!</h1>
+                <p className="text-[10px] text-slate-400 font-mono mt-0.5 leading-relaxed">
+                  Região contratual: <strong className="text-orange-400">{activeMotoboyUser?.cidade || 'Passos - MG'}</strong> • {' '}
+                  {activeMotoboyUser?.empresaExclusiva ? (
+                    isExclusiveNow ? (
+                      <span>Contrato: <strong className="text-amber-400">Exclusivo B2B</strong> • Ganho: <strong className="text-emerald-400">R$ {(activeMotoboyUser?.valorRepasseFixo || 4.00).toFixed(2)}</strong> por entrega</span>
+                    ) : (
+                      <span>Contrato: <strong className="text-emerald-450 text-emerald-400">Freelancer Liberado</strong> • Ganho: <strong className="text-emerald-400">R$ {(activeMotoboyUser?.valorRepasseFixo || 4.00).toFixed(2)}</strong> por entrega</span>
+                    )
+                  ) : (
+                    <span>Contrato: <strong className="text-emerald-400">Freelancer Geral</strong> • Tarifa variável por cliente local</span>
+                  )}
+                </p>
+                
+                {activeMotoboyUser?.empresaExclusiva && (
+                  <div className="mt-2.5 p-2 bg-slate-955 bg-slate-950/80 border border-slate-800 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-[10px] font-mono leading-normal font-bold">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-sm">🏢</span>
+                      <div>
+                        <span className="text-slate-400 text-[8px] block leading-none">Parceiro Exclusivo</span>
+                        <span className="text-orange-400 font-black uppercase text-[10px]">{activeMotoboyUser.empresaExclusiva}</span>
+                      </div>
+                    </div>
+                    <div>
+                      {isExclusiveNow ? (
+                        <div className="flex flex-col sm:items-end gap-0.5">
+                          <span className="inline-flex items-center gap-1 bg-amber-500/15 text-amber-400 border border-amber-500/30 px-2 py-0.5 rounded text-[9px] tracking-wider font-extrabold uppercase">
+                            <span className="w-1 h-1 rounded-full bg-amber-450 bg-amber-400 animate-ping" />
+                            Exclusivo (Até 18h Seg-Sex | Horário Comercial)
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="flex flex-col sm:items-end gap-0.5">
+                          <span className="inline-flex items-center gap-1 bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded text-[9px] tracking-wider font-extrabold uppercase text-right">
+                            <span className="w-1 h-1 rounded-full bg-emerald-400 animate-pulse" />
+                            Freelancer Liberado para outros
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                <div className="mt-3 flex flex-wrap gap-2 items-center">
+                  <button
+                    type="button"
+                    onClick={() => handleAbrirRelatorio('Motoboy')}
+                    className="bg-orange-500 hover:bg-orange-650 text-white text-[10px] font-black font-mono py-1.5 px-3 rounded-lg flex items-center gap-1.5 shadow transition-all cursor-pointer hover:scale-[1.01]"
+                  >
+                    📊 CONFERÊNCIA & HISTÓRICO 🧾
+                  </button>
+
+                  {/* Preferência do Maps */}
+                  <div className="bg-slate-950/85 border border-slate-800 rounded-lg px-2 py-1 flex items-center gap-1.5 shadow font-mono text-[9px]">
+                    <span className="text-orange-400 font-bold block whitespace-nowrap">🗺️ Maps:</span>
+                    <select
+                      value={mapsPreference}
+                      onChange={(e) => {
+                        const val = e.target.value as any;
+                        setMapsPreference(val);
+                        localStorage.setItem('torque_log_maps_pref', val);
+                      }}
+                      className="bg-slate-900 border border-slate-755 rounded px-1 py-0.5 text-[9px] text-slate-100 font-sans font-bold focus:outline-none focus:ring-1 focus:ring-orange-500 cursor-pointer"
+                    >
+                      <option value="always_ask">Perguntar sempre</option>
+                      <option value="always_open">Abrir Rota direto 🏍️</option>
+                      <option value="always_skip_maps">Não abrir Mapa 👍</option>
+                    </select>
+                  </div>
+
+                  {/* AUDIO CONFIRMATION / AUTOPLAY UNLOCKER PILL */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      playNotificationSound(true);
+                      if ('Notification' in window) {
+                        Notification.requestPermission();
+                        if (Notification.permission === 'granted') {
+                          new Notification("🏍️ TorqueLog: Alertas Ativados", {
+                            body: "O som de plantão para encomendas exclusivas já está ativo neste celular!",
+                            silent: false
+                          });
+                        }
+                      }
+                    }}
+                    className="bg-emerald-950 hover:bg-emerald-900 border border-emerald-500/20 hover:border-emerald-500/40 text-emerald-300 hover:text-white px-2 py-1.5 rounded-lg text-[9px] font-bold font-mono tracking-wider flex items-center gap-1 cursor-pointer transition active:scale-95"
+                    title="Permitir e testar o som do plantão"
+                  >
+                    🔊 CONFIRMAR SOM DO CELULAR
+                  </button>
+                </div>
               </div>
             </div>
           </div>
