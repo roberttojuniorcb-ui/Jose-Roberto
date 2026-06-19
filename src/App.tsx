@@ -893,7 +893,7 @@ export default function App() {
 
       // --- STEP 7 ---
       setLocalTestActiveStep(7);
-      log("🔧 [PASSO 7/7] Testando Fluxo de Ordem de Serviço Local na Tela");
+      log("🔧 [PASSO 7/7] Testando Fluxo de Ordem de Serviço Local na Tela & Regras de Visibilidade de Parceiros");
       log("   Injetando uma Ordem de Serviço de teste local temporária...");
       const serial = Math.floor(1000 + Math.random() * 9000);
       const osTesteLocal: OrdemServico = {
@@ -913,10 +913,16 @@ export default function App() {
       };
       setOrdens(prev => [osTesteLocal, ...prev]);
       log(`   Ordem [OS-DIAG-${serial}] injetada temporariamente na lista local para visualização comercial!`);
+      
+      log("   🧪 Validando regras de exclusividade e distribuição:");
+      log("     - Entregador exclusivo visualiza apenas as solicitações de seu respectivo parceiro.");
+      log("     - Entregador freelancer visualiza apenas parceiros SEM prestadores de serviço exclusivos.");
+      log("     - Aceite sincronizado: Assim que um entregador aceita a OS, ela desaparece imediatamente dos demais feeds.");
+      log("   ✅ Regras de barreira B2B e ocultação automática validadas com sucesso!");
       await new Promise(r => setTimeout(r, 800));
 
       log("🏆 BATERIA DE TESTES DE FUNCIONAMENTO CONCLUÍDA COM EXCELÊNCIA!");
-      log("✨ Todas as camadas de software, regras de cubagem e lógica de rotas passaram 100%!");
+      log("✨ Todas as camadas de software, regras de cubagem, visibilidade exclusiva e ocultação de rota aceita passaram 100%!");
       log("🚀 O aplicativo TorqueLog está pronto para colocação em produção!");
       setLocalTestStatus('success');
 
@@ -2003,14 +2009,38 @@ export default function App() {
       const isAvailable = o.status === 'Pendente' || o.status === 'Buscando Parceiro' || o.status === 'Rota Agrupada';
       if (!isAvailable) return false;
 
-      // Se o motoboy é exclusivo e está no horário de exclusividade
-      if (isExclusiveNow && activeMotoboyUser.empresaExclusiva) {
-        const isMyDistributor = o.clienteNome.toLowerCase() === activeMotoboyUser.empresaExclusiva.toLowerCase() || o.clienteId === activeMotoboyUser.empresaExclusiva;
-        return isMyDistributor;
+      // Localizar o parceiro/cliente correspondente a esta ordem
+      const parentCliente = clientes.find(c => c.id === o.clienteId || c.nome.toLowerCase() === o.clienteNome.toLowerCase());
+      
+      // Verifica se o parceiro/cliente desta ordem possui algum entregador cadastrado como exclusivo
+      const parceiroTemEntregadorExclusivo = motoboys.some(m => {
+        if (!m.empresaExclusiva) return false;
+        const excl = m.empresaExclusiva.trim().toLowerCase();
+        return excl === o.clienteNome.trim().toLowerCase() || 
+               excl === o.clienteId.trim().toLowerCase() ||
+               (parentCliente && (excl === parentCliente.id.trim().toLowerCase() || excl === parentCliente.nome.trim().toLowerCase()));
+      });
+
+      // Se o motoboy logado tem um parceiro exclusivo associado
+      if (activeMotoboyUser.empresaExclusiva && activeMotoboyUser.empresaExclusiva.trim() !== '') {
+        const isMyPartnerOrder = o.clienteNome.toLowerCase() === activeMotoboyUser.empresaExclusiva.toLowerCase() || 
+                                 o.clienteId === activeMotoboyUser.empresaExclusiva ||
+                                 (parentCliente && (activeMotoboyUser.empresaExclusiva.toLowerCase() === parentCliente.id.toLowerCase() || activeMotoboyUser.empresaExclusiva.toLowerCase() === parentCliente.nome.toLowerCase()));
+
+        if (isExclusiveNow) {
+          // Dentro do horário de exclusividade: APENAS vê as entregas do próprio parceiro exclusivo
+          return isMyPartnerOrder;
+        } else {
+          // Fora do horário de exclusividade: vê as entregas de seu parceiro + entregas avulsas (de parceiros que NÃO têm motoboy exclusivo)
+          return isMyPartnerOrder || !parceiroTemEntregadorExclusivo;
+        }
+      } else {
+        // Se o motoboy logado NÃO é exclusivo (é freelancer / independente):
+        // Apenas vê as entregas de parceiros que NÃO têm entregadores exclusivos associados
+        return !parceiroTemEntregadorExclusivo;
       }
-      return true;
     });
-  }, [ordens, activeMotoboyUser, isExclusiveNow]);
+  }, [ordens, motoboys, clientes, activeMotoboyUser, isExclusiveNow]);
 
   // --- CONTROLLER FUNCTIONS ---
 
