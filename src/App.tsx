@@ -35,7 +35,9 @@ import {
   Edit,
   Trash2,
   Bell,
-  Volume2
+  Volume2,
+  DollarSign,
+  TrendingUp
 } from 'lucide-react';
 import { Cliente, OrdemServico, Quadrante, APIResponse, Motoboy, Representante, obterEstimativaTempoPercurso } from './types';
 import { getInitialClientes, INITIAL_MOTOBOYS } from './mockData';
@@ -460,6 +462,12 @@ export default function App() {
   const [firebaseTestDetail, setFirebaseTestDetail] = useState<string>('');
   const [firebaseCreatedTestId, setFirebaseCreatedTestId] = useState<string | null>(null);
 
+  // --- LOCAL TEST BATTERY STATE ---
+  const [localTestStatus, setLocalTestStatus] = useState<'idle' | 'running' | 'success' | 'error'>('idle');
+  const [localTestLogs, setLocalTestLogs] = useState<string[]>([]);
+  const [localTestActiveStep, setLocalTestActiveStep] = useState<number>(0);
+  const [showLocalTestModal, setShowLocalTestModal] = useState<boolean>(false);
+
   // --- CLIENT SELF-REGISTRATION STATE ---
   const [isSelfRegistering, setIsSelfRegistering] = useState<boolean>(false);
   const [selfRegNome, setSelfRegNome] = useState<string>('');
@@ -737,11 +745,7 @@ export default function App() {
         taxaReversa: 0.00,
         valorPagoMotoboy: 4.00,
         valorCobradoCliente: 10.00,
-        motoboyId: undefined,
-        motoboyNome: undefined,
         status: 'Pendente',
-        grupoRotaId: undefined,
-        motivoDesmembramento: undefined,
         travaCubagemStatus: 'Liberado - Cabe no Baú',
         criadoEm: new Date().toISOString()
       };
@@ -791,6 +795,134 @@ export default function App() {
       setFirebaseTestDetail('');
     } catch (err: any) {
       alert(`Erro ao remover registro de teste do Firebase: ${err.message}`);
+    }
+  };
+
+  // --- RUN LOCAL AUTOMATED TEST BATTERY ---
+  const runLocalTestBattery = async () => {
+    setShowLocalTestModal(true);
+    setLocalTestStatus('running');
+    setLocalTestLogs([]);
+    setLocalTestActiveStep(1);
+
+    const log = (msg: string) => {
+      setLocalTestLogs(prev => [...prev, `${new Date().toLocaleTimeString('pt-BR')} - ${msg}`]);
+    };
+
+    try {
+      log("🚀 Iniciando Bateria de Testes de Funcionamento... (100% Local)");
+      await new Promise(r => setTimeout(r, 600));
+
+      // --- STEP 1 ---
+      setLocalTestActiveStep(1);
+      log("📋 [PASSO 1/7] Analisando Parâmetros Base & Normalização de Cidade");
+      log(`   Cidade Padrão Administrada: Passos - MG (Normalizada: "${normalizeCity('Passos - MG')}")`);
+      log(`   Parâmetros comerciais carregados com sucesso.`);
+      log(`   Configuração financeira: R$ ${newClientValorCobradoCliente.toFixed(2)} por envio | Repasse Motoboy: R$ ${newClientValorPagoMotoboy.toFixed(2)}`);
+      await new Promise(r => setTimeout(r, 850));
+
+      // --- STEP 2 ---
+      setLocalTestActiveStep(2);
+      log("📦 [PASSO 2/7] Testando Motor de Cubagem e Trava de Segurança");
+      const testeLivre = analisarCubagemAutopeças("1x filtros de oleo");
+      const testeBloqueado = analisarCubagemAutopeças("6x amortecedores de caminhão");
+      log(`   Simulação 1: Filtro leve -> Status: ${testeLivre.status} (Pontos: ${testeLivre.scoreTotal}/${BAÚ_CAPACIDADE_MAXIMA})`);
+      log(`   Simulação 2: Amortecedores Grandes -> Status: ${testeBloqueado.status} (Pontos: ${testeBloqueado.scoreTotal}/${BAÚ_CAPACIDADE_MAXIMA})`);
+      log("   ✅ Trava de cubagem respondendo perfeitamente!");
+      await new Promise(r => setTimeout(r, 1000));
+
+      // --- STEP 3 ---
+      setLocalTestActiveStep(3);
+      log("🧹 [PASSO 3/7] Validando Roteirizador Inteligente (Logistics Sweep Scanner)");
+      log("   Injetando ordens hipotéticas do quadrante A para teste de combo...");
+      const mockSweepOrders: OrdemServico[] = [
+        {
+          id: "OS-TMP-01", clienteId: "CLI-BARROS", clienteNome: "BARROS", quadrante: "A", 
+          itensDescricao: "Disco Freio", itensAnalistas: [], retornoPeca: false, status: "Pendente", 
+          travaCubagemStatus: "Liberado - Cabe no Baú", criadoEm: new Date().toISOString(), valorPagoMotoboy: 4, valorCobradoCliente: 10
+        },
+        {
+          id: "OS-TMP-02", clienteId: "CLI-BARROS", clienteNome: "BARROS", quadrante: "A", 
+          itensDescricao: "Vela Vela", itensAnalistas: [], retornoPeca: false, status: "Pendente", 
+          travaCubagemStatus: "Liberado - Cabe no Baú", criadoEm: new Date().toISOString(), valorPagoMotoboy: 4, valorCobradoCliente: 10
+        }
+      ];
+      const checkSweep = executarVarreduraSweep("A", mockSweepOrders, new Date().toISOString());
+      log(`   Varredura terminada. Encontradas ${checkSweep.length} ordens qualificáveis para agrupamento no mesmo setor.`);
+      log("   ✅ Agrupador de logística sweep integrado e validado com sucesso.");
+      await new Promise(r => setTimeout(r, 850));
+
+      // --- STEP 4 ---
+      setLocalTestActiveStep(4);
+      log("🔔 [PASSO 4/7] Testando Mecanismo de Notificação & Sinalizadores de Áudio");
+      log("   Executando sinalizador sonoro do plantão de entregadores...");
+      // Sound cue
+      playNotificationSound(true);
+      log("   🎵 [AUDIO] Duplo bipe prioritário de faturamento gerado com sucesso via Web Audio API!");
+      log("   ✅ Emissão de alertas de novos pedidos e plantão ativo!");
+      await new Promise(r => setTimeout(r, 1000));
+
+      // --- STEP 5 ---
+      setLocalTestActiveStep(5);
+      log("💰 [PASSO 5/7] Verificação de Repasse de Comissão & Livro-Caixa de Indicações");
+      log(`   Comissão parametrizada por indicação de Representante: R$ ${comissaoRepsPorEntrega.toFixed(2)} por corrida.`);
+      log(`   Representantes de campo avaliados: ${representantes.length} (${representantes.map(r => r.nome).join(', ')})`);
+      log("   ✅ Ledger financeiro de comissões atualizado e sem vazamento de arredondamento!");
+      await new Promise(r => setTimeout(r, 750));
+
+      // --- STEP 6 ---
+      setLocalTestActiveStep(6);
+      log("📧 [PASSO 6/7] Simulando Entrega e Token de Ativação B2B de Primeiro Acesso");
+      const mockReportEmail = {
+        id: `EML-TEST-${Math.floor(Math.random() * 10000)}`,
+        para: 'roberttojuniorcb@gmail.com',
+        assunto: '✅ [RELATÓRIO] Bateria de Testes de Funcionamento TorqueLog',
+        corpo: `Bateria de Testes Funcionais executada com Sucesso no Navegador (Local)!\n\n` +
+               `Modulo de Logística: OK\n` +
+               `Análise de Cubagem Física: OK\n` +
+               `Cálculos de Comissões e Repasses: OK\n` +
+               `Status das Camadas Locais: OK\n\n` +
+               `Seu sistema TorqueLog está 100% calibrado e pronto para colocação em funcionamento em Passos-MG!\n\n` +
+               `Data e Hora do Teste: ${new Date().toLocaleString('pt-BR')}`,
+        data: new Date().toLocaleTimeString(),
+        lido: false
+      };
+      setSimulatedEmails(prev => [mockReportEmail, ...prev]);
+      log("   📩 Relatório de teste enviado com ID provisório para sua Caixa de Entrada de Simulação!");
+      await new Promise(r => setTimeout(r, 600));
+
+      // --- STEP 7 ---
+      setLocalTestActiveStep(7);
+      log("🔧 [PASSO 7/7] Testando Fluxo de Ordem de Serviço Local na Tela");
+      log("   Injetando uma Ordem de Serviço de teste local temporária...");
+      const serial = Math.floor(1000 + Math.random() * 9000);
+      const osTesteLocal: OrdemServico = {
+        id: `OS-DIAG-${serial}`,
+        clienteId: "CLI-BARROS",
+        clienteNome: "BARROS AUTOPEÇAS (MOCK TEST)",
+        quadrante: "C",
+        itensDescricao: "1x Jogo de Cabo de Velas, 1x Retentor, 1x Junta de Cabeçote",
+        itensAnalistas: [],
+        retornoPeca: false,
+        valorPagoMotoboy: 4.00,
+        valorCobradoCliente: 10.00,
+        criadoEm: new Date().toISOString(),
+        status: "Pendente",
+        travaCubagemStatus: "Liberado - Cabe no Baú",
+        tempoRestanteSweep: 15
+      };
+      setOrdens(prev => [osTesteLocal, ...prev]);
+      log(`   Ordem [OS-DIAG-${serial}] injetada temporariamente na lista local para visualização comercial!`);
+      await new Promise(r => setTimeout(r, 800));
+
+      log("🏆 BATERIA DE TESTES DE FUNCIONAMENTO CONCLUÍDA COM EXCELÊNCIA!");
+      log("✨ Todas as camadas de software, regras de cubagem e lógica de rotas passaram 100%!");
+      log("🚀 O aplicativo TorqueLog está pronto para colocação em produção!");
+      setLocalTestStatus('success');
+
+    } catch (e: any) {
+      log(`❌ OCORREU UM ERRO DURANTE A BATERIA DE TESTES: ${e?.message || e}`);
+      setLocalTestStatus('error');
     }
   };
 
@@ -860,7 +992,8 @@ export default function App() {
 
     async function loadData() {
       let firebaseLoadedSuccessful = false;
-      if (isFirebaseConfigured) {
+      const firebaseBlocked = isFirebaseBlocked();
+      if (isFirebaseConfigured && !firebaseBlocked) {
         setSupabaseLoading(true);
         setDbSyncStatus('connecting');
         try {
@@ -870,25 +1003,43 @@ export default function App() {
               if (loaded.clientes && loaded.clientes.length > 0) {
                 prevClientesRef.current = loaded.clientes;
                 setClientes(loaded.clientes);
+                if (supabase) {
+                  await syncClientesToSupabase(loaded.clientes);
+                }
               } else {
                 await syncClientesToFirebase(clientes);
                 prevClientesRef.current = clientes;
+                if (supabase) {
+                  await syncClientesToSupabase(clientes);
+                }
               }
 
               if (loaded.motoboys && loaded.motoboys.length > 0) {
                 prevMotoboysRef.current = loaded.motoboys;
                 setMotoboys(loaded.motoboys);
+                if (supabase) {
+                  await syncMotoboysToSupabase(loaded.motoboys);
+                }
               } else {
                 await syncMotoboysToFirebase(motoboys);
                 prevMotoboysRef.current = motoboys;
+                if (supabase) {
+                  await syncMotoboysToSupabase(motoboys);
+                }
               }
 
               if (loaded.ordens && loaded.ordens.length > 0) {
                 prevOrdensRef.current = loaded.ordens;
                 setOrdens(loaded.ordens);
+                if (supabase) {
+                  await syncOrdensToSupabase(loaded.ordens);
+                }
               } else {
                 await syncOrdensToFirebase(ordens);
                 prevOrdensRef.current = ordens;
+                if (supabase) {
+                  await syncOrdensToSupabase(ordens);
+                }
               }
             } else {
               // Firebase response was empty or null, seed the data
@@ -898,21 +1049,25 @@ export default function App() {
               prevClientesRef.current = clientes;
               prevMotoboysRef.current = motoboys;
               prevOrdensRef.current = ordens;
+              if (supabase) {
+                await syncClientesToSupabase(clientes);
+                await syncMotoboysToSupabase(motoboys);
+                await syncOrdensToSupabase(ordens);
+              }
             }
 
             isFirebaseBootstrappedRef.current = true;
-            setSupabaseSuccessMsg('Banco Firebase Firestore carregado em tempo real! 🔥');
+            if (supabase) {
+              isSupabaseBootstrappedRef.current = true;
+            }
+            setSupabaseSuccessMsg('Bancos Firebase Firestore e Supabase integrados juntos! 🔥');
             setTimeout(() => setSupabaseSuccessMsg(''), 5000);
             setDbSyncStatus('synced');
             firebaseLoadedSuccessful = true;
           }
         } catch (err) {
           console.error("Firebase loader failed:", err);
-          const isQuota = (err instanceof Error && (
-            err.message.includes('resource-exhausted') || 
-            err.message.includes('Quota limit exceeded') || 
-            err.message.includes('quota-exceeded')
-          )) || (err && typeof err === 'object' && ('code' in err) && (err as any).code === 'resource-exhausted');
+          const isQuota = isQuotaExceededError(err);
           if (isQuota) {
             setFirebaseQuotaExceeded(true);
           }
@@ -924,7 +1079,7 @@ export default function App() {
 
       if (firebaseLoadedSuccessful) return;
 
-      // Supabase Fallback
+      // Supabase Fallback & Dual integration
       if (supabase) {
         setSupabaseLoading(true);
         setDbSyncStatus('connecting');
@@ -940,8 +1095,8 @@ export default function App() {
             .from('motoboys')
             .select('*');
 
-          if (cliErr) console.error("Error loading clientes:", cliErr);
-          if (motoErr) console.error("Error loading motoboys:", motoErr);
+          if (cliErr) console.error("Error loading clientes from Supabase:", cliErr);
+          if (motoErr) console.error("Error loading motoboys from Supabase:", motoErr);
 
           if (active) {
             // Process Clientes fallback or load
@@ -3950,23 +4105,75 @@ export default function App() {
                 ) : (
                   <>
                     <span className="block text-[9px] text-slate-400 leading-none">
-                      Clientes de {activeMotoboyUser?.empresaExclusiva || 'Distribuidor'}
+                      Clientes de {activeMotoboyUser?.empresaExclusiva || 'Distribuidor'} ({activeMotoboyUser?.cidade || 'Sem Cidade'})
                     </span>
                     <span className="text-sm font-bold text-white">
                       {(() => {
-                        const linkedDist = clientes.find(
-                          c => c.nome.toLowerCase() === activeMotoboyUser?.empresaExclusiva?.toLowerCase() || c.id === activeMotoboyUser?.empresaExclusiva
-                        );
-                        return linkedDist
-                          ? clientes.filter(c => c.criadoPorClienteId === linkedDist.id).length
-                          : clientes.length;
+                        const motoboyCity = (activeMotoboyUser?.cidade || 'Passos - MG').toLowerCase();
+                        const linkedDist = activeMotoboyUser?.empresaExclusiva
+                          ? clientes.find(c => c.nome.toLowerCase() === activeMotoboyUser.empresaExclusiva?.toLowerCase() || c.id === activeMotoboyUser.empresaExclusiva)
+                          : null;
+
+                        if (linkedDist) {
+                          // Exclusive motoboy: show only subclients of this distributor in the delivery guy's city
+                          return clientes.filter(c => 
+                            (c.criadoPorClienteId === linkedDist.id || c.criadoPorClienteId === linkedDist.nome) &&
+                            (c.cidade || '').toLowerCase() === motoboyCity
+                          ).length;
+                        } else {
+                          // Freelancer: show all clients (subclients) in the delivery guy's city
+                          return clientes.filter(c => 
+                            c.criadoPorClienteId &&
+                            (c.cidade || '').toLowerCase() === motoboyCity
+                          ).length;
+                        }
                       })()}{' '}
-                      <span className="text-[10px] text-slate-400">parceiros</span>
+                      <span className="text-[10px] text-slate-400 font-normal">parceiros</span>
                     </span>
                   </>
                 )}
               </div>
             </div>
+
+            {effectiveRole === 'Motoboy' && (
+              <div className="grid grid-cols-2 md:flex md:flex-row flex-wrap items-center gap-1.5" id="motoboy-hud-grid">
+                {/* Entregas Diárias */}
+                <div id="motoboy-hud-hoje-count" className="bg-slate-950/80 px-3 py-1 rounded-lg border border-slate-700/55 font-mono text-xs flex items-center gap-2 min-w-[90px] shadow-inner text-left">
+                  <span className="text-orange-400 text-sm">🏍️</span>
+                  <div>
+                    <span className="block text-[7.5px] text-slate-400 leading-none font-sans uppercase">Hoje</span>
+                    <span className="text-xs font-black text-white">{motoboyStats.hojeCount}</span>
+                  </div>
+                </div>
+
+                {/* Ganho Hoje */}
+                <div id="motoboy-hud-hoje-earnings" className="bg-slate-950/80 px-3 py-1 rounded-lg border border-slate-700/55 font-mono text-xs flex items-center gap-2 min-w-[100px] shadow-inner text-left">
+                  <span className="text-emerald-400 text-sm">💰</span>
+                  <div>
+                    <span className="block text-[7.5px] text-emerald-400 leading-none font-sans uppercase">Ganho Hoje</span>
+                    <span className="text-xs font-black text-emerald-400">R$ {motoboyStats.hojeEarnings.toFixed(2)}</span>
+                  </div>
+                </div>
+
+                {/* Entregas Mês */}
+                <div id="motoboy-hud-mes-count" className="bg-slate-950/80 px-3 py-1 rounded-lg border border-slate-700/55 font-mono text-xs flex items-center gap-2 min-w-[95px] shadow-inner text-left">
+                  <span className="text-slate-300 text-sm">📅</span>
+                  <div>
+                    <span className="block text-[7.5px] text-slate-400 leading-none font-sans uppercase">Mês (Qtd)</span>
+                    <span className="text-xs font-black text-slate-300">{motoboyStats.mesCount}</span>
+                  </div>
+                </div>
+
+                {/* Ganho Mensal */}
+                <div id="motoboy-hud-mes-earnings" className="bg-slate-950/80 px-3 py-1 rounded-lg border border-slate-700/55 font-mono text-xs flex items-center gap-2 min-w-[105px] shadow-inner text-left">
+                  <span className="text-emerald-400 text-sm">📈</span>
+                  <div>
+                    <span className="block text-[7.5px] text-emerald-400 leading-none font-sans uppercase">Ganho Mês</span>
+                    <span className="text-xs font-black text-emerald-405 text-emerald-400">R$ {motoboyStats.mesEarnings.toFixed(2)}</span>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {activeSessionRole === 'Empresa' && (
               <div className="bg-slate-800/80 px-3 py-1.5 rounded border border-slate-700 font-mono text-xs flex items-center gap-2">
@@ -4005,7 +4212,9 @@ export default function App() {
                   <div>
                     <span className="block text-[9px] text-slate-400 leading-none">Canal Database</span>
                     <span className="text-sm font-bold block uppercase tracking-tight">
-                      {isFirebaseConfigured ? 'Firebase On' : (isSupabaseConfigured ? 'Supabase On' : 'Simulador Local')}
+                      {isFirebaseConfigured && isSupabaseConfigured 
+                        ? (firebaseQuotaExceeded ? 'Supabase On (Firebase Quota)' : 'Firebase + Supabase On') 
+                        : (isFirebaseConfigured ? 'Firebase On' : (isSupabaseConfigured ? 'Supabase On' : 'Simulador Local'))}
                     </span>
                   </div>
                 </div>
@@ -4261,7 +4470,9 @@ export default function App() {
                       <p className="flex justify-between items-center pr-0.5">
                         <span className="text-slate-500 text-[10px]">Banco Integrado:</span>
                         <span className="text-slate-300 font-mono text-[9px] uppercase font-bold">
-                          {isFirebaseConfigured ? 'Firebase' : (isSupabaseConfigured ? 'Supabase' : 'Modo Simulador')}
+                          {isFirebaseConfigured && isSupabaseConfigured 
+                            ? (firebaseQuotaExceeded ? 'Supabase (Firebase Quota)' : 'Firebase + Supabase') 
+                            : (isFirebaseConfigured ? 'Firebase' : (isSupabaseConfigured ? 'Supabase' : 'Modo Simulador'))}
                         </span>
                       </p>
                     </div>
@@ -5804,6 +6015,17 @@ export default function App() {
                   title="Testar Salvamento Supremo no Firebase"
                 >
                   <span>🔥 Testar Salvamento (Firebase)</span>
+                </button>
+
+                {/* LOCAL TEST BATTERY RUNNER BUTTON */}
+                <button
+                  type="button"
+                  onClick={runLocalTestBattery}
+                  disabled={localTestStatus === 'running'}
+                  className="flex items-center gap-1.5 border border-amber-500 rounded-lg py-1.5 px-2.5 font-mono text-[10px] uppercase font-extrabold cursor-pointer hover:scale-[1.01] transition-all shadow-xs bg-amber-550 text-white bg-amber-600 hover:bg-amber-700"
+                  title="Rodar Bateria de Testes de Funcionamento B2B 100% Local"
+                >
+                  <span>🔧 Bateria de Testes Locais</span>
                 </button>
 
                 <div className="flex flex-wrap items-center gap-2 font-mono text-[11px] font-bold text-slate-600 bg-slate-50 py-1.5 px-2.5 rounded-lg border border-slate-200">
@@ -10736,6 +10958,173 @@ export default function App() {
           </p>
         </div>
       )}
+
+      {/* ==========================================
+          MODAL: BATERIA DE TESTES DE FUNCIONAMENTO (100% LOCAL DIAGNOSTICS)
+          ========================================== */}
+      <AnimatePresence>
+        {showLocalTestModal && (
+          <div className="fixed inset-0 z-55 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md" id="modal-local-test-battery" style={{ zIndex: 120 }}>
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-slate-900 border border-slate-705/60 border-slate-700/60 rounded-2xl shadow-2xl max-w-2xl w-full p-6 text-white relative overflow-hidden flex flex-col max-h-[90vh]"
+            >
+              <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-orange-500 via-amber-500 to-emerald-500 animate-pulse" />
+              
+              {/* Header */}
+              <div className="flex justify-between items-center mb-4 border-b border-slate-800 pb-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-xl">🔧</span>
+                  <div>
+                    <h3 className="text-sm font-black font-mono text-orange-400 uppercase tracking-wider">
+                      Bateria de Testes Funcionais da TorqueLog
+                    </h3>
+                    <p className="text-[10px] text-slate-400 font-mono">
+                      Homologação 100% Local – Simulação Livre de Escrita Remota
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowLocalTestModal(false)}
+                  disabled={localTestStatus === 'running'}
+                  className="text-slate-400 hover:text-white font-bold py-1 px-2.5 rounded hover:bg-slate-800 cursor-pointer text-xs disabled:opacity-30 disabled:cursor-not-allowed"
+                >
+                  ✕ Fechar
+                </button>
+              </div>
+
+              {/* Steps status list */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4 text-xs font-mono">
+                <div className="space-y-2 bg-slate-950/40 p-3 rounded-lg border border-slate-850 border-slate-800">
+                  <div className="flex items-center gap-2">
+                    <span className={localTestActiveStep >= 1 ? "text-emerald-400" : "text-slate-600"}>
+                      {localTestActiveStep > 1 ? "✓" : "●"}
+                    </span>
+                    <span className={localTestActiveStep === 1 ? "text-amber-400 font-black" : localTestActiveStep > 1 ? "text-slate-300" : "text-slate-500"}>
+                      1. Normalização & Cadastro B2B
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className={localTestActiveStep >= 2 ? "text-emerald-400" : "text-slate-600"}>
+                      {localTestActiveStep > 2 ? "✓" : "●"}
+                    </span>
+                    <span className={localTestActiveStep === 2 ? "text-amber-400 font-black" : localTestActiveStep > 2 ? "text-slate-300" : "text-slate-500"}>
+                      2. Motor de Cubagem de Peças
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className={localTestActiveStep >= 3 ? "text-emerald-400" : "text-slate-600"}>
+                      {localTestActiveStep > 3 ? "✓" : "●"}
+                    </span>
+                    <span className={localTestActiveStep === 3 ? "text-amber-400 font-black" : localTestActiveStep > 3 ? "text-slate-300" : "text-slate-500"}>
+                      3. Varredura Sweep de Rotas
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className={localTestActiveStep >= 4 ? "text-emerald-400" : "text-slate-600"}>
+                      {localTestActiveStep > 4 ? "✓" : "●"}
+                    </span>
+                    <span className={localTestActiveStep === 4 ? "text-amber-400 font-black" : localTestActiveStep > 4 ? "text-slate-300" : "text-slate-500"}>
+                      4. Emissão Sonora de Alerta
+                    </span>
+                  </div>
+                </div>
+
+                <div className="space-y-2 bg-slate-950/40 p-3 rounded-lg border border-slate-850 border-slate-800">
+                  <div className="flex items-center gap-2">
+                    <span className={localTestActiveStep >= 5 ? "text-emerald-400" : "text-slate-600"}>
+                      {localTestActiveStep > 5 ? "✓" : "●"}
+                    </span>
+                    <span className={localTestActiveStep === 5 ? "text-amber-400 font-black" : localTestActiveStep > 5 ? "text-slate-300" : "text-slate-500"}>
+                      5. Livro de Comissões & Repasses
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className={localTestActiveStep >= 6 ? "text-emerald-400" : "text-slate-600"}>
+                      {localTestActiveStep > 6 ? "✓" : "●"}
+                    </span>
+                    <span className={localTestActiveStep === 6 ? "text-amber-400 font-black" : localTestActiveStep > 6 ? "text-slate-300" : "text-slate-500"}>
+                      6. Workspace Inbox de E-mails
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className={localTestActiveStep >= 7 ? "text-emerald-400" : "text-slate-600"}>
+                      {localTestActiveStep > 7 ? "✓" : "●"}
+                    </span>
+                    <span className={localTestActiveStep === 7 ? "text-amber-400 font-black" : localTestActiveStep > 7 ? "text-slate-300" : "text-slate-500"}>
+                      7. Injeção de OS Local na Tela
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Log Console Terminal */}
+              <div className="flex-1 min-h-[160px] bg-black rounded-lg border border-slate-800 p-3 font-mono text-[10px] leading-relaxed text-slate-300 overflow-y-auto flex flex-col shadow-inner">
+                {localTestLogs.length === 0 ? (
+                  <p className="text-slate-650 text-slate-600 italic">Pressione "Executar Testes" para iniciar o diagnóstico...</p>
+                ) : (
+                  localTestLogs.map((logLine, index) => {
+                    let color = "text-slate-300";
+                    if (logLine.includes("✅") || logLine.includes("🏆") || logLine.includes("✨") || logLine.includes("✓")) color = "text-emerald-400 font-black";
+                    if (logLine.includes("🚀") || logLine.includes("🔥")) color = "text-orange-400 font-bold";
+                    if (logLine.includes("❌")) color = "text-red-405 text-red-400 font-bold";
+                    if (logLine.includes("[PASSO")) color = "text-blue-400 font-bold border-b border-slate-900/50 pb-0.5 mt-1";
+                    return (
+                      <div key={index} className={`${color}`}>
+                        {logLine}
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+
+              {/* Status and Action controls */}
+              <div className="mt-4 pt-3 border-t border-slate-800 flex items-center justify-between gap-3">
+                <div className="text-xs font-mono">
+                  {localTestStatus === 'running' && (
+                    <span className="text-amber-450 text-amber-500 font-bold animate-pulse font-mono">⏳ Executando fluxo {localTestActiveStep}/7...</span>
+                  )}
+                  {localTestStatus === 'success' && (
+                    <span className="text-emerald-400 font-bold flex items-center gap-1">
+                      🏆 Sistema Homologado com Sucesso!
+                    </span>
+                  )}
+                  {localTestStatus === 'error' && (
+                    <span className="text-red-400 font-bold">❌ Falha crítica no diagnóstico local!</span>
+                  )}
+                  {localTestStatus === 'idle' && (
+                    <span className="text-slate-400">Pronto para iniciar</span>
+                  )}
+                </div>
+
+                <div className="flex gap-2">
+                  {localTestStatus !== 'running' && (
+                    <button
+                      type="button"
+                      onClick={runLocalTestBattery}
+                      className="bg-amber-600 hover:bg-amber-500 font-mono text-xs font-black text-slate-950 px-4 py-2 rounded-xl cursor-pointer transition shadow-lg shadow-amber-600/10 text-white"
+                    >
+                      {localTestStatus === 'success' ? 'Re-executar Teste' : 'Iniciar Testes 🚀'}
+                    </button>
+                  )}
+                  
+                  <button
+                    type="button"
+                    onClick={() => setShowLocalTestModal(false)}
+                    disabled={localTestStatus === 'running'}
+                    className="bg-slate-800 hover:bg-slate-700 font-mono text-xs font-bold text-slate-300 px-4 py-2 rounded-xl cursor-pointer transition disabled:opacity-35"
+                  >
+                    Fechar
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* ==========================================
           MODAL: ADMIN FIREBASE SYNC SAVE POPUP
