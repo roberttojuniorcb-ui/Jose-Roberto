@@ -20,8 +20,8 @@ export default defineConfig(() => {
         host: 'localhost',
       },
       watch: {
-        usePolling: true,
-      }
-    }
+        usePolling: true, // Força o Vite a checar mudanças se o sistema de arquivos travar
+      },
+    },
   };
 });

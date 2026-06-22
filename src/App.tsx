@@ -344,6 +344,10 @@ export default function App() {
   const [firstAccessSenha, setFirstAccessSenha] = useState<string>('');
   const [firstAccessError, setFirstAccessError] = useState<string>('');
 
+  // --- PASSWORD RECOVERY STATES ---
+  const [showRecoverButton, setShowRecoverButton] = useState<boolean>(false);
+  const [passwordRecoverySuccess, setPasswordRecoverySuccess] = useState<string>('');
+
   // --- STATES FOR FIRST ACCESS CHANGE PROVISIONAL PASSWORD ---
   const [partnerNewPassword, setPartnerNewPassword] = useState<string>('');
   const [partnerConfirmPassword, setPartnerConfirmPassword] = useState<string>('');
@@ -2913,6 +2917,7 @@ export default function App() {
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     setLoginError('');
+    setPasswordRecoverySuccess('');
 
     if (loginRole === 'Empresa') {
       // MASTER SECURE DEVELOPER PASSWORD (you may customize this value right here)
@@ -2934,8 +2939,10 @@ export default function App() {
         setActiveSessionRole('Motoboy');
         setActiveMotoboyUser(selected);
         setActiveClienteUser(null);
+        setShowRecoverButton(false);
       } else {
-        setLoginError(`Senha incorreta para ${selected.nome} (Dica: ${selected.senha})`);
+        setLoginError(`Senha incorreta para ${selected.nome}`);
+        setShowRecoverButton(true);
       }
     } else if (loginRole === 'Cliente') {
       const selected = clientes.find(c => c.id === selectedLoginUserId);
@@ -2958,9 +2965,93 @@ export default function App() {
         setActiveSessionRole('Cliente');
         setActiveMotoboyUser(null);
         setActiveClienteUser(selected);
+        setShowRecoverButton(false);
       } else {
-        setLoginError(`Senha incorreta para ${selected.nome} (Dica: ${actualPW})`);
+        setLoginError(`Senha incorreta para ${selected.nome}`);
+        setShowRecoverButton(true);
       }
+    }
+  };
+
+  const handleRecoverPassword = () => {
+    setPasswordRecoverySuccess('');
+    setLoginError('');
+
+    if (loginRole === 'Motoboy') {
+      const selected = motoboys.find(m => m.id === selectedLoginUserId);
+      if (!selected) {
+        setLoginError('Selecione um entregador válido para recuperar a senha');
+        return;
+      }
+      const provisionalPassword = `MOTO-${Math.floor(100000 + Math.random() * 900000)}`;
+      
+      // Update state
+      setMotoboys(prev => prev.map(m => m.id === selected.id ? { ...m, senha: provisionalPassword } : m));
+      
+      const email = `${selected.nome.toLowerCase().replace(/[^a-z0-9]/g, '')}@torque-entregas.com`;
+      const subject = `🔑 Recuperação de Senha - TorqueLog Entregador: ${selected.nome}`;
+      const body = `Olá, ${selected.nome}!\n\nVocê solicitou a recuperação de sua senha no sistema TorqueLog.\n\nSua senha provisória de acesso foi redefinida para:\n👉 ${provisionalPassword}\n\nUtilize esta senha provisória para entrar no portal. Por motivos de segurança, atualize sua senha assim que possível.\n\nAtenciosamente,\nSuporte Técnico TorqueLog`;
+      
+      // Add simulated email so it shows in simulatedInbox
+      const simulatedEmail = {
+        id: `EML-REC-${Math.floor(1005 + Math.random() * 8990)}`,
+        para: email,
+        assunto: subject,
+        corpo: body,
+        codigo: provisionalPassword,
+        data: new Date().toLocaleTimeString(),
+        lido: false
+      };
+      setSimulatedEmails(prev => [simulatedEmail, ...prev]);
+
+      // Trigger actual API if available
+      sendRealEmail(email, subject, body);
+
+      // Open text WhatsApp simulation in new tab
+      const waText = `Olá ${selected.nome}! Sua nova senha provisória do TorqueLog foi resetada para: ${provisionalPassword}`;
+      const waUrl = `https://api.whatsapp.com/send?phone=55${selected.telefone.replace(/[^0-9]/g, '')}&text=${encodeURIComponent(waText)}`;
+      window.open(waUrl, '_blank');
+
+      setPasswordRecoverySuccess(`Sucesso! Uma senha provisória para ${selected.nome} foi gerada de forma segura. Ela foi enviada por e-mail (${email}) e disparada via alerta para o WhatsApp (${selected.telefone || 'cadastrado'}). Confira o simulador de e-mails abaixo para copiar o código.`);
+      setShowRecoverButton(false);
+
+    } else if (loginRole === 'Cliente') {
+      const selected = clientes.find(c => c.id === selectedLoginUserId);
+      if (!selected) {
+        setLoginError('Selecione um parceiro válido para recuperar a senha');
+        return;
+      }
+      const provisionalPassword = `PARC-${Math.floor(100000 + Math.random() * 900000)}`;
+      
+      // Update state
+      setClientes(prev => prev.map(c => c.id === selected.id ? { ...c, senha: provisionalPassword } : c));
+      
+      const email = selected.email || `${selected.nome.toLowerCase().replace(/[^a-z0-9]/g, '')}@parceiro-torque.com`;
+      const subject = `🔑 Recuperação de Senha - Portal do Parceiro B2B TorqueLog: ${selected.nome}`;
+      const body = `Olá, ${selected.nome}!\n\nFoi solicitada a recuperação de sua senha do Portal do Cliente B2B TorqueLog.\n\nA sua senha provisória de acesso foi redefinida automaticamente para:\n👉 ${provisionalPassword}\n\nPor e-mail e WhatsApp enviamos esta notificação. Utilize esta senha para entrar no seu painel e mude sua senha de acesso na área do cliente.\n\nAtenciosamente,\nSuporte Técnico TorqueLog`;
+      
+      // Add simulated email
+      const simulatedEmail = {
+        id: `EML-REC-${Math.floor(1005 + Math.random() * 8990)}`,
+        para: email,
+        assunto: subject,
+        corpo: body,
+        codigo: provisionalPassword,
+        data: new Date().toLocaleTimeString(),
+        lido: false
+      };
+      setSimulatedEmails(prev => [simulatedEmail, ...prev]);
+
+      // Send via real email
+      sendRealEmail(email, subject, body);
+
+      // WhatsApp redirection
+      const waText = `Olá ${selected.nome}! Sua nova senha provisória de acesso ao Portal B2B TorqueLog é: ${provisionalPassword}`;
+      const waUrl = `https://api.whatsapp.com/send?phone=55${selected.telefone.replace(/[^0-9]/g, '')}&text=${encodeURIComponent(waText)}`;
+      window.open(waUrl, '_blank');
+
+      setPasswordRecoverySuccess(`Sucesso! Uma senha provisória de acesso corporativo ao Portal B2B foi gerada para ${selected.nome}. Ela foi enviada por e-mail (${email}) e disparada via link WhatsApp (${selected.telefone || 'cadastrado'}). Confira a simulação de e-mails no rodapé para visualizar a mensagem.`);
+      setShowRecoverButton(false);
     }
   };
 
@@ -3947,6 +4038,28 @@ export default function App() {
                     <AlertTriangle className="w-4 h-4 text-red-400 shrink-0" />
                     <span>{loginError}</span>
                   </div>
+                )}
+
+                {/* Success recovery prompt */}
+                {passwordRecoverySuccess && (
+                  <div className="p-3 bg-emerald-950/55 border border-emerald-800 text-emerald-400 text-xs rounded-lg flex flex-col gap-1.5 font-mono leading-relaxed">
+                    <div className="flex items-center gap-2 font-bold text-white uppercase tracking-wider text-[10px]">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 animate-bounce" />
+                      <span>Senha Recuperada com Sucesso</span>
+                    </div>
+                    <span>{passwordRecoverySuccess}</span>
+                  </div>
+                )}
+
+                {/* Recover Password Button */}
+                {showRecoverButton && loginRole !== 'Empresa' && !passwordRecoverySuccess && (
+                  <button
+                    type="button"
+                    onClick={handleRecoverPassword}
+                    className="w-full bg-slate-900 hover:bg-slate-950 text-slate-300 hover:text-white border border-slate-700 hover:border-orange-500 font-mono font-bold text-xs py-2 px-3.5 rounded-xl transition duration-150 flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    🔐 RECUPERAR SENHA (EMAIL/WHATSAPP)
+                  </button>
                 )}
 
                 {/* Login button */}
