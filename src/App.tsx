@@ -352,6 +352,7 @@ export default function App() {
   // --- STATE FOR CLIENT PORTAL REGISTERING NEW CLIENTS ---
   const [isClientAddingNewClient, setIsClientAddingNewClient] = useState<boolean>(false);
   const [clientNewClientNome, setClientNewClientNome] = useState<string>('');
+  const [clientNewClientCNPJorCPF, setClientNewClientCNPJorCPF] = useState<string>('');
   const [clientNewClientQuadrante, setClientNewClientQuadrante] = useState<Quadrante>('A');
   const [clientNewClientCEP, setClientNewClientCEP] = useState<string>('');
   const [isClientFetchingNewClientCEP, setIsClientFetchingNewClientCEP] = useState<boolean>(false);
@@ -7800,7 +7801,7 @@ export default function App() {
                 setQuickClientNome('');
                 setQuickClientEndereco('');
                 setIsQuickRegisteringDestinatario(false);
-                setClientItemTexto('Objeto de Envio');
+                setClientItemTexto('');
 
                 // Set local reactive dispatch confirmation card details
                 setLastDispatchedOrder({ id: novaOrdemId, destName: finalDestName });
@@ -9170,8 +9171,9 @@ export default function App() {
                   telefone: clientNewClientTelefone || 'Não informado',
                   cidade: clientNewClientCidade || 'Passos - MG',
                   cep: clientNewClientCEP,
-                  valorPagoMotoboy: 4.00,
-                  valorCobradoCliente: 10.00,
+                  cnpj: clientNewClientCNPJorCPF,
+                  valorPagoMotoboy: 0.00,
+                  valorCobradoCliente: 0.00,
                   senha: `cli-${randCode}`,
                   email: clientNewClientEmail,
                   emailConfirmado: true,
@@ -9229,6 +9231,7 @@ export default function App() {
 
                 // Reset internal state
                 setClientNewClientNome('');
+                setClientNewClientCNPJorCPF('');
                 setClientNewClientCEP('');
                 setClientNewClientEndereco('');
                 setClientNewClientTelefone('');
@@ -9245,6 +9248,19 @@ export default function App() {
                     value={clientNewClientNome}
                     onChange={(e) => setClientNewClientNome(e.target.value)}
                     placeholder="Ex: Auto Mecânica Passos"
+                    className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded-lg p-2.5 text-xs focus:ring-2 focus:ring-orange-500 font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1 font-mono">
+                    CNPJ ou CPF
+                  </label>
+                  <input
+                    type="text"
+                    value={clientNewClientCNPJorCPF}
+                    onChange={(e) => setClientNewClientCNPJorCPF(e.target.value)}
+                    placeholder="Ex: 00.000.000/0001-00 ou 111.222.333-44"
                     className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded-lg p-2.5 text-xs focus:ring-2 focus:ring-orange-500 font-mono"
                   />
                 </div>
@@ -9555,10 +9571,10 @@ export default function App() {
                     />
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-1 gap-2">
                     <div>
-                      <label className="block text-[9px] font-bold text-slate-600 uppercase mb-1 font-mono leading-tight">
-                        Fixo Cobrado (Cliente)
+                      <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1 font-mono">
+                        Taxa de Contrato B2B (Fixo Cobrado do Parceiro) *
                       </label>
                       <input
                         type="number"
@@ -9566,20 +9582,7 @@ export default function App() {
                         min="0"
                         value={newClientValorCobradoCliente}
                         onChange={(e) => setNewClientValorCobradoCliente(parseFloat(e.target.value) || 0)}
-                        className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded-lg p-2 px-2.5 text-xs focus:ring-2 focus:ring-orange-500 font-mono font-bold"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[9px] font-bold text-slate-600 uppercase mb-1 font-mono leading-tight">
-                        Repasse (Motoboy)
-                      </label>
-                      <input
-                        type="number"
-                        step="0.50"
-                        min="0"
-                        value={newClientValorPagoMotoboy}
-                        onChange={(e) => setNewClientValorPagoMotoboy(parseFloat(e.target.value) || 0)}
-                        className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded-lg p-2 px-2.5 text-xs focus:ring-2 focus:ring-orange-500 font-mono font-bold"
+                        className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded-lg p-2.5 text-xs focus:ring-2 focus:ring-orange-500 font-mono font-bold"
                       />
                     </div>
                   </div>
@@ -9613,11 +9616,6 @@ export default function App() {
                         </option>
                       ))}
                     </select>
-                  </div>
-
-                  <div className="text-[10px] font-extrabold text-emerald-600 font-mono bg-emerald-50 p-2 rounded border border-emerald-100 flex justify-between">
-                    <span>💵 MARGEM LIQUIDA:</span>
-                    <span>R$ {(newClientValorCobradoCliente - newClientValorPagoMotoboy).toFixed(2)}</span>
                   </div>
                 </div>
 
