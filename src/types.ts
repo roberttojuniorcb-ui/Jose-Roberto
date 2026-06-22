@@ -48,6 +48,57 @@ export interface Motoboy {
   situacao?: string; // Observação sobre a situação do motoboy (ex: ativo, faltou, mudou telefone)
   empresaExclusiva?: string; // Empresa/B2B Cliente exclusivo ao qual o motoboy presta serviços (ex: BARROS AUTOPEÇAS)
   veiculo?: string; // Vehicle like Moto, Carro, Van, Furgão
+  tipoMoto?: 'alugada' | 'propria'; // 'alugada' triggers rent + odometro + fuel mechanics
+  placaAtual?: string;
+  kmEntrada?: number;
+  fotoOdometroEntrada?: string;
+  dataEntrada?: string;
+  isTrabalhandoAtivo?: boolean; // if check-in was completed
+  kmSaidaAcumuladaQuinzenal?: number; // total work kms within current 15 days
+}
+
+export interface RegistroOdometro {
+  id: string;
+  motoboyId: string;
+  motoboyNome: string;
+  placa: string;
+  kmInicial: number;
+  fotoInicial: string;
+  dataEntrada: string;
+  kmFinal?: number;
+  fotoFinal?: string;
+  dataSaida?: string;
+  kmTrabalhado?: number;
+}
+
+export interface ExtratoQuinzenal {
+  id: string;
+  periodo?: string; // Ex: "01/06/2026 - 15/06/2026"
+  createdAt?: string;
+  tipo?: 'Parceiro' | 'Entregador';
+  targetId?: string; // id do cliente ou motoboy
+  targetNome?: string;
+  brutoPlataforma?: number;
+  deduzirImpostoGoverno?: boolean; // se aplica a dedução tributária de 6%
+  valorImposto?: number;
+  valorAluguelMotoDeducao?: number; // R$ 700.00 if applicable
+  valorRetencaoCombustivel?: number; // R$ 0.50/KM if applicable
+  totalKmsRodados?: number;
+  saldoLiquido?: number;
+  pago?: boolean; // marked paid by admin
+  ordensIds?: string[];
+
+  // Fields used in App.tsx consolidations
+  motoboyId: string;
+  motoboyNome: string;
+  dataFechamento: string;
+  totalBrutoLocal: number;
+  totalBrutoIntermunicipal: number;
+  repasseBloqueadoPendente: number;
+  kmRodadoCombustivel: number;
+  descontoCombustivel: number;
+  descontoAluguelMoto: number;
+  saldoLiquidoPago: number;
 }
 
 export interface PecasItem {
@@ -79,6 +130,10 @@ export interface OrdemServico {
   motivoDesmembramento?: string; // Reason if split due to cubage lock
   travaCubagemStatus: 'Liberado - Cabe no Baú' | 'Bloqueado - Excesso de Volume';
   tempoRestanteSweep?: number; // to visualize the "15 mins sweep" remaining count
+  tipoEntrega?: 'local' | 'intermunicipal';
+  distanciaKm?: number;
+  tipoEntregadorPedido?: 'exclusivo' | 'freelancer';
+  faturaParceiraPaga?: boolean;
 }
 
 export interface RotaAgrupada {

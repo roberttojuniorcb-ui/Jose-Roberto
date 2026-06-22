@@ -39,7 +39,7 @@ import {
   DollarSign,
   TrendingUp
 } from 'lucide-react';
-import { Cliente, OrdemServico, Quadrante, APIResponse, Motoboy, Representante, obterEstimativaTempoPercurso } from './types';
+import { Cliente, OrdemServico, Quadrante, APIResponse, Motoboy, Representante, RegistroOdometro, ExtratoQuinzenal, obterEstimativaTempoPercurso } from './types';
 import { getInitialClientes, INITIAL_MOTOBOYS } from './mockData';
 import { 
   query, 
@@ -269,6 +269,10 @@ export default function App() {
   const [retornoPeca, setRetornoPeca] = useState<boolean>(false);
   const [taxaReversaParam, setTaxaReversaParam] = useState<number>(15.00);
   const [comissaoRepsPorEntrega, setComissaoRepsPorEntrega] = useState<number>(0.50);
+  const [tipoEntregadorPedido, setTipoEntregadorPedido] = useState<'exclusivo' | 'freelancer'>('freelancer');
+  const [pedidoIntermunicipal, setPedidoIntermunicipal] = useState<boolean>(false);
+  const [pedidoCidadeDestino, setPedidoCidadeDestino] = useState<string>('Santa Cruz das Palmeiras - SP');
+  const [pedidoDistanciaKm, setPedidoDistanciaKm] = useState<number>(10); // KM padrão de teste de ida
   const [cepErrorState, setCepErrorState] = useState<{ [key: string]: string }>({});
 
   // --- FILTER & CONFIG FOR CLIENT LIST VIEW ---
@@ -420,6 +424,7 @@ export default function App() {
   const [newMotoboyRepasse, setNewMotoboyRepasse] = useState<number>(4.00);
   const [newMotoboyEmpresaExclusiva, setNewMotoboyEmpresaExclusiva] = useState<string>('');
   const [newMotoboyVeiculo, setNewMotoboyVeiculo] = useState<string>('Moto');
+  const [newMotoboyTipoMoto, setNewMotoboyTipoMoto] = useState<'alugada' | 'propria'>('propria');
 
   // --- STATE FOR MOTOBOY EDITING (CRUD) ---
   const [motoboyParaEditar, setMotoboyParaEditar] = useState<Motoboy | null>(null);
@@ -431,6 +436,42 @@ export default function App() {
   const [editMotoboySituacao, setEditMotoboySituacao] = useState<string>('Ativo');
   const [editMotoboyEmpresaExclusiva, setEditMotoboyEmpresaExclusiva] = useState<string>('');
   const [editMotoboyVeiculo, setEditMotoboyVeiculo] = useState<string>('Moto');
+  const [editMotoboyTipoMoto, setEditMotoboyTipoMoto] = useState<'alugada' | 'propria'>('propria');
+
+  // --- REGISTRADOR DE ODÔMETROS ESTADOS ---
+  const [isCheckinModalOpen, setCheckinModalOpen] = useState<boolean>(false);
+  const [isCheckoutModalOpen, setCheckoutModalOpen] = useState<boolean>(false);
+  const [checkinPlaca, setCheckinPlaca] = useState<string>('');
+  const [checkinKm, setCheckinKm] = useState<string>('');
+  const [checkinFoto, setCheckinFoto] = useState<string>('');
+  const [checkoutKm, setCheckoutKm] = useState<string>('');
+  const [checkoutFoto, setCheckoutFoto] = useState<string>('');
+
+  // --- RETENTION & RUNTIME VEHICLE RENT STATES ---
+  const [registrosOdometros, setRegistrosOdometros] = useState<RegistroOdometro[]>(() => {
+    const saved = localStorage.getItem('torque_registros_odometros');
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [extratosQuinzenais, setExtratosQuinzenais] = useState<ExtratoQuinzenal[]>(() => {
+    const saved = localStorage.getItem('torque_extratos_quinzenais');
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [livroCaixaCombustivelTorquelog, setLivroCaixaCombustivelTorquelog] = useState<number>(() => {
+    const saved = localStorage.getItem('torque_caixa_combustivel');
+    return saved ? parseFloat(saved) : 340.50;
+  });
+
+  useEffect(() => {
+    localStorage.setItem('torque_registros_odometros', JSON.stringify(registrosOdometros));
+  }, [registrosOdometros]);
+
+  useEffect(() => {
+    localStorage.setItem('torque_extratos_quinzenais', JSON.stringify(extratosQuinzenais));
+  }, [extratosQuinzenais]);
+
+  useEffect(() => {
+    localStorage.setItem('torque_caixa_combustivel', livroCaixaCombustivelTorquelog.toString());
+  }, [livroCaixaCombustivelTorquelog]);
 
   // --- STATES FOR EXCLUSION CONFIRMATION ---
   const [deleteConfirmType, setDeleteConfirmType] = useState<'cliente' | 'motoboy' | 'multiple-clientes' | 'ordem' | 'representante' | 'desvincular-cliente' | null>(null);
@@ -453,19 +494,31 @@ export default function App() {
   }, [overrideExclusivity, activeMotoboyUser]);
 
   const filteredMotoboysForClient = useMemo(() => {
-    if (!activeClienteUser) return motoboys;
+    if (!activeClienteUser) return [];
     const clientCityNormalized = normalizeCity(activeClienteUser.cidade);
-    return motoboys.filter(mb => normalizeCity(mb.cidade) === clientCityNormalized);
+    return motoboys.filter(mb => {
+      const sameCity = normalizeCity(mb.cidade) === clientCityNormalized;
+      if (!sameCity) return false;
+
+      // Must be exclusive to this specific B2B partner
+      const isExclusiveToMe = mb.empresaExclusiva && (
+        mb.empresaExclusiva.toLowerCase() === activeClienteUser.nome.toLowerCase() ||
+        mb.empresaExclusiva === activeClienteUser.id
+      );
+
+      return isExclusiveToMe;
+    });
   }, [activeClienteUser, motoboys]);
 
   // --- ADMIN CITY FILTER & SEARCH ---
   const [selectedAdminCity, setSelectedAdminCity] = useState<string>('Todas');
-  const [adminSubTab, setAdminSubTab] = useState<'logistica' | 'representantes' | 'taxas'>('logistica');
+  const [adminSubTab, setAdminSubTab] = useState<'logistica' | 'representantes' | 'taxas' | 'quinzenal'>('logistica');
 
   // --- FIREBASE TEST SAVING STATE ---
   const [firebaseTestStatus, setFirebaseTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
   const [firebaseTestDetail, setFirebaseTestDetail] = useState<string>('');
   const [firebaseCreatedTestId, setFirebaseCreatedTestId] = useState<string | null>(null);
+  const [isDeducaoGovernoAtiva, setIsDeducaoGovernoAtiva] = useState<boolean>(true);
 
   // --- LOCAL TEST BATTERY STATE ---
   const [localTestStatus, setLocalTestStatus] = useState<'idle' | 'running' | 'success' | 'error'>('idle');
@@ -2003,6 +2056,10 @@ export default function App() {
 
   const motoboyVisibleOrders = useMemo(() => {
     if (!activeMotoboyUser) return [];
+    
+    const isRiderExclusive = !!(activeMotoboyUser.empresaExclusiva && activeMotoboyUser.empresaExclusiva.trim());
+    const motoboyCityNormalized = normalizeCity(activeMotoboyUser.cidade);
+
     return ordens.filter(o => {
       if (o.status === 'Entregue') return false;
       // Se a ordem já pertence ao motoboy logado, ele vê e controla ela
@@ -2017,6 +2074,12 @@ export default function App() {
       // Localizar o parceiro/cliente correspondente a esta ordem
       const parentCliente = clientes.find(c => c.id === o.clienteId || c.nome.toLowerCase() === o.clienteNome.toLowerCase());
       
+      // 1. REGION/CITY FILTER: O motoboy só vê entregas da sua respectiva região de atuação (cidade)
+      const orderCity = parentCliente?.cidade || o.cidade;
+      if (normalizeCity(orderCity) !== motoboyCityNormalized) {
+        return false;
+      }
+
       // Verifica se o parceiro/cliente desta ordem possui algum entregador cadastrado como exclusivo
       const parceiroTemEntregadorExclusivo = motoboys.some(m => {
         if (!m.empresaExclusiva) return false;
@@ -2026,23 +2089,28 @@ export default function App() {
                (parentCliente && (excl === parentCliente.id.trim().toLowerCase() || excl === parentCliente.nome.trim().toLowerCase()));
       });
 
-      // Se o motoboy logado tem um parceiro exclusivo associado
-      if (activeMotoboyUser.empresaExclusiva && activeMotoboyUser.empresaExclusiva.trim() !== '') {
-        const isMyPartnerOrder = o.clienteNome.toLowerCase() === activeMotoboyUser.empresaExclusiva.toLowerCase() || 
-                                 o.clienteId === activeMotoboyUser.empresaExclusiva ||
-                                 (parentCliente && (activeMotoboyUser.empresaExclusiva.toLowerCase() === parentCliente.id.toLowerCase() || activeMotoboyUser.empresaExclusiva.toLowerCase() === parentCliente.nome.toLowerCase()));
+      const isMyPartnerOrder = activeMotoboyUser.empresaExclusiva && (
+        o.clienteNome.toLowerCase() === activeMotoboyUser.empresaExclusiva.toLowerCase() || 
+        o.clienteId === activeMotoboyUser.empresaExclusiva ||
+        (parentCliente && (
+          activeMotoboyUser.empresaExclusiva.toLowerCase() === parentCliente.id.toLowerCase() || 
+          activeMotoboyUser.empresaExclusiva.toLowerCase() === parentCliente.nome.toLowerCase()
+        ))
+      );
 
-        if (isExclusiveNow) {
-          // Dentro do horário de exclusividade: APENAS vê as entregas do próprio parceiro exclusivo
+      if (isRiderExclusive) {
+        // CASE A: Logged-in Motoboy is EXCLUSIVE
+        if (o.tipoEntregadorPedido === 'exclusivo') {
           return isMyPartnerOrder;
         } else {
-          // Fora do horário de exclusividade: vê as entregas de seu parceiro + entregas avulsas (de parceiros que NÃO têm motoboy exclusivo)
-          return isMyPartnerOrder || !parceiroTemEntregadorExclusivo;
+          // any freelancer order or orders from partners with no exclusive delivery rider
+          // can only be seen outside exclusivity hours
+          return !isExclusiveNow;
         }
       } else {
-        // Se o motoboy logado NÃO é exclusivo (é freelancer / independente):
-        // Apenas vê as entregas de parceiros que NÃO têm entregadores exclusivos associados
-        return !parceiroTemEntregadorExclusivo;
+        // CASE B: Logged-in Motoboy is FREELANCER (NOT exclusive)
+        // Only views orders if they were opted as freelancer, OR if the emitting partner has no exclusive delivery riders.
+        return o.tipoEntregadorPedido === 'freelancer' || !parceiroTemEntregadorExclusivo;
       }
     });
   }, [ordens, motoboys, clientes, activeMotoboyUser, isExclusiveNow]);
@@ -2566,7 +2634,8 @@ export default function App() {
       valorRepasseFixo: Number(editMotoboyRepasse) || 4.00,
       situacao: editMotoboySituacao || 'Ativo',
       empresaExclusiva: editMotoboyEmpresaExclusiva || undefined,
-      veiculo: editMotoboyVeiculo
+      veiculo: editMotoboyVeiculo,
+      tipoMoto: editMotoboyTipoMoto
     };
 
     setMotoboys(prev => prev.map(m => m.id === motoboyParaEditar.id ? updatedMb : m));
@@ -3338,7 +3407,8 @@ export default function App() {
       valorRepasseFixo: Number(newMotoboyRepasse) || 4.00,
       criadoEm: new Date().toISOString(),
       empresaExclusiva: newMotoboyEmpresaExclusiva || undefined,
-      veiculo: newMotoboyVeiculo
+      veiculo: newMotoboyVeiculo,
+      tipoMoto: newMotoboyTipoMoto
     };
 
     setMotoboys(prev => [novoMotoboy, ...prev]);
@@ -3383,6 +3453,7 @@ export default function App() {
     setNewMotoboySenha('passos123');
     setNewMotoboyEmpresaExclusiva('');
     setNewMotoboyVeiculo('Moto');
+    setNewMotoboyTipoMoto('propria');
   };
 
   // Copy current selected day's deliveries audit report
@@ -3456,6 +3527,10 @@ export default function App() {
   };
 
   const handleAceitarOuPerguntarOrdem = (o: OrdemServico) => {
+    if (activeMotoboyUser?.tipoMoto === 'alugada' && !activeMotoboyUser.isTrabalhandoAtivo) {
+      alert("⚠️ Atenção: Você está utilizando uma Moto Alugada e precisa realizar o Check-In de Odômetro (Entrada de Turno) antes de aceitar corridas!");
+      return;
+    }
     if (mapsPreference === 'always_open') {
       handleAtualizarStatusOrdem(o.id, 'Moto a Caminho');
       handleAbrirGoogleMaps(o);
@@ -3553,6 +3628,23 @@ export default function App() {
     setOrdens(nextOrdens);
 
     const updatedO = nextOrdens.find(o => o.id === ordemId);
+
+    // LÓGICA DE DETECÇÃO E RETENÇÃO DE COMBUSTÍVEL PARA MOTO ALUGADA TORQUELOG:
+    if (activeMotoboyUser && activeMotoboyUser.tipoMoto === 'alugada' && updatedO) {
+      const orderDistance = updatedO.distanciaKm || 4.2; // fallback
+      const combDeducao = orderDistance * 0.50; // R$ 0.50 por KM
+      setLivroCaixaCombustivelTorquelog(prev => prev + combDeducao);
+      
+      const updatedRiders = motoboys.map(m => {
+        if (m.id === activeMotoboyUser.id) {
+          const prevKms = m.kmSaidaAcumuladaQuinzenal || 0;
+          return { ...m, kmSaidaAcumuladaQuinzenal: prevKms + orderDistance };
+        }
+        return m;
+      });
+      setMotoboys(updatedRiders);
+      setActiveMotoboyUser(prev => prev ? { ...prev, kmSaidaAcumuladaQuinzenal: (prev.kmSaidaAcumuladaQuinzenal || 0) + orderDistance } : null);
+    }
 
     if (isFirebaseConfigured && updatedO) {
       try {
@@ -4809,6 +4901,18 @@ export default function App() {
                  id="tab-admin-taxas"
                >
                  ⚙️ Taxas & Valores
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAdminSubTab('quinzenal')}
+                  className={`flex-1 md:flex-none px-4 py-2 text-xs font-bold font-mono rounded-lg transition-all duration-150 cursor-pointer ${
+                    adminSubTab === 'quinzenal'
+                      ? 'bg-orange-500 text-white shadow-md'
+                      : 'text-slate-400 hover:text-white hover:bg-slate-900'
+                  }`}
+                  id="tab-admin-faturamento"
+                >
+                  📅 Faturamento 15 Dias
                </button>
              </div>
           </div>
@@ -5798,6 +5902,38 @@ export default function App() {
                     </select>
                   </div>
 
+                  {newMotoboyVeiculo === 'Moto' && (
+                    <div>
+                      <label className="block text-[9px] font-bold text-slate-705 uppercase mb-1 font-mono">
+                        Vínculo da Motocicleta (Frota)
+                      </label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setNewMotoboyTipoMoto('propria')}
+                          className={`py-1.5 px-3 rounded text-[10px] font-mono font-bold border transition ${
+                            newMotoboyTipoMoto === 'propria'
+                              ? 'bg-orange-500 border-orange-500 text-white shadow-sm'
+                              : 'bg-white border-slate-255 text-slate-700 hover:bg-slate-50'
+                          }`}
+                        >
+                          🏍️ Moto Própria
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setNewMotoboyTipoMoto('alugada')}
+                          className={`py-1.5 px-3 rounded text-[10px] font-mono font-bold border transition ${
+                            newMotoboyTipoMoto === 'alugada'
+                              ? 'bg-rose-600 border-rose-600 text-white shadow-sm'
+                              : 'bg-white border-slate-255 text-slate-700 hover:bg-slate-50'
+                          }`}
+                        >
+                          🔑 Moto Alugada (Frota)
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
                   <button
                     type="submit"
                     className="w-full bg-slate-900 text-white font-mono font-bold text-xs py-2 rounded shadow-sm hover:bg-slate-850 cursor-pointer"
@@ -5862,6 +5998,7 @@ export default function App() {
                           setEditMotoboySituacao(m.situacao || 'Ativo');
                           setEditMotoboyEmpresaExclusiva(m.empresaExclusiva || '');
                           setEditMotoboyVeiculo(m.veiculo || 'Moto');
+                          setEditMotoboyTipoMoto(m.tipoMoto || 'propria');
                         }}
                         className="bg-slate-100 hover:bg-slate-200 text-slate-700 p-1.5 rounded transition border border-slate-250 cursor-pointer self-center"
                         title="Editar credenciamento de motoboy"
@@ -7207,6 +7344,412 @@ export default function App() {
       )}
 
       {/* ==========================================
+          FECHAMENTO E FATURAMENTO QUINZENAL DE 15 DIAS (ADMIN PANEL)
+          ========================================== */}
+      {effectiveRole === 'Empresa' && adminSubTab === 'quinzenal' && (
+        <main className="max-w-7xl mx-auto p-4 lg:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 flex-1 w-full animate-fade-in" id="faturamento-quinzenal-dashboard">
+          {/* Cabeçalho do Faturamento */}
+          <div className="lg:col-span-12 bg-slate-900 border border-slate-800 text-white rounded-2xl p-5 md:p-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 shadow-md shadow-orange-500/5">
+            <div>
+              <span className="bg-orange-550/20 text-orange-400 border border-orange-550/15 font-bold text-[8px] px-2 py-0.5 rounded uppercase tracking-widest block w-fit mb-1.5 leading-none">
+                Ciclo de 15 Dias • Quinzena Ativa
+              </span>
+              <h2 className="text-lg font-black font-mono uppercase tracking-tight text-white">
+                📅 Conciliação Quinzenal & Liquidação de Frota
+              </h2>
+              <p className="text-xs text-slate-400 mt-1 font-mono">
+                Gerencie o faturamento corporativo CNPJ com incidência de 6%, retenção de combustível (R$0,50/km) e descontos de aluguel fixo de R$700,00.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-4 bg-slate-950 p-3 rounded-xl border border-slate-850">
+              <div className="flex items-center gap-2 select-none">
+                <input
+                  type="checkbox"
+                  id="toggle-deducao-fiscal"
+                  checked={isDeducaoGovernoAtiva}
+                  onChange={(e) => setIsDeducaoGovernoAtiva(e.target.checked)}
+                  className="w-4.5 h-4.5 rounded border-slate-705 text-orange-500 focus:ring-orange-500 cursor-pointer accent-orange-550 bg-slate-900"
+                />
+                <label htmlFor="toggle-deducao-fiscal" className="text-xs font-mono font-bold text-slate-300 cursor-pointer">
+                  Dedução Fiscal Governo (6%)
+                </label>
+              </div>
+              <div className="h-5 w-px bg-slate-800 hidden sm:block" />
+              <div className="text-xs font-mono">
+                <span className="text-slate-500 block text-[9px] leading-none uppercase">Caixa Combustível TorqueLog</span>
+                <span className="text-emerald-400 font-extrabold text-[13px] mt-1 block">R$ {livroCaixaCombustivelTorquelog.toFixed(2)}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* LADO ESQUERDO: PARCEIROS CORPORATIVOS (CLIENTES CNPJ) */}
+          <div className="lg:col-span-12 xl:col-span-6 space-y-6">
+            <div className="bg-white rounded-2xl p-5 border border-slate-205 shadow-sm">
+              <div className="border-b border-slate-100 pb-3 mb-4 flex justify-between items-center">
+                <div>
+                  <h3 className="text-xs font-black text-slate-900 uppercase font-mono tracking-wider">
+                    🏢 Faturas Quinzenais de Parceiros (B2B CNPJ)
+                  </h3>
+                  <p className="text-[11px] text-slate-400">Marque como pagas para liberar repasses de entregas intermunicipais</p>
+                </div>
+                <span className="text-[10px] font-mono bg-slate-100 px-2 py-0.5 rounded font-bold text-slate-650">
+                  Total: {clientes.filter(c => !c.criadoPorClienteId).length}
+                </span>
+              </div>
+
+              {/* Tabela do Faturamento dos Parceiros (Clientes) */}
+              <div className="space-y-3 max-h-[550px] overflow-y-auto pr-1">
+                {clientes.filter(c => !c.criadoPorClienteId).map(cli => {
+                  const ordensCliente = ordens.filter(o => o.clienteId === cli.id && o.status === 'Entregue');
+                  const countEntregas = ordensCliente.length;
+                  
+                  const faturamentoBruto = ordensCliente.reduce((sum, o) => sum + (o.valorCobradoCliente || 10), 0);
+                  const deducaoFiscalAmt = isDeducaoGovernoAtiva ? faturamentoBruto * 0.06 : 0;
+                  const faturamentoLiquido = faturamentoBruto - deducaoFiscalAmt;
+
+                  const totalPagas = ordensCliente.filter(o => o.faturaParceiraPaga).length;
+                  const isFaturaPaga = countEntregas > 0 && totalPagas === countEntregas;
+
+                  return (
+                    <div key={cli.id} className="bg-slate-50 border border-slate-200 rounded-xl p-4 flex flex-col justify-between gap-3 font-mono text-xs text-slate-700">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <strong className="text-slate-900 text-[13px] block">{cli.nome}</strong>
+                          <span className="text-[9.5px] text-slate-505 block mt-0.5">CNPJ: {cli.cnpj || '38.450.128/0001-90'} • Cidade: {cli.cidade || 'Passos - MG'}</span>
+                        </div>
+                        <span className={`px-2 py-0.5 rounded text-[9.5px] font-black uppercase tracking-wider ${
+                          isFaturaPaga 
+                            ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' 
+                            : 'bg-rose-100 text-rose-800 border border-rose-200 animate-pulse'
+                        }`}>
+                          {isFaturaPaga ? '✅ FATURA PAGA' : '⏳ COMPROVANTE PENDENTE'}
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-2 py-1 text-center bg-white border border-slate-150 rounded-lg p-2">
+                        <div>
+                          <span className="block text-[8px] text-slate-400 uppercase tracking-tight">Entregas</span>
+                          <span className="text-[12px] font-black text-slate-800 font-mono">{countEntregas}</span>
+                        </div>
+                        <div>
+                          <span className="block text-[8px] text-slate-400 uppercase tracking-tight">Valor Bruto</span>
+                          <span className="text-[12px] font-black text-slate-800 font-mono">R$ {faturamentoBruto.toFixed(2)}</span>
+                        </div>
+                        <div>
+                          <span className="block text-[8px] text-slate-400 uppercase tracking-tight">Líquido (c/ Desc.)</span>
+                          <span className="text-[12px] font-black text-emerald-600 font-mono font-black animate-pulse">R$ {faturamentoLiquido.toFixed(2)}</span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between text-[10px] border-t border-dashed border-slate-200 pt-2 flex-wrap gap-2">
+                        <div className="text-slate-500 leading-normal">
+                          {isDeducaoGovernoAtiva ? (
+                            <span>Com retenção governamental de <strong className="text-rose-600 font-mono">6% (- R$ {deducaoFiscalAmt.toFixed(2)})</strong> aplicada</span>
+                          ) : (
+                            <span>Isenção de tributo fiscal de 6%</span>
+                          )}
+                        </div>
+
+                        {!isFaturaPaga && countEntregas > 0 ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const updatedOrdens = ordens.map(o => {
+                                if (o.clienteId === cli.id && o.status === 'Entregue') {
+                                  return { ...o, faturaParceiraPaga: true };
+                                }
+                                return o;
+                              });
+                              setOrdens(updatedOrdens);
+                              alert(`✅ Sucesso!\nFaturamento da quinzena para "${cli.nome}" de R$ ${faturamentoLiquido.toFixed(2)} recebido! Repasses intermunicipais associados foram liberados.`);
+                            }}
+                            className="bg-emerald-600 hover:bg-emerald-700 text-white font-mono font-bold text-[9px] px-3 py-1.5 rounded-lg transition active:scale-95 shadow cursor-pointer uppercase font-black"
+                          >
+                            💸 Marcar como Pago e Liberar Repasse
+                          </button>
+                        ) : isFaturaPaga ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const updatedOrdens = ordens.map(o => {
+                                if (o.clienteId === cli.id && o.status === 'Entregue') {
+                                  return { ...o, faturaParceiraPaga: false };
+                                }
+                                return o;
+                              });
+                              setOrdens(updatedOrdens);
+                              alert(`⚠️ Faturamento de "${cli.nome}" estornado para PENDENTE.`);
+                            }}
+                            className="bg-slate-200 hover:bg-slate-300 text-slate-700 font-mono text-[8.5px] px-2 py-1 rounded transition cursor-pointer"
+                          >
+                            Estornar Pagamento
+                          </button>
+                        ) : (
+                          <span className="text-[10px] text-slate-400 italic">Sem entregas entregues na quinzena</span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          {/* LADO DIREITO: DEMONSTRATIVO & LIQUIDAÇÃO DE ENTREGADORES */}
+          <div className="lg:col-span-12 xl:col-span-6 space-y-6">
+            <div className="bg-white rounded-2xl p-5 border border-slate-205 shadow-sm">
+              <div className="border-b border-slate-100 pb-3 mb-4 flex justify-between items-center">
+                <div>
+                  <h3 className="text-xs font-black text-slate-900 uppercase font-mono tracking-wider">
+                    🏍️ Repasses Quinzenais & Descontos de Entregadores
+                  </h3>
+                  <p className="text-[11px] text-slate-400">Verifique aluguéis, retenções de combustível e repasses bloqueados</p>
+                </div>
+                <span className="text-[10px] font-mono bg-slate-100 px-2 py-0.5 rounded font-bold text-slate-650">
+                  Total: {motoboys.length}
+                </span>
+              </div>
+
+              {/* Tabela de Fechamento de Repasses por Entregador */}
+              <div className="space-y-4 max-h-[550px] overflow-y-auto pr-1">
+                {motoboys.map(mb => {
+                  const ordensMb = ordens.filter(o => o.motoboyId === mb.id && o.status === 'Entregue');
+                  
+                  const ordensLocais = ordensMb.filter(o => o.tipoEntrega === 'local');
+                  const repasseBrutoLocal = ordensLocais.reduce((sum, o) => sum + (o.valorPagoMotoboy || 4.00), 0);
+
+                  const ordensIntermunicipais = ordensMb.filter(o => o.tipoEntrega === 'intermunicipal');
+                  const kmIntermunicipalConcluido = ordensIntermunicipais.reduce((sum, o) => sum + (o.distanciaKm || 0), 0);
+                  const repasseIntermunicipalTotal = ordensIntermunicipais.reduce((sum, o) => sum + (o.valorPagoMotoboy || 0), 0);
+                  
+                  const repasseIntermunicipalLiberado = ordensIntermunicipais
+                    .filter(o => o.faturaParceiraPaga)
+                    .reduce((sum, o) => sum + (o.valorPagoMotoboy || 0), 0);
+
+                  const repasseIntermunicipalBloqueado = repasseIntermunicipalTotal - repasseIntermunicipalLiberado;
+
+                  const isAlugada = mb.tipoMoto === 'alugada';
+                  const kmRodadoQuinzenal = isAlugada ? (mb.kmSaidaAcumuladaQuinzenal || 0) : 0;
+                  const deducaoCombustivelAmt = isAlugada ? kmRodadoQuinzenal * 0.50 : 0;
+
+                  const taxaAluguelMoto = isAlugada ? 700.00 : 0;
+
+                  const repasseTotalLiberadoBruto = repasseBrutoLocal + repasseIntermunicipalLiberado;
+                  const repasseLiquido = repasseTotalLiberadoBruto - deducaoCombustivelAmt - taxaAluguelMoto;
+
+                  return (
+                    <div key={mb.id} className="bg-slate-950 text-slate-100 rounded-xl p-4.5 border border-slate-850 font-mono text-xs flex flex-col justify-between gap-3.5" id={`mb-fechamento-${mb.id}`}>
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <strong className="text-white text-[13px] block">{mb.nome}</strong>
+                          <span className="text-[9.5px] text-slate-450 block mt-0.5">
+                            Veículo: <strong className="text-orange-400 font-bold font-mono">{mb.veiculo?.toUpperCase() || 'MOTO'} ({isAlugada ? 'Frota Torque Alugada' : 'Moto Própria'})</strong>
+                          </span>
+                        </div>
+                        {isAlugada ? (
+                          <span className="bg-orange-500/10 text-orange-400 border border-orange-500/20 px-2 py-0.5 rounded text-[8.5px] font-black uppercase tracking-widest animate-pulse">
+                            Frota Torque Rented
+                          </span>
+                        ) : (
+                          <span className="bg-slate-800 text-slate-450 px-2 py-0.5 rounded text-[8.5px] uppercase">
+                            Own Bike
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Demonstrativo Financeiro Interno da Quinzena */}
+                      <div className="space-y-1.5 text-[11px] bg-slate-900 border border-slate-800 rounded-lg p-3 text-slate-300">
+                        <div className="flex justify-between items-center">
+                          <span>📦 Repasse Local Bruto:</span>
+                          <strong>R$ {repasseBrutoLocal.toFixed(2)}</strong>
+                        </div>
+
+                        {repasseIntermunicipalTotal > 0 && (
+                          <div className="border-t border-slate-850/50 pt-1 space-y-1">
+                            <div className="flex justify-between items-center text-emerald-400">
+                              <span>🌍 Repasse Intermunicipal Liberado:</span>
+                              <strong>R$ {repasseIntermunicipalLiberado.toFixed(2)}</strong>
+                            </div>
+                            {repasseIntermunicipalBloqueado > 0 && (
+                              <div className="flex justify-between items-center text-amber-500 font-extrabold animate-pulse">
+                                <span className="flex items-center gap-1">🔒 Repasse Intermunicipal Bloqueado:</span>
+                                <span>R$ {repasseIntermunicipalBloqueado.toFixed(2)}</span>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {isAlugada && (
+                          <div className="border-t border-slate-850 pt-1.5 space-y-1">
+                            <div className="flex justify-between items-center text-rose-400">
+                              <span>🔥 Retenção de Combustível ({kmRodadoQuinzenal.toFixed(1)} km):</span>
+                              <strong>- R$ {deducaoCombustivelAmt.toFixed(2)}</strong>
+                            </div>
+                            <div className="flex justify-between items-center text-amber-500 font-bold">
+                              <span>📝 Aluguel Fixo Quinzenal:</span>
+                              <strong>- R$ {taxaAluguelMoto.toFixed(2)}</strong>
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="border-t border-slate-800 pt-2 flex justify-between items-center text-xs font-black">
+                          <span className="text-white font-mono">💰 Saldo Líquido Liberado na Quinzena:</span>
+                          <span className={`${repasseLiquido >= 0 ? 'text-emerald-400 animate-pulse font-black' : 'text-rose-455 text-rose-400'} text-xs font-black`}>
+                            R$ {repasseLiquido.toFixed(2)}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Botão de Fechamento / Liquidação Quinzenal do Entregador */}
+                      <div className="flex items-center justify-between text-[10px] border-t border-slate-850 pt-3 flex-wrap gap-2">
+                        <span className="text-slate-500 font-mono">
+                          {isAlugada ? 'Zera odômetros acumulados' : 'Fecha saldos de entregas'}
+                        </span>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (repasseIntermunicipalBloqueado > 0) {
+                              if (!window.confirm(`⚠️ Atenção: Este entregador possui R$ ${repasseIntermunicipalBloqueado.toFixed(2)} em repasses intermunicipais BLOQUEADOS na quinzena porque os Parceiros (clientes) correspondentes não pagaram as faturas corporativas. Deseja liquidar a quinzena APENAS com o saldo liberado de R$ ${repasseLiquido.toFixed(2)}? O saldo bloqueado ficará pendente de recolhimento para a próxima quinzena.`)) {
+                                return;
+                              }
+                            } else {
+                              if (!window.confirm(`Deseja efetuar o fechamento quinzenal unificado de 15 dias de "${mb.nome}"?\n\nIsso gerará o extrato e zerará KM quinzenal acumulado para a frota.`)) {
+                                return;
+                              }
+                            }
+
+                            const novoExtrato: ExtratoQuinzenal = {
+                              id: `EXT-${Math.floor(10000 + Math.random() * 90000)}`,
+                              motoboyId: mb.id,
+                              motoboyNome: mb.nome,
+                              dataFechamento: new Date().toISOString(),
+                              totalBrutoLocal: repasseBrutoLocal,
+                              totalBrutoIntermunicipal: repasseIntermunicipalTotal,
+                              repasseBloqueadoPendente: repasseIntermunicipalBloqueado,
+                              kmRodadoCombustivel: kmRodadoQuinzenal,
+                              descontoCombustivel: deducaoCombustivelAmt,
+                              descontoAluguelMoto: taxaAluguelMoto,
+                              saldoLiquidoPago: repasseLiquido
+                            };
+
+                            setExtratosQuinzenais(prev => [novoExtrato, ...prev]);
+
+                            const updatedRidersList = motoboys.map(m => {
+                              if (m.id === mb.id) {
+                                return { 
+                                  ...m, 
+                                  kmSaidaAcumuladaQuinzenal: 0,
+                                  isTrabalhandoAtivo: false,
+                                  placaAtual: undefined,
+                                  kmEntrada: undefined,
+                                  fotoOdometroEntrada: undefined,
+                                  dataEntrada: undefined
+                                };
+                              }
+                              return m;
+                            });
+
+                            if (activeMotoboyUser && activeMotoboyUser.id === mb.id) {
+                              setActiveMotoboyUser({
+                                ...activeMotoboyUser,
+                                kmSaidaAcumuladaQuinzenal: 0,
+                                isTrabalhandoAtivo: false,
+                                placaAtual: undefined,
+                                kmEntrada: undefined,
+                                fotoOdometroEntrada: undefined,
+                                dataEntrada: undefined
+                              });
+                            }
+
+                            setMotoboys(updatedRidersList);
+
+                            setLivroCaixaCombustivelTorquelog(prev => prev + deducaoCombustivelAmt);
+
+                            alert(`🎉 Quinzena liquidada com absoluto sucesso de ${mb.nome}!\nExtrato ${novoExtrato.id} gerado.\nValor pago: R$ ${repasseLiquido.toFixed(2)} via PIX Corporativo.`);
+                          }}
+                          className="bg-orange-500 hover:bg-orange-600 border border-orange-400 text-white font-mono text-[9px] font-black uppercase py-1.5 px-3 rounded-lg transition hover:scale-103 cursor-pointer"
+                        >
+                          📅 Realizar Fechamento Quinzenal
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          {/* HISTÓRICO DE EXTRATOS EMITIDOS */}
+          <div className="lg:col-span-12 space-y-4">
+            <div className="bg-slate-900 border border-slate-800 text-slate-100 rounded-2xl p-5 font-mono">
+              <h3 className="text-xs font-black text-white uppercase tracking-wider mb-2.5 flex items-center gap-2">
+                📂 Histórico de Extratos Quinzenais Consolidados ({extratosQuinzenais.length})
+              </h3>
+              
+              {extratosQuinzenais.length === 0 ? (
+                <div className="text-xs text-center text-slate-500 p-4 bg-slate-950 border border-dashed border-slate-850 rounded-xl leading-relaxed">
+                  Nenhum extrato quinzenal fechado ou faturado até o momento.<br />
+                  Selecione um entregador acima e realize o fechamento do ciclo de 15 dias para gerar o documento.
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {extratosQuinzenais.map(ext => (
+                    <div key={ext.id} className="bg-slate-950 border border-slate-800 rounded-xl p-4 flex flex-col justify-between gap-2.5 text-[11px]" id={`extrato-${ext.id}`}>
+                      <div className="flex justify-between items-center border-b border-slate-850 pb-2 mb-1.5">
+                        <strong className="text-orange-400 font-extrabold text-[12px]">{ext.id}</strong>
+                        <span className="text-[9px] text-slate-505">{new Date(ext.dataFechamento).toLocaleDateString()} {new Date(ext.dataFechamento).toLocaleTimeString()}</span>
+                      </div>
+
+                      <div className="space-y-1 text-slate-350">
+                        <div>Entregador: <strong className="text-white font-bold">{ext.motoboyNome}</strong></div>
+                        <div className="flex justify-between">
+                          <span>Bruto Local:</span>
+                          <span className="text-white">R$ {ext.totalBrutoLocal.toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Bruto Interminic.:</span>
+                          <span className="text-white">R$ {ext.totalBrutoIntermunicipal.toFixed(2)}</span>
+                        </div>
+                        {ext.repasseBloqueadoPendente > 0 && (
+                          <div className="flex justify-between text-amber-500 font-bold">
+                            <span>Retido p/ Próx. Quinz.:</span>
+                            <span>R$ {ext.repasseBloqueadoPendente.toFixed(2)}</span>
+                          </div>
+                        )}
+                        {ext.descontoCombustivel > 0 && (
+                          <div className="flex justify-between text-rose-400">
+                            <span>Desc. Combustível ({ext.kmRodadoCombustivel?.toFixed(1)}km):</span>
+                            <span>- R$ {ext.descontoCombustivel.toFixed(2)}</span>
+                          </div>
+                        )}
+                        {ext.descontoAluguelMoto > 0 && (
+                          <div className="flex justify-between text-rose-400">
+                            <span>Desc. Aluguel Moto:</span>
+                            <span>- R$ {ext.descontoAluguelMoto.toFixed(2)}</span>
+                          </div>
+                        )}
+                        <div className="border-t border-slate-850 pt-1.5 flex justify-between font-black text-emerald-450 text-emerald-400">
+                          <span>Saldo Pago:</span>
+                          <span>R$ {ext.saldoLiquidoPago.toFixed(2)}</span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-1.5 mt-2 bg-slate-900 border border-slate-850 p-2 rounded justify-between text-[9px] text-slate-500 leading-normal">
+                        <span>Status Transação:</span>
+                        <span className="text-emerald-400 font-black tracking-widest uppercase">✅ PIX PROCESSADO</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </main>
+      )}
+
+      {/* ==========================================
           PORTAL PERSPECTIVE: MOTOBOY DASHBOARD
           ========================================== */}
       {effectiveRole === 'Motoboy' && (
@@ -7413,6 +7956,129 @@ export default function App() {
               </div>
             </div>
           </div>
+
+          {/* PAINEL DE GESTÃO DE MOTO ALUGADA TORQUELOG */}
+          {activeMotoboyUser?.tipoMoto === 'alugada' && (
+            <div className="lg:col-span-12 bg-white rounded-2xl border border-slate-200 shadow-sm p-5 md:p-6 flex flex-col md:flex-row justify-between gap-6" id="painel-moto-alugada">
+              {/* Lado Esquerdo: Check-In/Check-Out */}
+              <div className="flex-1 space-y-4">
+                <div className="flex items-center gap-2">
+                  <span className="p-2.5 bg-orange-100 text-orange-600 rounded-xl text-lg">🏍️</span>
+                  <div>
+                    <h2 className="text-sm font-black text-slate-900 uppercase tracking-wider font-mono">
+                      Controle de Frota Alugada & Odômetro
+                    </h2>
+                    <p className="text-[11px] text-slate-500 font-mono">Documente a rodagem do veículo do plantão para faturamento seguro</p>
+                  </div>
+                </div>
+
+                {!activeMotoboyUser.isTrabalhandoAtivo ? (
+                  <div className="bg-amber-50/50 border border-amber-200/80 rounded-xl p-4 space-y-3">
+                    <div className="flex items-start gap-2.5">
+                      <span className="text-base">⚠️</span>
+                      <div>
+                        <h4 className="text-xs font-bold text-amber-900 font-mono">Turno Bloqueado — Check-In Pendente</h4>
+                        <p className="text-[10px] text-amber-700 leading-normal mt-0.5">
+                          Como você utiliza uma moto alugada da frota, é obrigatório registrar a foto do odômetro e a quilometragem de entrada para iniciar o recebimento de corridas.
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCheckinPlaca(activeMotoboyUser.placaAtual || '');
+                        setCheckinKm(activeMotoboyUser.kmEntrada?.toString() || '');
+                        setCheckinFoto('https://images.unsplash.com/photo-1558981806-ec527fa84c39?w=400&auto=format&fit=crop&q=60referrerPolicy=no-referrer');
+                        setCheckinModalOpen(true);
+                      }}
+                      className="w-full bg-orange-605 bg-orange-600 hover:bg-orange-700 text-white font-mono font-bold text-xs py-2 rounded-lg transition shadow-sm cursor-pointer uppercase tracking-wider text-center flex items-center justify-center gap-1.5"
+                    >
+                      <span>🔓 Registrar Entrada / Abrir Turno</span>
+                    </button>
+                  </div>
+                ) : (
+                  <div className="bg-emerald-50/50 border border-emerald-250 rounded-xl p-4 space-y-3 font-mono text-xs text-slate-700">
+                    <div className="flex items-center justify-between">
+                      <span className="flex items-center gap-1 bg-emerald-500/10 text-emerald-700 border border-emerald-500/35 px-2 py-0.5 rounded text-[10px] uppercase font-black tracking-widest">
+                        <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-ping" />
+                        Turno Ativo / Moto Liberada
+                      </span>
+                      <span className="text-[10px] text-slate-400">Desde: {activeMotoboyUser.dataEntrada ? new Date(activeMotoboyUser.dataEntrada).toLocaleTimeString() : 'Agora'}</span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3 pt-1">
+                      <div className="bg-white p-2.5 rounded border border-slate-150 text-center">
+                        <span className="block text-[8px] text-slate-400 uppercase tracking-tight">Placa Ativa</span>
+                        <span className="text-[13px] font-black text-slate-850">{activeMotoboyUser.placaAtual || 'NÃO CONFIG.'}</span>
+                      </div>
+                      <div className="bg-white p-2.5 rounded border border-slate-150 text-center">
+                        <span className="block text-[8px] text-slate-400 uppercase tracking-tight">KM de Entrada</span>
+                        <span className="text-[13px] font-black text-slate-850 font-mono">{activeMotoboyUser.kmEntrada || 0} km</span>
+                      </div>
+                    </div>
+
+                    {activeMotoboyUser.fotoOdometroEntrada && (
+                      <div className="relative h-14 bg-slate-900 rounded overflow-hidden flex items-center justify-center border border-slate-200">
+                        <img referrerPolicy="no-referrer" src={activeMotoboyUser.fotoOdometroEntrada} alt="Foto Entrada" className="absolute inset-0 w-full h-full object-cover opacity-60" />
+                        <span className="absolute bottom-1 right-1.5 bg-black/75 text-white text-[8px] px-1 py-0.2 rounded font-sans uppercase">Foto Entrada Gravada 📸</span>
+                      </div>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCheckoutKm('');
+                        setCheckoutFoto('https://images.unsplash.com/photo-1558981806-ec527fa84c39?w=400&auto=format&fit=crop&q=60referrerPolicy=no-referrer');
+                        setCheckoutModalOpen(true);
+                      }}
+                      className="w-full bg-slate-900 hover:bg-slate-950 text-white font-mono font-bold text-xs py-2 rounded-lg transition shadow cursor-pointer uppercase tracking-wider text-center"
+                    >
+                      <span>🔒 Registrar Saída / Registrar Fim-Turno</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Lado Direito: Faturamento Quinzenal Provisório */}
+              <div className="flex-1 bg-slate-950 text-slate-100 rounded-2xl p-5 border border-slate-805 flex flex-col justify-between gap-4 font-mono">
+                <div>
+                  <span className="bg-orange-550/20 text-orange-400 border border-orange-550/15 font-bold px-2 py-0.5 rounded text-[8px] tracking-widest uppercase block w-fit mb-1 leading-none">
+                    Diferencial Operacional de Frota
+                  </span>
+                  <h3 className="text-[13px] font-black text-white uppercase tracking-wider leading-tight">
+                    Demonstrativo Financeiro do Aluguel
+                  </h3>
+                  <p className="text-[9px] text-slate-400 mt-1">Simulação provisória com base nas rodagens e retenções da quinzena</p>
+                </div>
+
+                <div className="space-y-2 text-[11px] pt-1 border-t border-slate-850">
+                  <div className="flex justify-between items-center text-slate-400">
+                    <span>🏍️ Distância Concluída por Entregas:</span>
+                    <strong className="text-white">{(activeMotoboyUser.kmSaidaAcumuladaQuinzenal || 0).toFixed(1)} km</strong>
+                  </div>
+                  <div className="flex justify-between items-center text-emerald-400">
+                    <span>🔥 Retenção Combustível (Caixa):</span>
+                    <strong className="font-bold">- R$ {((activeMotoboyUser.kmSaidaAcumuladaQuinzenal || 0) * 0.50).toFixed(2)}</strong>
+                  </div>
+                  <div className="flex justify-between items-center text-amber-400">
+                    <span>📝 Mensalidade/Aluguel Quinzenal Moto:</span>
+                    <strong className="font-bold">- R$ 700.00</strong>
+                  </div>
+                  
+                  <div className="border-t border-slate-850 pt-2 flex justify-between items-center text-xs font-black">
+                    <span className="text-slate-300">💰 Deduções Acumuladas Provisórias:</span>
+                    <span className="text-rose-455 text-rose-400 font-black">
+                      R$ {(((activeMotoboyUser.kmSaidaAcumuladaQuinzenal || 0) * 0.50) + 700.00).toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="p-2 bg-slate-900 border border-slate-800 rounded-lg text-[9px] text-slate-400 leading-normal">
+                  💡 <strong>Regra 15 dias:</strong> O aluguel fixo de R$ 700,00 e o combustível de R$ 0,50/KM são descontados no fechamento da quinzena. KMs das corridas locais baseiam-se na distância do setor (quadrante). Entregas Intermunicipais baseiam-se nos KMs reais computados.
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Left Panel: Available runs (Demandas na Rua) */}
           <div className="lg:col-span-8 space-y-6">
@@ -7669,7 +8335,7 @@ export default function App() {
             <div>
               <span className="text-xs bg-emerald-500/20 text-emerald-400 font-bold px-3 py-1 rounded-full uppercase tracking-widest font-mono">PORTAL DO CLIENTE B2B</span>
               <h1 className="text-2xl font-black mt-2">Olá, {activeClienteUser?.nome}!</h1>
-              <p className="text-xs text-slate-400 font-mono mt-1">Sua agência de autopeças/oficina: Setor {activeClienteUser?.quadrante} • Endereço B2B: {activeClienteUser?.endereco} ({activeClienteUser?.cidade})</p>
+              <p className="text-xs text-slate-400 font-mono mt-1">Sua agência de autopeças/oficina • Endereço B2B: {activeClienteUser?.endereco} ({activeClienteUser?.cidade})</p>
               <div className="mt-4 flex flex-wrap gap-2.5">
                 <button
                   type="button"
@@ -7863,24 +8529,38 @@ export default function App() {
 
                 const statusFinal = 'Buscando Parceiro';
                 const novaOrdemId = `OS-${Math.floor(1000 + Math.random() * 9000)}`;
+
+                const isInter = pedidoIntermunicipal;
+                const kmTotal = isInter ? (Number(pedidoDistanciaKm) * 2) : obterEstimativaTempoPercurso(finalQuadrante).distanciaKm;
+                const cobrado = isInter 
+                  ? (10.00 + (Number(pedidoDistanciaKm) * 2.50) + (Number(pedidoDistanciaKm) * 1.20))
+                  : 9.00; // Taxa fixa R$ 9.00
+                const repasse = isInter
+                  ? (Number(pedidoDistanciaKm) * 2) // R$ 1.00 por KM total
+                  : (tipoEntregadorPedido === 'exclusivo' ? 4.50 : 6.00);
+
                 const novaOrdem: OrdemServico = {
                   id: novaOrdemId,
                   clienteId: activeClienteUser.id,
                   clienteNome: activeClienteUser.nome,
                   quadrante: finalQuadrante,
-                  cidade: activeClienteUser.cidade || 'Passos - MG',
+                  cidade: isInter ? pedidoCidadeDestino : 'Santa Cruz das Palmeiras - SP',
                   itensDescricao: clientItemTexto.trim() || 'Objeto de Envio',
                   itensAnalistas: [], // Empty since we do not need items/cubage logic
                   enderecoEntrega: finalEndereco,
                   destinatarioNome: finalDestName,
                   retornoPeca,
                   taxaReversa: retornoPeca ? 15 : undefined,
-                  valorPagoMotoboy: activeClienteUser.valorPagoMotoboy || 4.00,
-                  valorCobradoCliente: activeClienteUser.valorCobradoCliente || 10.00,
+                  valorPagoMotoboy: repasse,
+                  valorCobradoCliente: cobrado,
                   criadoEm: new Date().toISOString(),
                   status: statusFinal,
                   travaCubagemStatus: 'Liberado - Cabe no Baú',
-                  tempoRestanteSweep: 15
+                  tempoRestanteSweep: 15,
+                  tipoEntrega: isInter ? 'intermunicipal' : 'local',
+                  distanciaKm: kmTotal,
+                  tipoEntregadorPedido: tipoEntregadorPedido,
+                  faturaParceiraPaga: false
                 };
 
                 const updatedList = [novaOrdem, ...ordens];
@@ -8115,7 +8795,7 @@ export default function App() {
                 )}
 
                 <div className="space-y-1">
-                  <label className="block text-xs font-bold text-slate-700 uppercase font-mono">Detalhamento do Objeto de Envio (Opcional)</label>
+                  <label className="block text-xs font-bold text-slate-700 uppercase font-mono font-bold">Detalhamento do Objeto de Envio (Opcional)</label>
                   <input
                     type="text"
                     value={clientItemTexto}
@@ -8125,12 +8805,111 @@ export default function App() {
                   />
                 </div>
 
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase mb-2 font-mono">Sua Tarifa de Contrato B2B</label>
-                  <div className="p-2.5 bg-slate-50 rounded-lg border border-slate-150 flex justify-between text-[11px] font-mono">
-                    <span>💵 Taxa Fixa Contratual</span>
-                    <span className="font-extrabold text-slate-900">R$ {(activeClienteUser?.valorCobradoCliente || 10.00).toFixed(2)} por envio</span>
+                {/* BOTÃO DE SELEÇÃO DE ENTREGADOR (EXCLUSIVO VS FREELANCER) */}
+                <div className="bg-slate-50 p-3 rounded-lg border border-slate-150 space-y-2">
+                  <label className="block text-[10px] font-black text-slate-700 uppercase font-mono tracking-tight leading-none">
+                    🎯 Tipo de Despacho & Roteamento
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setTipoEntregadorPedido('exclusivo')}
+                      className={`py-2 px-3 rounded-md text-[10.5px] font-mono font-black border transition-all flex flex-col items-center justify-center text-center ${
+                        tipoEntregadorPedido === 'exclusivo'
+                          ? 'bg-orange-555 bg-orange-600 border-orange-551 text-white shadow-sm scale-102'
+                          : 'bg-white border-slate-201 text-slate-700 hover:bg-slate-100'
+                      }`}
+                    >
+                      <span className="block text-[11px]">👤 Exclusivo</span>
+                      <span className="block text-[8px] opacity-80 font-normal leading-tight">Motorista Dedicado</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setTipoEntregadorPedido('freelancer')}
+                      className={`py-2 px-3 rounded-md text-[10.5px] font-mono font-black border transition-all flex flex-col items-center justify-center text-center ${
+                        tipoEntregadorPedido === 'freelancer'
+                          ? 'bg-emerald-600 border-emerald-650 text-white shadow-sm scale-102'
+                          : 'bg-white border-slate-201 text-slate-700 hover:bg-slate-100'
+                      }`}
+                    >
+                      <span className="block text-[11px]">🌐 Freelancer</span>
+                      <span className="block text-[8px] opacity-80 font-normal leading-tight">Painel Geral Geral</span>
+                    </button>
                   </div>
+                </div>
+
+                {/* SELETOR DE ENTREGA INTERMUNICIPAL / LONGA DISTÂNCIA */}
+                <div className="bg-slate-50 p-3 rounded-lg border border-slate-150 space-y-2.5">
+                  <div className="flex justify-between items-center">
+                    <label className="block text-[10px] font-black text-slate-700 uppercase font-mono tracking-tight leading-none">
+                      🗺️ Destinação Territorial
+                    </label>
+                    <span className="bg-slate-200/60 text-slate-600 font-mono text-[8px] px-1.5 py-0.5 rounded uppercase font-bold">raio urbano</span>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="toggle-intermunicipal"
+                      checked={pedidoIntermunicipal}
+                      onChange={(e) => setPedidoIntermunicipal(e.target.checked)}
+                      className="cursor-pointer h-4 w-4 accent-orange-600"
+                    />
+                    <label htmlFor="toggle-intermunicipal" className="text-[11px] font-mono font-bold text-slate-750 cursor-pointer select-none">
+                      Entrega Intermunicipal de Longa Distância?
+                    </label>
+                  </div>
+
+                  {pedidoIntermunicipal && (
+                    <div className="space-y-2 p-2 bg-white rounded border border-slate-150 animate-fade-in text-xs font-mono">
+                      <div>
+                        <label className="block text-[9px] text-slate-500 font-bold uppercase mb-0.5">Cidade Destino</label>
+                        <input
+                          type="text"
+                          value={pedidoCidadeDestino}
+                          onChange={(e) => setPedidoCidadeDestino(e.target.value)}
+                          placeholder="Ex: Porto Ferreira - SP"
+                          className="w-full bg-slate-50 border border-slate-200 rounded p-1.5 text-xs text-slate-800 font-bold"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[9px] text-slate-500 font-bold uppercase mb-0.5">Distância Aproximada (Ida em KM)</label>
+                        <input
+                          type="number"
+                          value={pedidoDistanciaKm}
+                          onChange={(e) => setPedidoDistanciaKm(Math.max(1, parseInt(e.target.value) || 0))}
+                          className="w-full bg-slate-50 border border-slate-200 rounded p-1.5 text-xs text-slate-800 font-bold"
+                          min="1"
+                        />
+                        <span className="text-[9px] text-slate-400 mt-0.5 block leading-tight">
+                          Será computado KM de Volta equivalente ({pedidoDistanciaKm || 0} KM ida + {pedidoDistanciaKm || 0} KM volta = {(pedidoDistanciaKm || 0) * 2} KM Total)
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-2 font-mono">Preço do Despacho (Sua Fatura B2B)</label>
+                  {pedidoIntermunicipal ? (
+                    <div className="p-3 bg-amber-50/70 border border-amber-200 rounded-lg space-y-1.5 font-mono text-[11px]">
+                      <div className="flex justify-between font-bold text-slate-800">
+                        <span>🏷️ Tarifa Longa Distância Unificada:</span>
+                        <span className="text-sm font-black text-slate-900 font-mono">
+                          R$ {(10.00 + (Number(pedidoDistanciaKm) * 2.50) + (Number(pedidoDistanciaKm) * 1.20)).toFixed(2)}
+                        </span>
+                      </div>
+                      <div className="text-[8.5px] text-slate-450 border-t border-slate-200/50 pt-1 leading-normal">
+                        Cálculo: R$ 10.00 (Base) + ({pedidoDistanciaKm} KM ida * R$ 2.50) + ({pedidoDistanciaKm} KM volta * R$ 1.20)<br/>
+                        <strong className="text-orange-600">Repasse para o entregador: R$ {((Number(pedidoDistanciaKm) * 2)).toFixed(2)} acumulando KMs</strong>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="p-2.5 bg-slate-50 rounded-lg border border-slate-150 flex justify-between text-[11px] font-mono">
+                      <span>💵 Taxa Fixa Urbana (Local):</span>
+                      <span className="font-extrabold text-slate-900">R$ 9.00 por envio</span>
+                    </div>
+                  )}
                 </div>
 
                 {/* Reversa option */}
@@ -8171,7 +8950,7 @@ export default function App() {
               <div className="space-y-3 max-h-[290px] overflow-y-auto pr-1">
                 {filteredMotoboysForClient.length === 0 ? (
                   <div className="p-8 text-center text-slate-400 italic font-mono text-xs border border-dashed border-slate-200 rounded-xl bg-slate-50">
-                    Nenhum entregador cadastrado para a sua cidade ({activeClienteUser?.cidade || 'Passos - MG'}).
+                    Nenhum entregador exclusivo cadastrado para a sua região ({activeClienteUser?.cidade || 'Sem Cidade'}).
                   </div>
                 ) : (
                   filteredMotoboysForClient.map((mb, idx) => {
@@ -8566,6 +9345,255 @@ export default function App() {
                 </div>
               </form>
 
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ==========================================
+          MODAL: CHECK-IN DE ODÔMETRO (MOTO ALUGADA)
+          ========================================== */}
+      <AnimatePresence>
+        {isCheckinModalOpen && activeMotoboyUser && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm" id="modal-checkin-odometro">
+            <motion.div 
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white rounded-xl shadow-2xl border border-slate-200 max-w-sm w-full p-5"
+            >
+              <div className="flex justify-between items-start mb-4">
+                <h3 className="text-sm font-black text-slate-900 uppercase font-mono tracking-tight">
+                  🔓 Check-In de Odômetro (Entrada)
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => setCheckinModalOpen(false)}
+                  className="text-slate-400 hover:text-slate-600 font-bold py-1 px-2 rounded hover:bg-slate-100 cursor-pointer text-xs font-mono"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <p className="text-[10px] text-slate-500 font-mono mb-4 leading-normal">
+                Preencha os indicadores de rodagem da motocicleta de frota alugada para liberar as entregas do turno.
+              </p>
+
+              <div className="space-y-4 font-mono text-xs">
+                <div>
+                  <label className="block text-[10px] uppercase font-bold text-slate-600 mb-1">Placa do Veículo 🏍️</label>
+                  <input
+                    type="text"
+                    value={checkinPlaca}
+                    onChange={(e) => setCheckinPlaca(e.target.value.toUpperCase())}
+                    placeholder="Ex: ABC-1234"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs font-bold font-mono focus:ring-1 focus:ring-orange-500 text-slate-900"
+                    maxLength={8}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] uppercase font-bold text-slate-600 mb-1">Quilometragem de Entrada (Painel) 📊</label>
+                  <input
+                    type="number"
+                    value={checkinKm}
+                    onChange={(e) => setCheckinKm(e.target.value)}
+                    placeholder="Ex: 12450"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs font-bold font-mono focus:ring-1 focus:ring-orange-500 text-slate-900"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] uppercase font-bold text-slate-600 mb-1">Foto de Registro do Painel 📸</label>
+                  <div className="border border-dashed border-slate-200 rounded-lg p-2 bg-slate-50 flex flex-col items-center justify-center text-center">
+                    <span className="text-lg">📷</span>
+                    <span className="text-[9px] text-slate-500 mt-1 uppercase font-bold font-sans">odometro_entrada.png</span>
+                    <span className="text-[8px] text-emerald-600 bg-emerald-50 px-1.5 py-0.2 rounded font-sans uppercase font-bold mt-1">Foto Capturada 📸</span>
+                  </div>
+                </div>
+
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setCheckinModalOpen(false)}
+                    className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 py-2 rounded-lg text-xs font-bold font-mono cursor-pointer"
+                  >
+                    Voltar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!checkinPlaca.trim() || !checkinKm.trim()) {
+                        alert("Por favor, informe a Placa e a Quilometragem de Entrada válidos!");
+                        return;
+                      }
+                      const kmNum = parseInt(checkinKm);
+                      if (isNaN(kmNum) || kmNum < 0) {
+                        alert("Por favor, digite uma quilometragem de entrada válida!");
+                        return;
+                      }
+
+                      const updatedMb = {
+                        ...activeMotoboyUser,
+                        isTrabalhandoAtivo: true,
+                        placaAtual: checkinPlaca,
+                        kmEntrada: kmNum,
+                        fotoOdometroEntrada: checkinFoto,
+                        dataEntrada: new Date().toISOString()
+                      };
+
+                      const updatedRidersList = motoboys.map(m => {
+                        if (m.id === activeMotoboyUser.id) {
+                          return { 
+                            ...m, 
+                            isTrabalhandoAtivo: true, 
+                            placaAtual: checkinPlaca, 
+                            kmEntrada: kmNum, 
+                            fotoOdometroEntrada: checkinFoto, 
+                            dataEntrada: updatedMb.dataEntrada 
+                          };
+                        }
+                        return m;
+                      });
+
+                      setMotoboys(updatedRidersList);
+                      setActiveMotoboyUser(updatedMb);
+                      setCheckinModalOpen(false);
+                      alert("🔓 Check-In realizado sucesso! Turno iniciado e entregas liberadas para você.");
+                    }}
+                    className="flex-1 bg-orange-600 hover:bg-orange-700 text-white font-mono font-bold text-xs py-2 rounded-lg transition shadow uppercase cursor-pointer"
+                  >
+                    Enviar Check-In
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ==========================================
+          MODAL: CHECK-OUT DE ODÔMETRO (MOTO ALUGADA)
+          ========================================== */}
+      <AnimatePresence>
+        {isCheckoutModalOpen && activeMotoboyUser && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm" id="modal-checkout-odometro">
+            <motion.div 
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white rounded-xl shadow-2xl border border-slate-200 max-w-sm w-full p-5"
+            >
+              <div className="flex justify-between items-start mb-4">
+                <h3 className="text-sm font-black text-slate-900 uppercase font-mono tracking-tight">
+                  🔒 Check-Out de Odômetro (Saída)
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => setCheckoutModalOpen(false)}
+                  className="text-slate-400 hover:text-slate-600 font-bold py-1 px-2 rounded hover:bg-slate-100 cursor-pointer text-xs font-mono"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="bg-slate-50 p-2.5 rounded border border-slate-200 text-slate-600 text-[10px] font-mono mb-4 leading-normal">
+                <div>Placa Registrada: <strong className="text-slate-800">{activeMotoboyUser.placaAtual}</strong></div>
+                <div>KM de Entrada: <strong className="text-slate-800">{activeMotoboyUser.kmEntrada} km</strong></div>
+                <div>Entrada em: {activeMotoboyUser.dataEntrada ? new Date(activeMotoboyUser.dataEntrada).toLocaleTimeString() : 'Não informada'}</div>
+              </div>
+
+              <div className="space-y-4 font-mono text-xs">
+                <div>
+                  <label className="block text-[10px] uppercase font-bold text-slate-600 mb-1">Quilometragem de Saída (Painel) 📊</label>
+                  <input
+                    type="number"
+                    value={checkoutKm}
+                    onChange={(e) => setCheckoutKm(e.target.value)}
+                    placeholder={`Deve ser maior ou igual a ${activeMotoboyUser.kmEntrada || 0}`}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs font-bold font-mono focus:ring-1 focus:ring-orange-500 text-slate-900"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] uppercase font-bold text-slate-600 mb-1">Foto de Registro do Painel 📸</label>
+                  <div className="border border-dashed border-slate-200 rounded-lg p-2 bg-slate-50 flex flex-col items-center justify-center text-center">
+                    <span className="text-lg">📷</span>
+                    <span className="text-[9px] text-slate-500 mt-1 uppercase font-bold font-sans">odometro_saida.png</span>
+                    <span className="text-[8px] text-emerald-600 bg-emerald-50 px-1.5 py-0.2 rounded font-sans uppercase font-bold mt-1">Foto Capturada 📸</span>
+                  </div>
+                </div>
+
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setCheckoutModalOpen(false)}
+                    className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 py-2 rounded-lg text-xs font-bold font-mono cursor-pointer"
+                  >
+                    Voltar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const kmInicial = activeMotoboyUser.kmEntrada || 0;
+                      const kmFinal = parseInt(checkoutKm);
+                      if (isNaN(kmFinal) || kmFinal < kmInicial) {
+                        alert(`⚠️ Erro: A quilometragem de saída (${kmFinal || 0}) não pode ser inferior à quilometragem de entrada gravada (${kmInicial} km)!`);
+                        return;
+                      }
+
+                      const kmRodado = kmFinal - kmInicial;
+                      
+                      const novoRegistro: RegistroOdometro = {
+                        id: `ODO-${Math.floor(1000 + Math.random() * 9000)}`,
+                        motoboyId: activeMotoboyUser.id,
+                        motoboyNome: activeMotoboyUser.nome,
+                        placa: activeMotoboyUser.placaAtual || '',
+                        kmInicial: kmInicial,
+                        fotoInicial: activeMotoboyUser.fotoOdometroEntrada || '',
+                        dataEntrada: activeMotoboyUser.dataEntrada || new Date().toISOString(),
+                        kmFinal: kmFinal,
+                        fotoFinal: checkoutFoto,
+                        dataSaida: new Date().toISOString(),
+                        kmTrabalhado: kmRodado
+                      };
+
+                      setRegistrosOdometros(prev => [novoRegistro, ...prev]);
+
+                      const updatedMb = {
+                        ...activeMotoboyUser,
+                        isTrabalhandoAtivo: false,
+                        placaAtual: undefined,
+                        kmEntrada: undefined,
+                        fotoOdometroEntrada: undefined,
+                        dataEntrada: undefined
+                      };
+
+                      const updatedRidersList = motoboys.map(m => {
+                        if (m.id === activeMotoboyUser.id) {
+                          return { 
+                            ...m, 
+                            isTrabalhandoAtivo: false, 
+                            placaAtual: undefined, 
+                            kmEntrada: undefined, 
+                            fotoOdometroEntrada: undefined, 
+                            dataEntrada: undefined 
+                          };
+                        }
+                        return m;
+                      });
+
+                      setMotoboys(updatedRidersList);
+                      setActiveMotoboyUser(updatedMb);
+                      setCheckoutModalOpen(false);
+                      alert(`🔒 Expediente finalizado com absoluto sucesso!\nTotal percorrido no turno: ${kmRodado} km.`);
+                    }}
+                    className="flex-1 bg-slate-900 hover:bg-slate-950 text-white font-mono font-bold text-xs py-2 rounded-lg transition shadow uppercase cursor-pointer"
+                  >
+                    Enviar Saída
+                  </button>
+                </div>
+              </div>
             </motion.div>
           </div>
         )}
@@ -10549,6 +11577,38 @@ export default function App() {
                     <option value="Furgão">Furgão 🚚</option>
                   </select>
                 </div>
+
+                {editMotoboyVeiculo === 'Moto' && (
+                  <div>
+                    <label className="block text-xs font-bold text-slate-705 uppercase mb-1 font-mono">
+                      Vínculo da Motocicleta (Frota)
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setEditMotoboyTipoMoto('propria')}
+                        className={`py-1.5 px-3 rounded text-[11px] font-mono font-bold border transition ${
+                          editMotoboyTipoMoto === 'propria'
+                            ? 'bg-orange-500 border-orange-500 text-white shadow-sm'
+                            : 'bg-white border-slate-250 text-slate-700 hover:bg-slate-50'
+                        }`}
+                      >
+                        🏍️ Moto Própria
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEditMotoboyTipoMoto('alugada')}
+                        className={`py-1.5 px-3 rounded text-[11px] font-mono font-bold border transition ${
+                          editMotoboyTipoMoto === 'alugada'
+                            ? 'bg-rose-600 border-rose-600 text-white shadow-sm'
+                            : 'bg-white border-slate-250 text-slate-700 hover:bg-slate-50'
+                        }`}
+                      >
+                        🔑 Moto Alugada (Frota)
+                      </button>
+                    </div>
+                  </div>
+                )}
 
                 <div>
                   <div className="flex justify-between items-center mb-1">
