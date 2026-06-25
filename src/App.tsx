@@ -432,6 +432,8 @@ export default function App() {
   const [newMotoboyCidade, setNewMotoboyCidade] = useState<string>('Passos - MG');
   const [newMotoboySenha, setNewMotoboySenha] = useState<string>('passos123');
   const [newMotoboyRepasse, setNewMotoboyRepasse] = useState<number>(4.00);
+  const [newMotoboyContratoExclusivo, setNewMotoboyContratoExclusivo] = useState<number>(150.00);
+  const [newMotoboyTaxaFreelancer, setNewMotoboyTaxaFreelancer] = useState<number>(6.00);
   const [newMotoboyEmpresaExclusiva, setNewMotoboyEmpresaExclusiva] = useState<string>('');
   const [newMotoboyVeiculo, setNewMotoboyVeiculo] = useState<string>('Moto');
   const [newMotoboyTipoMoto, setNewMotoboyTipoMoto] = useState<'alugada' | 'propria'>('propria');
@@ -443,6 +445,8 @@ export default function App() {
   const [editMotoboyCidade, setEditMotoboyCidade] = useState<string>('Passos - MG');
   const [editMotoboySenha, setEditMotoboySenha] = useState<string>('');
   const [editMotoboyRepasse, setEditMotoboyRepasse] = useState<number>(4.00);
+  const [editMotoboyContratoExclusivo, setEditMotoboyContratoExclusivo] = useState<number>(150.00);
+  const [editMotoboyTaxaFreelancer, setEditMotoboyTaxaFreelancer] = useState<number>(6.00);
   const [editMotoboySituacao, setEditMotoboySituacao] = useState<string>('Ativo');
   const [editMotoboyEmpresaExclusiva, setEditMotoboyEmpresaExclusiva] = useState<string>('');
   const [editMotoboyVeiculo, setEditMotoboyVeiculo] = useState<string>('Moto');
@@ -774,7 +778,7 @@ export default function App() {
   const hasMotoboyChanged = (a: Motoboy, b: Motoboy) => {
     const keys: (keyof Motoboy)[] = [
       'nome', 'telefone', 'cidade', 'senha', 'valorRepasseFixo', 'situacao', 
-      'empresaExclusiva', 'veiculo'
+      'empresaExclusiva', 'veiculo', 'valorContratoExclusivo', 'valorTaxaFreelancer'
     ];
     return keys.some(k => {
       const valA = a[k] ?? '';
@@ -1210,8 +1214,14 @@ export default function App() {
                 telefone: m.telefone,
                 cidade: m.cidade,
                 senha: m.senha,
-                valorRepasseFixo: Number(m.valor_repasse_fixo),
-                criadoEm: m.criado_em
+                valorRepasseFixo: Number(m.valor_repasse_fixo || m.valorRepasseFixo || 4.00),
+                valorContratoExclusivo: Number(m.valor_contrato_exclusivo || m.valorContratoExclusivo || 150.00),
+                valorTaxaFreelancer: Number(m.valor_taxa_freelancer || m.valorTaxaFreelancer || 6.00),
+                situacao: m.situacao || 'Ativo',
+                empresaExclusiva: m.empresa_exclusiva || m.empresaExclusiva || '',
+                veiculo: m.veiculo || 'Moto',
+                tipoMoto: m.tipo_moto || m.tipoMoto || 'propria',
+                criadoEm: m.criado_em || m.criadoEm
               }));
               prevMotoboysRef.current = mappedMoto;
               setMotoboys(mappedMoto);
@@ -1706,37 +1716,105 @@ export default function App() {
   const motoboyStats = useMemo(() => {
     if (!activeMotoboyUser) return { hojeCount: 0, hojeEarnings: 0, mesCount: 0, mesEarnings: 0 };
     
-    // helper to check date properties
-    const cleanToday = new Date().toDateString();
+    const cleanTodayString = new Date().toDateString();
     const cleanMonth = new Date().getMonth();
     const cleanYear = new Date().getFullYear();
 
     let hojeCount = 0;
-    let hojeEarnings = 0;
     let mesCount = 0;
-    let mesEarnings = 0;
+
+    // We will group completed orders by date string to compute precise daily earnings
+    const monthlyOrdersByDate: { [dateStr: string]: OrdemServico[] } = {};
+    const todayOrders: OrdemServico[] = [];
 
     ordens.forEach(o => {
-      if (o.motoboyId === activeMotoboyUser.id) {
+      if (o.motoboyId === activeMotoboyUser.id && o.status === 'Entregue') {
         const orderDate = new Date(o.criadoEm);
-        const orderDateString = orderDate.toDateString();
         const orderMonth = orderDate.getMonth();
         const orderYear = orderDate.getFullYear();
+        const dateStr = orderDate.toDateString();
 
-        const isOToday = orderDateString === cleanToday;
-        const isOThisMonth = orderMonth === cleanMonth && orderYear === cleanYear;
-        const repasse = obterValorRepasseOperacional(o);
-
-        if (isOThisMonth && o.status === 'Entregue') {
+        if (orderMonth === cleanMonth && orderYear === cleanYear) {
           mesCount++;
-          mesEarnings += repasse;
+          if (!monthlyOrdersByDate[dateStr]) {
+            monthlyOrdersByDate[dateStr] = [];
+          }
+          monthlyOrdersByDate[dateStr].push(o);
         }
-        if (isOToday && o.status === 'Entregue') {
+
+        if (dateStr === cleanTodayString) {
           hojeCount++;
-          hojeEarnings += repasse;
+          todayOrders.push(o);
         }
       }
     });
+
+    // Helper to calculate earnings for a set of orders on a single date
+    const calculateDayEarnings = (dayOrdersList: OrdemServico[], dateString: string) => {
+      if (dayOrdersList.length === 0) return 0;
+
+      // If the motoboy has an exclusive contract, check hours
+      if (activeMotoboyUser.empresaExclusiva) {
+        let hasExclusiveWork = false;
+        let freelanceCount = 0;
+
+        dayOrdersList.forEach(o => {
+          const oDate = new Date(o.criadoEm);
+          const dayOfWeek = oDate.getDay();
+          const oHours = oDate.getHours();
+          const oMinutes = oDate.getMinutes();
+          const timeInMinutes = oHours * 60 + oMinutes;
+
+          let isOExclusiveTime = false;
+          if (dayOfWeek >= 1 && dayOfWeek <= 5) {
+            isOExclusiveTime = timeInMinutes < 18 * 60; // Mon-Fri < 18:00
+          } else if (dayOfWeek === 6) {
+            isOExclusiveTime = timeInMinutes < 12 * 60; // Sat < 12:00
+          }
+
+          if (isOExclusiveTime) {
+            hasExclusiveWork = true;
+          } else {
+            freelanceCount++;
+          }
+        });
+
+        const contractVal = Number(activeMotoboyUser.valorContratoExclusivo || 150.00);
+        const freelanceRate = Number(activeMotoboyUser.valorTaxaFreelancer || 6.00);
+
+        if (hasExclusiveWork) {
+          return contractVal + (freelanceCount * freelanceRate);
+        } else {
+          return dayOrdersList.length * freelanceRate;
+        }
+      } else {
+        // General freelance motoboy
+        let dayTotal = 0;
+        dayOrdersList.forEach(o => {
+          dayTotal += o.valorPagoMotoboy || activeMotoboyUser.valorRepasseFixo || 4.00;
+        });
+        return dayTotal;
+      }
+    };
+
+    // Calculate Mes Earnings
+    let mesEarnings = 0;
+    Object.keys(monthlyOrdersByDate).forEach(dateStr => {
+      mesEarnings += calculateDayEarnings(monthlyOrdersByDate[dateStr], dateStr);
+    });
+
+    // Calculate Hoje Earnings
+    let hojeEarnings = 0;
+    if (activeMotoboyUser.empresaExclusiva) {
+      if (isExclusiveNow) {
+        hojeEarnings = Number(activeMotoboyUser.valorContratoExclusivo || 150.00);
+      } else {
+        // Freelancer hours
+        hojeEarnings = hojeCount * Number(activeMotoboyUser.valorTaxaFreelancer || 6.00);
+      }
+    } else {
+      hojeEarnings = calculateDayEarnings(todayOrders, cleanTodayString);
+    }
 
     return { hojeCount, hojeEarnings, mesCount, mesEarnings };
   }, [activeMotoboyUser, ordens, isExclusiveNow]);
@@ -2657,6 +2735,8 @@ export default function App() {
       cidade: editMotoboyCidade,
       senha: editMotoboySenha || motoboyParaEditar.senha,
       valorRepasseFixo: Number(editMotoboyRepasse) || 4.00,
+      valorContratoExclusivo: Number(editMotoboyContratoExclusivo) || 150.00,
+      valorTaxaFreelancer: Number(editMotoboyTaxaFreelancer) || 6.00,
       situacao: editMotoboySituacao || 'Ativo',
       empresaExclusiva: editMotoboyEmpresaExclusiva || undefined,
       veiculo: editMotoboyVeiculo,
@@ -3467,6 +3547,8 @@ export default function App() {
       cidade: newMotoboyCidade,
       senha: newMotoboySenha || 'passos123',
       valorRepasseFixo: Number(newMotoboyRepasse) || 4.00,
+      valorContratoExclusivo: Number(newMotoboyContratoExclusivo) || 150.00,
+      valorTaxaFreelancer: Number(newMotoboyTaxaFreelancer) || 6.00,
       criadoEm: new Date().toISOString(),
       empresaExclusiva: newMotoboyEmpresaExclusiva || undefined,
       veiculo: newMotoboyVeiculo,
@@ -3513,6 +3595,8 @@ export default function App() {
     setNewMotoboyNome('');
     setNewMotoboyTelefone('');
     setNewMotoboySenha('passos123');
+    setNewMotoboyContratoExclusivo(150.00);
+    setNewMotoboyTaxaFreelancer(6.00);
     setNewMotoboyEmpresaExclusiva('');
     setNewMotoboyVeiculo('Moto');
     setNewMotoboyTipoMoto('propria');
@@ -5035,11 +5119,6 @@ export default function App() {
                 </div>
               </div>
             </div>
-
-            <div className="text-[10px] text-slate-400 bg-slate-950 border border-slate-850 px-3 py-1.5 rounded-xl flex flex-col justify-center items-end self-stretch lg:self-auto min-w-[130px]">
-              <span className="text-[8px] text-slate-500 uppercase leading-none block">Status Gateway</span>
-              <span className="font-bold text-white mt-0.5">Passos-MG (HTTPS)</span>
-            </div>
           </div>
         </div>
       )}
@@ -5933,6 +6012,35 @@ export default function App() {
                     </div>
                   </div>
 
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-[9px] font-bold text-slate-755 uppercase mb-0.5 font-mono">Diária Contrato Exclusivo (R$)</label>
+                      <input
+                        type="number"
+                        step="1.00"
+                        min="0"
+                        required
+                        value={newMotoboyContratoExclusivo}
+                        onChange={(e) => setNewMotoboyContratoExclusivo(parseFloat(e.target.value) || 0)}
+                        placeholder="Ex: 150.00"
+                        className="w-full bg-white text-slate-900 border border-slate-250 rounded p-2 text-xs focus:ring-2 focus:ring-orange-550 font-mono font-bold text-orange-650"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[9px] font-bold text-slate-755 uppercase mb-0.5 font-mono">Taxa por Corrida Freelancer (R$)</label>
+                      <input
+                        type="number"
+                        step="0.50"
+                        min="0"
+                        required
+                        value={newMotoboyTaxaFreelancer}
+                        onChange={(e) => setNewMotoboyTaxaFreelancer(parseFloat(e.target.value) || 0)}
+                        placeholder="Ex: 6.00"
+                        className="w-full bg-white text-slate-900 border border-slate-250 rounded p-2 text-xs focus:ring-2 focus:ring-orange-550 font-mono font-bold text-emerald-650"
+                      />
+                    </div>
+                  </div>
+
                   <div>
                     <div className="flex justify-between items-center mb-0.5">
                       <label className="block text-[9px] font-bold text-slate-700 uppercase font-mono">Empresa de Serviço Exclusiva (Opcional)</label>
@@ -6072,6 +6180,8 @@ export default function App() {
                           setEditMotoboyCidade(m.cidade);
                           setEditMotoboySenha(m.senha);
                           setEditMotoboyRepasse(m.valorRepasseFixo);
+                          setEditMotoboyContratoExclusivo(m.valorContratoExclusivo || 150.00);
+                          setEditMotoboyTaxaFreelancer(m.valorTaxaFreelancer || 6.00);
                           setEditMotoboySituacao(m.situacao || 'Ativo');
                           setEditMotoboyEmpresaExclusiva(m.empresaExclusiva || '');
                           setEditMotoboyVeiculo(m.veiculo || 'Moto');
@@ -7944,9 +8054,9 @@ export default function App() {
                   Região contratual: <strong className="text-orange-400">{activeMotoboyUser?.cidade || 'Passos - MG'}</strong> • {' '}
                   {activeMotoboyUser?.empresaExclusiva ? (
                     isExclusiveNow ? (
-                      <span>Contrato: <strong className="text-amber-400">Exclusivo B2B</strong> • Ganho: <strong className="text-emerald-400">R$ {(activeMotoboyUser?.valorRepasseFixo || 4.00).toFixed(2)}</strong> por entrega</span>
+                      <span>Contrato: <strong className="text-amber-400">Exclusivo B2B (Ativo)</strong> • Diária Contratada: <strong className="text-emerald-400">R$ {(activeMotoboyUser?.valorContratoExclusivo || 150.00).toFixed(2)}</strong></span>
                     ) : (
-                      <span>Contrato: <strong className="text-emerald-450 text-emerald-400">Freelancer Liberado</strong> • Ganho: <strong className="text-emerald-400">R$ {(activeMotoboyUser?.valorRepasseFixo || 4.00).toFixed(2)}</strong> por entrega</span>
+                      <span>Contrato: <strong className="text-emerald-405 text-emerald-400">Freelancer (Ativo fora de horário)</strong> • Taxa Corrida: <strong className="text-emerald-400">R$ {(activeMotoboyUser?.valorTaxaFreelancer || 6.00).toFixed(2)}</strong></span>
                     )
                   ) : (
                     <span>Contrato: <strong className="text-emerald-400">Freelancer Geral</strong> • Tarifa variável por cliente local</span>
@@ -7954,7 +8064,7 @@ export default function App() {
                 </p>
                 
                 {activeMotoboyUser?.empresaExclusiva && (
-                  <div className="mt-2.5 p-2 bg-slate-955 bg-slate-950/80 border border-slate-800 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-[10px] font-mono leading-normal font-bold">
+                  <div className="mt-2.5 p-2 bg-slate-950/80 border border-slate-800 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-[10px] font-mono leading-normal font-bold">
                     <div className="flex items-center gap-1.5">
                       <span className="text-sm">🏢</span>
                       <div>
@@ -7966,15 +8076,15 @@ export default function App() {
                       {isExclusiveNow ? (
                         <div className="flex flex-col sm:items-end gap-0.5">
                           <span className="inline-flex items-center gap-1 bg-amber-500/15 text-amber-400 border border-amber-500/30 px-2 py-0.5 rounded text-[9px] tracking-wider font-extrabold uppercase">
-                            <span className="w-1 h-1 rounded-full bg-amber-450 bg-amber-400 animate-ping" />
-                            Exclusivo (Até 18h Seg-Sex | Horário Comercial)
+                            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping" />
+                            Exclusivo (Até 18h Seg-Sex | Comercial) • Diária: R$ {(activeMotoboyUser?.valorContratoExclusivo || 150.00).toFixed(2)}
                           </span>
                         </div>
                       ) : (
                         <div className="flex flex-col sm:items-end gap-0.5">
                           <span className="inline-flex items-center gap-1 bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded text-[9px] tracking-wider font-extrabold uppercase text-right">
-                            <span className="w-1 h-1 rounded-full bg-emerald-400 animate-pulse" />
-                            Freelancer Liberado para outros
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                            Freelancer Ativado • Taxa: R$ {(activeMotoboyUser?.valorTaxaFreelancer || 6.00).toFixed(2)} / entrega
                           </span>
                         </div>
                       )}
@@ -11772,6 +11882,37 @@ export default function App() {
                     onChange={(e) => setEditMotoboyRepasse(parseFloat(e.target.value) || 0)}
                     className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded-lg p-2.5 text-xs focus:ring-2 focus:ring-orange-500 font-mono font-bold"
                   />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 uppercase mb-1 font-mono">
+                      Diária Contrato Exclusivo (R$)
+                    </label>
+                    <input
+                      type="number"
+                      step="1.00"
+                      min="0"
+                      required
+                      value={editMotoboyContratoExclusivo}
+                      onChange={(e) => setEditMotoboyContratoExclusivo(parseFloat(e.target.value) || 0)}
+                      className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded-lg p-2.5 text-xs focus:ring-2 focus:ring-orange-500 font-mono font-bold text-orange-650"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 uppercase mb-1 font-mono">
+                      Taxa Corrida Freelancer (R$)
+                    </label>
+                    <input
+                      type="number"
+                      step="0.50"
+                      min="0"
+                      required
+                      value={editMotoboyTaxaFreelancer}
+                      onChange={(e) => setEditMotoboyTaxaFreelancer(parseFloat(e.target.value) || 0)}
+                      className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded-lg p-2.5 text-xs focus:ring-2 focus:ring-orange-500 font-mono font-bold text-emerald-650"
+                    />
+                  </div>
                 </div>
 
                 <div>

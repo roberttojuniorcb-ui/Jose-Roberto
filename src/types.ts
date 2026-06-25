@@ -56,6 +56,8 @@ export interface Motoboy {
   dataEntrada?: string;
   isTrabalhandoAtivo?: boolean; // if check-in was completed
   kmSaidaAcumuladaQuinzenal?: number; // total work kms within current 15 days
+  valorContratoExclusivo?: number; // Valor fixo contratado por dia/mês (diária ou mensalidade contratada)
+  valorTaxaFreelancer?: number; // Valor pago por entrega avulsa (freelancer)
 }
 
 export interface RegistroOdometro {
