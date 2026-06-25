@@ -289,6 +289,7 @@ export default function App() {
   const [newClientEndereco, setNewClientEndereco] = useState<string>('');
   const [newClientTelefone, setNewClientTelefone] = useState<string>('');
   const [newClientCidade, setNewClientCidade] = useState<string>('Passos - MG');
+  const [newClientNumero, setNewClientNumero] = useState<string>(''); // Establishment number
   const [newClientValorPagoMotoboy, setNewClientValorPagoMotoboy] = useState<number>(4.00);
   const [newClientValorCobradoCliente, setNewClientValorCobradoCliente] = useState<number>(10.00);
   const [newClientEmail, setNewClientEmail] = useState<string>('');
@@ -299,6 +300,9 @@ export default function App() {
   // --- STATE FOR QUICK REGISTERING CLIENT/DESTINATARIO (CRUD) ---
   const [isQuickRegisteringDestinatario, setIsQuickRegisteringDestinatario] = useState<boolean>(false);
   const [quickClientNome, setQuickClientNome] = useState<string>('');
+  const [quickClientCEP, setQuickClientCEP] = useState<string>('');
+  const [quickClientNumero, setQuickClientNumero] = useState<string>('');
+  const [isFetchingQuickClientCEP, setIsFetchingQuickClientCEP] = useState<boolean>(false);
   const [quickClientEndereco, setQuickClientEndereco] = useState<string>('');
   const [lastDispatchedOrder, setLastDispatchedOrder] = useState<{ id: string; destName: string } | null>(null);
 
@@ -311,6 +315,7 @@ export default function App() {
   const [editClientEndereco, setEditClientEndereco] = useState<string>('');
   const [editClientTelefone, setEditClientTelefone] = useState<string>('');
   const [editClientCidade, setEditClientCidade] = useState<string>('Passos - MG');
+  const [editClientNumero, setEditClientNumero] = useState<string>(''); // Establishment number
   const [editClientValorPagoMotoboy, setEditClientValorPagoMotoboy] = useState<number>(4.00);
   const [editClientValorCobradoCliente, setEditClientValorCobradoCliente] = useState<number>(10.00);
   const [editClientEmail, setEditClientEmail] = useState<string>('');
@@ -325,7 +330,10 @@ export default function App() {
   const [subCliNome, setSubCliNome] = useState<string>('');
   const [subCliEmail, setSubCliEmail] = useState<string>('');
   const [subCliSenha, setSubCliSenha] = useState<string>('');
+  const [subCliCEP, setSubCliCEP] = useState<string>(''); // Sub-client CEP
+  const [isFetchingSubCliCEP, setIsFetchingSubCliCEP] = useState<boolean>(false);
   const [subCliEndereco, setSubCliEndereco] = useState<string>('');
+  const [subCliNumero, setSubCliNumero] = useState<string>(''); // Sub-client establishment number
   const [subCliTelefone, setSubCliTelefone] = useState<string>('');
   const [subCliRamo, setSubCliRamo] = useState<string>('Oficina mecânica');
   const [subCliQuadrante, setSubCliQuadrante] = useState<Quadrante>('A');
@@ -342,6 +350,7 @@ export default function App() {
   const [firstAccessCEP, setFirstAccessCEP] = useState<string>('');
   const [isFetchingFirstAccessCEP, setIsFetchingFirstAccessCEP] = useState<boolean>(false);
   const [firstAccessEndereco, setFirstAccessEndereco] = useState<string>('');
+  const [firstAccessNumero, setFirstAccessNumero] = useState<string>(''); // Establishment number
   const [firstAccessCidade, setFirstAccessCidade] = useState<string>('');
   const [firstAccessTelefone, setFirstAccessTelefone] = useState<string>('');
   const [firstAccessEmail, setFirstAccessEmail] = useState<string>('');
@@ -365,6 +374,7 @@ export default function App() {
   const [clientNewClientCEP, setClientNewClientCEP] = useState<string>('');
   const [isClientFetchingNewClientCEP, setIsClientFetchingNewClientCEP] = useState<boolean>(false);
   const [clientNewClientEndereco, setClientNewClientEndereco] = useState<string>('');
+  const [clientNewClientNumero, setClientNewClientNumero] = useState<string>(''); // Establishment number
   const [clientNewClientTelefone, setClientNewClientTelefone] = useState<string>('');
   const [clientNewClientCidade, setClientNewClientCidade] = useState<string>('Passos - MG');
   const [clientNewClientEmail, setClientNewClientEmail] = useState<string>('');
@@ -533,6 +543,7 @@ export default function App() {
   const [selfRegInscricaoEstadual, setSelfRegInscricaoEstadual] = useState<string>('Isento');
   const [selfRegCEP, setSelfRegCEP] = useState<string>('');
   const [selfRegEndereco, setSelfRegEndereco] = useState<string>('');
+  const [selfRegNumero, setSelfRegNumero] = useState<string>(''); // Establishment number
   const [selfRegCidade, setSelfRegCidade] = useState<string>('Passos - MG');
   const [selfRegTelefone, setSelfRegTelefone] = useState<string>('');
   const [selfRegEmail, setSelfRegEmail] = useState<string>('');
@@ -1514,6 +1525,9 @@ export default function App() {
 
   // --- STATES FOR CLIENT WORKSPACE DISPATCH FORM (CLEAN EXTRA OPTIONS) ---
   const [destinoTipo, setDestinoTipo] = useState<'endereco' | 'cliente'>('endereco');
+  const [destinoCEP, setDestinoCEP] = useState<string>('');
+  const [destinoNumero, setDestinoNumero] = useState<string>('');
+  const [isFetchingDestinoCEP, setIsFetchingDestinoCEP] = useState<boolean>(false);
   const [destinoEndereco, setDestinoEndereco] = useState<string>('');
   const [destinoQuadrante, setDestinoQuadrante] = useState<Quadrante>('A');
   const [destinoClienteId, setDestinoClienteId] = useState<string>('');
@@ -2255,6 +2269,7 @@ export default function App() {
       telefone: newClientTelefone || 'Pendente - Preencher no 1º Acesso',
       cidade: newClientCidade || 'Passos - MG',
       cep: newClientCEP,
+      numero: newClientNumero,
       valorPagoMotoboy: Number(newClientValorPagoMotoboy) || 4.00,
       valorCobradoCliente: Number(newClientValorCobradoCliente) || 10.00,
       senha: finalSenha, 
@@ -2355,6 +2370,7 @@ export default function App() {
     setNewClientNome('');
     setNewClientCEP('');
     setNewClientEndereco('');
+    setNewClientNumero('');
     setNewClientTelefone('');
     setNewClientEmail('');
     setNewClientSenha('');
@@ -2383,6 +2399,7 @@ export default function App() {
       telefone: editClientTelefone || 'Pendente - Preencher no 1º Acesso',
       cidade: editClientCidade,
       cep: editClientCEP,
+      numero: editClientNumero,
       valorPagoMotoboy: Number(editClientValorPagoMotoboy) || 4.00,
       valorCobradoCliente: Number(editClientValorCobradoCliente) || 10.00,
       email: editClientEmail,
@@ -2429,6 +2446,8 @@ export default function App() {
             email: subCliEmail,
             senha: subCliSenha || c.senha,
             endereco: subCliEndereco,
+            cep: subCliCEP,
+            numero: subCliNumero,
             telefone: subCliTelefone,
             ramo: subCliRamo,
             quadrante: subCliQuadrante,
@@ -2458,6 +2477,8 @@ export default function App() {
         nome: subCliNome,
         quadrante: subCliQuadrante,
         endereco: subCliEndereco || 'Pendente - Preencher no 1º Acesso',
+        cep: subCliCEP,
+        numero: subCliNumero,
         telefone: subCliTelefone || 'Pendente - Preencher no 1º Acesso',
         cidade: clienteParaEditar.cidade || 'Passos - MG',
         valorPagoMotoboy: Number(subCliValorPagoMotoboy) || 4.00,
@@ -2508,7 +2529,9 @@ export default function App() {
     setSubCliNome('');
     setSubCliEmail('');
     setSubCliSenha('');
+    setSubCliCEP('');
     setSubCliEndereco('');
+    setSubCliNumero('');
     setSubCliTelefone('');
     setSubCliRamo('Oficina mecânica');
     setSubCliQuadrante(clienteParaEditar.quadrante || 'A');
@@ -2525,7 +2548,9 @@ export default function App() {
     setSubCliNome(sub.nome);
     setSubCliEmail(sub.email || '');
     setSubCliSenha(sub.senha || '');
+    setSubCliCEP(sub.cep || '');
     setSubCliEndereco(sub.endereco || '');
+    setSubCliNumero(sub.numero || '');
     setSubCliTelefone(sub.telefone || '');
     setSubCliRamo(sub.ramo || 'Oficina mecânica');
     setSubCliQuadrante(sub.quadrante || 'A');
@@ -2822,7 +2847,7 @@ export default function App() {
   };
 
   // --- INTEGRATED VIA CEP LOOKUP ENGINE (AUTO-RESOLVE ADRESS/CITY) ---
-  const handleFetchCEP = async (cep: string, target: 'selfReg' | 'newClient' | 'editClient' | 'clientNewClient' | 'firstAccess') => {
+  const handleFetchCEP = async (cep: string, target: 'selfReg' | 'newClient' | 'editClient' | 'clientNewClient' | 'firstAccess' | 'subCli' | 'quickClient' | 'destino') => {
     const cleanedCEP = cep.replace(/\D/g, '');
     
     // Regex validation to ensure only digits exist and it has exactly 8 characters
@@ -2840,6 +2865,9 @@ export default function App() {
     else if (target === 'editClient') setIsFetchingEditClientCEP(true);
     else if (target === 'clientNewClient') setIsClientFetchingNewClientCEP(true);
     else if (target === 'firstAccess') setIsFetchingFirstAccessCEP(true);
+    else if (target === 'subCli') setIsFetchingSubCliCEP(true);
+    else if (target === 'quickClient') setIsFetchingQuickClientCEP(true);
+    else if (target === 'destino') setIsFetchingDestinoCEP(true);
 
     try {
       const response = await fetch(`https://viacep.com.br/ws/${cleanedCEP}/json/`);
@@ -2866,6 +2894,12 @@ export default function App() {
         } else if (target === 'firstAccess') {
           setFirstAccessEndereco(fullAddress);
           setFirstAccessCidade(cityState);
+        } else if (target === 'subCli') {
+          setSubCliEndereco(fullAddress);
+        } else if (target === 'quickClient') {
+          setQuickClientEndereco(fullAddress);
+        } else if (target === 'destino') {
+          setDestinoEndereco(fullAddress);
         }
       } else {
         setCepErrorState(prev => ({ ...prev, [target]: 'CEP não cadastrado ou inexistente.' }));
@@ -2880,10 +2914,13 @@ export default function App() {
       else if (target === 'editClient') setIsFetchingEditClientCEP(false);
       else if (target === 'clientNewClient') setIsClientFetchingNewClientCEP(false);
       else if (target === 'firstAccess') setIsFetchingFirstAccessCEP(false);
+      else if (target === 'subCli') setIsFetchingSubCliCEP(false);
+      else if (target === 'quickClient') setIsFetchingQuickClientCEP(false);
+      else if (target === 'destino') setIsFetchingDestinoCEP(false);
     }
   };
 
-  const handleCEPChange = (val: string, target: 'selfReg' | 'newClient' | 'editClient' | 'clientNewClient' | 'firstAccess') => {
+  const handleCEPChange = (val: string, target: 'selfReg' | 'newClient' | 'editClient' | 'clientNewClient' | 'firstAccess' | 'subCli' | 'quickClient' | 'destino') => {
     // Regex validation to check for invalid characters (only allows digits, spaces, and hyphens)
     const hasInvalidChar = /[^\d\s-]/.test(val);
     
@@ -2933,6 +2970,27 @@ export default function App() {
       setFirstAccessCEP(displayVal);
       if (formatted.length === 8) {
         handleFetchCEP(formatted, 'firstAccess');
+      } else if (formatted.length > 0 && formatted.length < 8) {
+        setCepErrorState(prev => ({ ...prev, [target]: 'Formato incorreto. O CEP deve possuir 8 dígitos.' }));
+      }
+    } else if (target === 'subCli') {
+      setSubCliCEP(displayVal);
+      if (formatted.length === 8) {
+        handleFetchCEP(formatted, 'subCli');
+      } else if (formatted.length > 0 && formatted.length < 8) {
+        setCepErrorState(prev => ({ ...prev, [target]: 'Formato incorreto. O CEP deve possuir 8 dígitos.' }));
+      }
+    } else if (target === 'quickClient') {
+      setQuickClientCEP(displayVal);
+      if (formatted.length === 8) {
+        handleFetchCEP(formatted, 'quickClient');
+      } else if (formatted.length > 0 && formatted.length < 8) {
+        setCepErrorState(prev => ({ ...prev, [target]: 'Formato incorreto. O CEP deve possuir 8 dígitos.' }));
+      }
+    } else if (target === 'destino') {
+      setDestinoCEP(displayVal);
+      if (formatted.length === 8) {
+        handleFetchCEP(formatted, 'destino');
       } else if (formatted.length > 0 && formatted.length < 8) {
         setCepErrorState(prev => ({ ...prev, [target]: 'Formato incorreto. O CEP deve possuir 8 dígitos.' }));
       }
@@ -3242,6 +3300,7 @@ export default function App() {
       nome: selfRegNome,
       quadrante: selfRegQuadrante,
       endereco: selfRegEndereco,
+      numero: selfRegNumero,
       telefone: selfRegTelefone,
       cidade: selfRegCidade,
       cep: selfRegCEP,
@@ -3281,6 +3340,7 @@ export default function App() {
     setSelfRegInscricaoEstadual('Isento');
     setSelfRegCEP('');
     setSelfRegEndereco('');
+    setSelfRegNumero('');
     setSelfRegCidade('Passos - MG');
     setSelfRegTelefone('');
     setSelfRegEmail('');
@@ -3342,6 +3402,7 @@ export default function App() {
       cnpj: firstAccessCNPJ,
       inscricaoEstadual: firstAccessInscricaoEstadual || 'Isento',
       cep: firstAccessCEP,
+      numero: firstAccessNumero,
       cidade: firstAccessCidade || target.cidade || 'Passos - MG',
       endereco: firstAccessEndereco,
       telefone: firstAccessTelefone,
@@ -3371,6 +3432,7 @@ export default function App() {
     setFirstAccessCNPJ('');
     setFirstAccessInscricaoEstadual('');
     setFirstAccessCEP('');
+    setFirstAccessNumero('');
     setFirstAccessEndereco('');
     setFirstAccessCidade('');
     setFirstAccessTelefone('');
@@ -3807,9 +3869,21 @@ export default function App() {
                     <input
                       type="text"
                       required
-                      placeholder="Ex: Av. dos Autistas, 305 - Centro"
+                      placeholder="Ex: Av. Principal - Centro"
                       value={selfRegEndereco}
                       onChange={(e) => setSelfRegEndereco(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-sm text-white focus:outline-none focus:border-emerald-500 font-mono"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Número do Estabelecimento *</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Ex: 305 ou S/N"
+                      value={selfRegNumero}
+                      onChange={(e) => setSelfRegNumero(e.target.value)}
                       className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-sm text-white focus:outline-none focus:border-emerald-500 font-mono"
                     />
                   </div>
@@ -5680,6 +5754,7 @@ export default function App() {
                             setClienteParaEditar(cli);
                             setEditClientNome(cli.nome);
                             setEditClientCEP(cli.cep || '');
+                            setEditClientNumero(cli.numero || '');
                             setEditClientQuadrante(cli.quadrante);
                             setEditClientEndereco(cli.endereco);
                             setEditClientTelefone(cli.telefone);
@@ -5699,7 +5774,9 @@ export default function App() {
                             setSubCliNome('');
                             setSubCliEmail('');
                             setSubCliSenha('');
+                            setSubCliCEP('');
                             setSubCliEndereco('');
+                            setSubCliNumero('');
                             setSubCliTelefone('');
                             setSubCliRamo('Oficina mecânica');
                             setSubCliQuadrante(cli.quadrante || 'A');
@@ -8465,11 +8542,14 @@ export default function App() {
                     }
                     const randId = Math.floor(1000 + Math.random() * 9000);
                     const newId = `CLI-${destinoQuadrante}-${randId}`;
+                    const formattedEndereco = `${quickClientEndereco.trim()}${quickClientNumero.trim() ? `, ${quickClientNumero.trim()}` : ''}${quickClientCEP.trim() ? ` - CEP: ${quickClientCEP.trim()}` : ''}`;
                     const novoCli: Cliente = {
                       id: newId,
                       nome: quickClientNome,
                       quadrante: destinoQuadrante,
-                      endereco: quickClientEndereco,
+                      endereco: formattedEndereco,
+                      cep: quickClientCEP,
+                      numero: quickClientNumero,
                       telefone: 'Não informado',
                       cidade: activeClienteUser?.cidade || 'Passos - MG',
                       valorPagoMotoboy: 4.00,
@@ -8498,6 +8578,8 @@ export default function App() {
 
                     setQuickClientNome('');
                     setQuickClientEndereco('');
+                    setQuickClientCEP('');
+                    setQuickClientNumero('');
                     setIsQuickRegisteringDestinatario(false);
                   }
 
@@ -8525,6 +8607,15 @@ export default function App() {
                     alert("Por favor, preencha o endereço de destino.");
                     return;
                   }
+                  // Compile address with CEP and Numero
+                  let fullAddr = destinoEndereco.trim();
+                  if (destinoNumero.trim()) {
+                    fullAddr += `, ${destinoNumero.trim()}`;
+                  }
+                  if (destinoCEP.trim()) {
+                    fullAddr += ` - CEP: ${destinoCEP.trim()}`;
+                  }
+                  finalEndereco = fullAddr;
                 }
 
                 const statusFinal = 'Buscando Parceiro';
@@ -8589,10 +8680,14 @@ export default function App() {
 
                 // Reset B2B dispatch fields to empty / false defaults for the next entry
                 setDestinoEndereco('');
+                setDestinoCEP('');
+                setDestinoNumero('');
                 setDestinoClienteId('');
                 setRetornoPeca(false);
                 setQuickClientNome('');
                 setQuickClientEndereco('');
+                setQuickClientCEP('');
+                setQuickClientNumero('');
                 setIsQuickRegisteringDestinatario(false);
                 setClientItemTexto('');
 
@@ -8608,6 +8703,34 @@ export default function App() {
                 
                 {destinoTipo === 'endereco' ? (
                   <>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="space-y-1">
+                        <label className="block text-xs font-bold text-slate-700 uppercase font-mono">CEP</label>
+                        <input
+                          type="text"
+                          value={destinoCEP}
+                          onChange={(e) => handleCEPChange(e.target.value, 'destino')}
+                          placeholder="37900-000"
+                          className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded-lg p-2 text-xs focus:ring-2 focus:ring-orange-500 font-mono"
+                        />
+                        {isFetchingDestinoCEP && <p className="text-[10px] text-orange-500 font-mono animate-pulse">Buscando CEP...</p>}
+                        {cepErrorState['destino'] && (
+                          <p className="text-red-500 text-[10px] font-mono mt-1 text-left">⚠️ {cepErrorState['destino']}</p>
+                        )}
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="block text-xs font-bold text-slate-700 uppercase font-mono">Número</label>
+                        <input
+                          type="text"
+                          value={destinoNumero}
+                          onChange={(e) => setDestinoNumero(e.target.value)}
+                          placeholder="Ex: 1040"
+                          className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded-lg p-2 text-xs focus:ring-2 focus:ring-orange-500 font-mono"
+                        />
+                      </div>
+                    </div>
+
                     <div className="space-y-1">
                       <label className="block text-xs font-bold text-slate-700 uppercase font-mono">Endereço de Entrega</label>
                       <input
@@ -8615,7 +8738,7 @@ export default function App() {
                         required
                         value={destinoEndereco}
                         onChange={(e) => setDestinoEndereco(e.target.value)}
-                        placeholder="Ex: Av. da Moda, 1040 - Centro, Passos - MG"
+                        placeholder="Ex: Av. da Moda - Centro, Passos - MG"
                         className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded-lg p-2.5 text-xs focus:ring-2 focus:ring-orange-500 font-mono"
                       />
                     </div>
@@ -8655,7 +8778,13 @@ export default function App() {
                           <div className="flex gap-2">
                             <button
                               type="button"
-                              onClick={() => setIsQuickRegisteringDestinatario(true)}
+                              onClick={() => {
+                                setIsQuickRegisteringDestinatario(true);
+                                setQuickClientNome('');
+                                setQuickClientEndereco('');
+                                setQuickClientCEP('');
+                                setQuickClientNumero('');
+                              }}
                               className="text-[10px] text-orange-650 hover:text-orange-700 font-bold font-mono uppercase tracking-tight flex items-center gap-0.5 cursor-pointer"
                             >
                               <Plus className="w-3 h-3 text-orange-500" /> Rápido
@@ -8712,13 +8841,39 @@ export default function App() {
                             />
                           </div>
 
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <input
+                                type="text"
+                                value={quickClientCEP}
+                                onChange={(e) => handleCEPChange(e.target.value, 'quickClient')}
+                                placeholder="CEP (ex: 37900-000)"
+                                className="w-full bg-white text-slate-900 border border-slate-200 rounded-lg p-2 text-xs font-mono focus:ring-1 focus:ring-orange-500"
+                              />
+                              {isFetchingQuickClientCEP && <p className="text-[9px] text-orange-500 font-mono animate-pulse">Buscando...</p>}
+                              {cepErrorState['quickClient'] && (
+                                <p className="text-red-500 text-[9px] font-mono mt-0.5 text-left">⚠️ {cepErrorState['quickClient']}</p>
+                              )}
+                            </div>
+
+                            <div>
+                              <input
+                                type="text"
+                                value={quickClientNumero}
+                                onChange={(e) => setQuickClientNumero(e.target.value)}
+                                placeholder="Número"
+                                className="w-full bg-white text-slate-900 border border-slate-200 rounded-lg p-2 text-xs font-mono focus:ring-1 focus:ring-orange-500"
+                              />
+                            </div>
+                          </div>
+
                           <div>
                             <input
                               type="text"
                               required
                               value={quickClientEndereco}
                               onChange={(e) => setQuickClientEndereco(e.target.value)}
-                              placeholder="Endereço (Rua, Número, Bairro)"
+                              placeholder="Endereço (Rua, Bairro) - Auto por CEP"
                               className="w-full bg-white text-slate-900 border border-slate-200 rounded-lg p-2 text-xs font-mono focus:ring-1 focus:ring-orange-500"
                             />
                           </div>
@@ -8730,6 +8885,8 @@ export default function App() {
                                 setIsQuickRegisteringDestinatario(false);
                                 setQuickClientNome('');
                                 setQuickClientEndereco('');
+                                setQuickClientCEP('');
+                                setQuickClientNumero('');
                               }}
                               className="flex-1 bg-white hover:bg-slate-100 text-slate-600 border border-slate-200 py-1 px-2 rounded text-[10px] font-bold font-mono transition cursor-pointer"
                             >
@@ -8745,12 +8902,15 @@ export default function App() {
 
                                 const randId = Math.floor(1000 + Math.random() * 9000);
                                 const newId = `CLI-${destinoQuadrante}-${randId}`;
+                                const formattedEndereco = `${quickClientEndereco.trim()}${quickClientNumero.trim() ? `, ${quickClientNumero.trim()}` : ''}${quickClientCEP.trim() ? ` - CEP: ${quickClientCEP.trim()}` : ''}`;
                                 
                                 const novoCli: Cliente = {
                                   id: newId,
                                   nome: quickClientNome,
                                   quadrante: destinoQuadrante,
-                                  endereco: quickClientEndereco,
+                                  endereco: formattedEndereco,
+                                  cep: quickClientCEP,
+                                  numero: quickClientNumero,
                                   telefone: 'Não informado',
                                   cidade: activeClienteUser?.cidade || 'Passos - MG',
                                   valorPagoMotoboy: 4.00,
@@ -8778,6 +8938,8 @@ export default function App() {
 
                                 setQuickClientNome('');
                                 setQuickClientEndereco('');
+                                setQuickClientCEP('');
+                                setQuickClientNumero('');
                                 setIsQuickRegisteringDestinatario(false);
 
                                 setSupabaseSuccessMsg(`✅ Destinatário "${novoCli.nome}" cadastrado, SALVO NO BANCO e selecionado!`);
@@ -9020,6 +9182,82 @@ export default function App() {
             />
           </div>
 
+          {/* Row 3 (lg:col-span-12) - CUSTOMER'S OWN CLIENTS BASE DATABASE / SUB-CLIENTS */}
+          <div className="lg:col-span-12 bg-white rounded-xl shadow-sm border border-slate-200 p-5" id="carteira-clientes-distribuidora">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-slate-100 pb-3 mb-4">
+              <div>
+                <h2 className="text-sm font-black text-slate-900 uppercase tracking-wider flex items-center gap-1.5 font-mono">
+                  <Briefcase className="w-4 h-4 text-orange-500" />
+                  Sua Carteira Privada de Clientes (Destinatários Cadastrados)
+                </h2>
+                <p className="text-xs text-slate-450 font-mono">Consulte, selecione para envio ou pré-registre novas oficinas parceiras em sua base persistente.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setClientNewClientNome('');
+                  setClientNewClientEndereco('');
+                  setClientNewClientQuadrante('A');
+                  setIsClientAddingNewClient(true);
+                }}
+                className="bg-orange-500 text-white font-mono text-xs font-bold py-1.5 px-3 rounded-lg hover:bg-orange-600 flex items-center gap-1 cursor-pointer transition shadow-xs self-stretch sm:self-auto text-center justify-center"
+              >
+                <Plus className="w-3.5 h-3.5 text-white" />
+                Cadastrar Novo Cliente B2B (Oficina)
+              </button>
+            </div>
+
+            {clientes.filter(c => c.criadoPorClienteId === activeClienteUser?.id).length === 0 ? (
+              <div className="text-center py-10 border border-dashed border-slate-200 rounded-xl space-y-2 bg-slate-50/50">
+                <p className="text-xs text-slate-500 font-mono">Nenhum cliente/oficina destinatária cadastrada na sua base de dados ainda.</p>
+                <p className="text-[10px] text-slate-450 font-mono">Use o botão acima ou o cadastro rápido no formulário de despacho para começar.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                {clientes.filter(c => c.criadoPorClienteId === activeClienteUser?.id).map(c => (
+                  <div key={c.id} className="p-3 bg-slate-50 border border-slate-150 rounded-lg flex flex-col justify-between hover:border-orange-200 hover:bg-slate-50/60 transition duration-155">
+                    <div className="space-y-1">
+                      <div className="flex justify-between items-start gap-1">
+                        <span className="text-xs font-bold text-slate-900 font-mono truncate max-w-[180px] block">{c.nome}</span>
+                        <span className="text-[9px] font-mono bg-orange-100 text-orange-800 font-bold px-1.5 py-0.2 rounded shrink-0">
+                          Setor {c.quadrante}
+                        </span>
+                      </div>
+                      <span className="text-[9.5px] text-slate-400 font-mono block">Código: {c.id}</span>
+                      <p className="text-[10.5px] text-slate-650 font-mono leading-relaxed line-clamp-2">📍 {c.endereco}</p>
+                    </div>
+
+                    <div className="border-t border-slate-100 mt-3 pt-2.5 flex items-center justify-between gap-2">
+                      <span className="text-[9px] font-mono text-emerald-600 bg-emerald-50 px-1 py-0.5 rounded border border-emerald-100">
+                        ✓ Banco Sincronizado
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDestinoTipo('cliente');
+                          setDestinoClienteId(c.id);
+                          setDestinoQuadrante(c.quadrante);
+                          
+                          setSupabaseSuccessMsg(`🎯 "${c.nome}" selecionado com sucesso! Preencha a descrição de itens.`);
+                          setTimeout(() => setSupabaseSuccessMsg(''), 4500);
+
+                          // Scroll back smoothly to form focus
+                          const dispatchFormSec = document.getElementById("portal-cliente-form-solicitacao");
+                          if (dispatchFormSec) {
+                            dispatchFormSec.scrollIntoView({ behavior: 'smooth' });
+                          }
+                        }}
+                        className="bg-white hover:bg-orange-500 hover:text-white text-orange-600 border border-orange-200 hover:border-orange-500 text-[10px] font-bold font-mono py-1 px-2.5 rounded-md transition cursor-pointer"
+                      >
+                        🚚 Selecionar p/ Entrega
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
           {/* Row 2 (lg:col-span-12) - Real-time Order tracking list */}
           <div className="lg:col-span-12 bg-white rounded-xl shadow-sm border border-slate-200 p-5">
             <h2 className="text-sm font-black text-slate-900 uppercase tracking-wider flex items-center gap-1.5 border-b border-slate-100 pb-3 mb-4 font-mono">
@@ -9105,82 +9343,6 @@ export default function App() {
                 ))
               )}
             </div>
-          </div>
-
-          {/* Row 3 (lg:col-span-12) - CUSTOMER'S OWN CLIENTS BASE DATABASE / SUB-CLIENTS */}
-          <div className="lg:col-span-12 bg-white rounded-xl shadow-sm border border-slate-200 p-5" id="carteira-clientes-distribuidora">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-slate-100 pb-3 mb-4">
-              <div>
-                <h2 className="text-sm font-black text-slate-900 uppercase tracking-wider flex items-center gap-1.5 font-mono">
-                  <Briefcase className="w-4 h-4 text-orange-500" />
-                  Sua Carteira Privada de Clientes (Destinatários Cadastrados)
-                </h2>
-                <p className="text-xs text-slate-450 font-mono">Consulte, selecione para envio ou pré-registre novas oficinas parceiras em sua base persistente.</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setClientNewClientNome('');
-                  setClientNewClientEndereco('');
-                  setClientNewClientQuadrante('A');
-                  setIsClientAddingNewClient(true);
-                }}
-                className="bg-orange-500 text-white font-mono text-xs font-bold py-1.5 px-3 rounded-lg hover:bg-orange-600 flex items-center gap-1 cursor-pointer transition shadow-xs self-stretch sm:self-auto text-center justify-center"
-              >
-                <Plus className="w-3.5 h-3.5 text-white" />
-                Cadastrar Novo Cliente B2B (Oficina)
-              </button>
-            </div>
-
-            {clientes.filter(c => c.criadoPorClienteId === activeClienteUser?.id).length === 0 ? (
-              <div className="text-center py-10 border border-dashed border-slate-200 rounded-xl space-y-2 bg-slate-50/50">
-                <p className="text-xs text-slate-500 font-mono">Nenhum cliente/oficina destinatária cadastrada na sua base de dados ainda.</p>
-                <p className="text-[10px] text-slate-450 font-mono">Use o botão acima ou o cadastro rápido no formulário de despacho para começar.</p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                {clientes.filter(c => c.criadoPorClienteId === activeClienteUser?.id).map(c => (
-                  <div key={c.id} className="p-3 bg-slate-50 border border-slate-150 rounded-lg flex flex-col justify-between hover:border-orange-200 hover:bg-slate-50/60 transition duration-155">
-                    <div className="space-y-1">
-                      <div className="flex justify-between items-start gap-1">
-                        <span className="text-xs font-bold text-slate-900 font-mono truncate max-w-[180px] block">{c.nome}</span>
-                        <span className="text-[9px] font-mono bg-orange-100 text-orange-800 font-bold px-1.5 py-0.2 rounded shrink-0">
-                          Setor {c.quadrante}
-                        </span>
-                      </div>
-                      <span className="text-[9.5px] text-slate-400 font-mono block">Código: {c.id}</span>
-                      <p className="text-[10.5px] text-slate-650 font-mono leading-relaxed line-clamp-2">📍 {c.endereco}</p>
-                    </div>
-
-                    <div className="border-t border-slate-100 mt-3 pt-2.5 flex items-center justify-between gap-2">
-                      <span className="text-[9px] font-mono text-emerald-600 bg-emerald-50 px-1 py-0.5 rounded border border-emerald-100">
-                        ✓ Banco Sincronizado
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setDestinoTipo('cliente');
-                          setDestinoClienteId(c.id);
-                          setDestinoQuadrante(c.quadrante);
-                          
-                          setSupabaseSuccessMsg(`🎯 "${c.nome}" selecionado com sucesso! Preencha a descrição de itens.`);
-                          setTimeout(() => setSupabaseSuccessMsg(''), 4500);
-
-                          // Scroll back smoothly to form focus
-                          const dispatchFormSec = document.getElementById("portal-cliente-form-solicitacao");
-                          if (dispatchFormSec) {
-                            dispatchFormSec.scrollIntoView({ behavior: 'smooth' });
-                          }
-                        }}
-                        className="bg-white hover:bg-orange-500 hover:text-white text-orange-600 border border-orange-200 hover:border-orange-500 text-[10px] font-bold font-mono py-1 px-2.5 rounded-md transition cursor-pointer"
-                      >
-                        🚚 Selecionar p/ Entrega
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
           </div>
 
         </main>
@@ -10312,6 +10474,7 @@ export default function App() {
                   telefone: clientNewClientTelefone || 'Não informado',
                   cidade: clientNewClientCidade || 'Passos - MG',
                   cep: clientNewClientCEP,
+                  numero: clientNewClientNumero,
                   cnpj: clientNewClientCNPJorCPF,
                   valorPagoMotoboy: 0.00,
                   valorCobradoCliente: 0.00,
@@ -10375,6 +10538,7 @@ export default function App() {
                 setClientNewClientCNPJorCPF('');
                 setClientNewClientCEP('');
                 setClientNewClientEndereco('');
+                setClientNewClientNumero('');
                 setClientNewClientTelefone('');
                 setClientNewClientCidade('Passos - MG');
                 setClientNewClientEmail('');
@@ -10460,7 +10624,21 @@ export default function App() {
                     required
                     value={clientNewClientEndereco}
                     onChange={(e) => setClientNewClientEndereco(e.target.value)}
-                    placeholder="Ex: Rua Central, 45"
+                    placeholder="Ex: Rua Central"
+                    className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded-lg p-2.5 text-xs focus:ring-2 focus:ring-orange-500 font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1 font-mono">
+                    Número do Estabelecimento *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={clientNewClientNumero}
+                    onChange={(e) => setClientNewClientNumero(e.target.value)}
+                    placeholder="Ex: 45 ou S/N"
                     className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded-lg p-2.5 text-xs focus:ring-2 focus:ring-orange-500 font-mono"
                   />
                 </div>
@@ -10637,7 +10815,21 @@ export default function App() {
                     required
                     value={newClientEndereco}
                     onChange={(e) => setNewClientEndereco(e.target.value)}
-                    placeholder="Ex: Av. Juca Stockler, 1200 - Centro"
+                    placeholder="Ex: Av. Juca Stockler - Centro"
+                    className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded-lg p-2.5 text-xs focus:ring-2 focus:ring-orange-500 focus:border-orange-500 font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1 font-mono">
+                    Número do Estabelecimento *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={newClientNumero}
+                    onChange={(e) => setNewClientNumero(e.target.value)}
+                    placeholder="Ex: 1200 ou S/N"
                     className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded-lg p-2.5 text-xs focus:ring-2 focus:ring-orange-500 focus:border-orange-500 font-mono"
                   />
                 </div>
@@ -10928,6 +11120,19 @@ export default function App() {
                     value={editClientEndereco}
                     onChange={(e) => setEditClientEndereco(e.target.value)}
                     placeholder="Endereço principal da empresa"
+                    className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded-lg p-2.5 text-xs focus:ring-2 focus:ring-orange-500 focus:border-orange-500 font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1 font-mono">
+                    Número do Estabelecimento
+                  </label>
+                  <input
+                    type="text"
+                    value={editClientNumero}
+                    onChange={(e) => setEditClientNumero(e.target.value)}
+                    placeholder="Ex: 1200 ou S/N"
                     className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded-lg p-2.5 text-xs focus:ring-2 focus:ring-orange-500 focus:border-orange-500 font-mono"
                   />
                 </div>
@@ -11273,14 +11478,56 @@ export default function App() {
                     </div>
 
                     <div>
-                      <label className="block text-[9px] font-bold text-slate-705 uppercase font-mono mb-0.5">Endereço de Entrega</label>
-                      <input
-                        type="text"
-                        value={subCliEndereco}
-                        onChange={(e) => setSubCliEndereco(e.target.value)}
-                        placeholder="Ex: Rua das Flores, 450 - Centro"
-                        className="w-full bg-white text-slate-950 border border-slate-250 rounded p-1.5 text-xs font-mono"
-                      />
+                      <label className="block text-[9px] font-bold text-slate-705 uppercase font-mono mb-0.5 flex items-center justify-between">
+                        <span>CEP (Opcional)</span>
+                        {isFetchingSubCliCEP && (
+                          <span className="text-emerald-500 animate-pulse text-[8px] font-mono leading-none">🔍 BUSCANDO CEP...</span>
+                        )}
+                      </label>
+                      <div className="flex gap-1.5">
+                        <input
+                          type="text"
+                          value={subCliCEP}
+                          onChange={(e) => handleCEPChange(e.target.value, 'subCli')}
+                          placeholder="Ex: 37900-124"
+                          className="flex-1 bg-white text-slate-950 border border-slate-250 rounded p-1.5 text-xs font-mono"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleFetchCEP(subCliCEP, 'subCli')}
+                          disabled={isFetchingSubCliCEP || !subCliCEP}
+                          className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 text-white text-[9px] font-bold px-2 rounded font-mono cursor-pointer shadow transition shrink-0"
+                        >
+                          {isFetchingSubCliCEP ? '...' : '🔍 Buscar'}
+                        </button>
+                      </div>
+                      {cepErrorState['subCli'] && (
+                        <p className="text-red-500 text-[8.5px] font-mono mt-0.5 text-left">⚠️ {cepErrorState['subCli']}</p>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-2">
+                      <div className="col-span-2">
+                        <label className="block text-[9px] font-bold text-slate-705 uppercase font-mono mb-0.5">Endereço de Entrega</label>
+                        <input
+                          type="text"
+                          value={subCliEndereco}
+                          onChange={(e) => setSubCliEndereco(e.target.value)}
+                          placeholder="Ex: Rua das Flores - Centro"
+                          className="w-full bg-white text-slate-950 border border-slate-250 rounded p-1.5 text-xs font-mono"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[9px] font-bold text-slate-705 uppercase font-mono mb-0.5">Número *</label>
+                        <input
+                          type="text"
+                          required
+                          value={subCliNumero}
+                          onChange={(e) => setSubCliNumero(e.target.value)}
+                          placeholder="Ex: 450 ou S/N"
+                          className="w-full bg-white text-slate-950 border border-slate-250 rounded p-1.5 text-xs font-mono"
+                        />
+                      </div>
                     </div>
 
                     {/* EXCLUSIVE ADMIN CONTROLS THAT THE PARTNER CANNOT EDIT/SEE */}
@@ -11779,6 +12026,7 @@ export default function App() {
                             setFirstAccessCNPJ(cli.cnpj || '');
                             setFirstAccessInscricaoEstadual(cli.inscricaoEstadual || '');
                             setFirstAccessCEP(cli.cep || '');
+                            setFirstAccessNumero(cli.numero || '');
                             setFirstAccessCidade(cli.cidade || 'Passos - MG');
                           }
                         }}
@@ -11982,9 +12230,21 @@ export default function App() {
                       <input
                         type="text"
                         required
-                        placeholder="Ex: Rua das Flores, 123 - Centro"
+                        placeholder="Ex: Rua das Flores - Centro"
                         value={firstAccessEndereco}
                         onChange={(e) => setFirstAccessEndereco(e.target.value)}
+                        className="w-full bg-slate-100/10 text-white placeholder-slate-600 border border-slate-800 rounded-lg p-2.5 text-xs font-mono focus:outline-none focus:border-orange-500"
+                      />
+                    </div>
+
+                    <div className="text-left">
+                      <label className="block text-xs font-bold text-slate-300 uppercase mb-1 font-mono text-left">Número do Estabelecimento *</label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="Ex: 123 ou S/N"
+                        value={firstAccessNumero}
+                        onChange={(e) => setFirstAccessNumero(e.target.value)}
                         className="w-full bg-slate-100/10 text-white placeholder-slate-600 border border-slate-800 rounded-lg p-2.5 text-xs font-mono focus:outline-none focus:border-orange-500"
                       />
                     </div>

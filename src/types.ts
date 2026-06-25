@@ -5,6 +5,7 @@ export interface Cliente {
   nome: string;
   quadrante: Quadrante;
   endereco: string;
+  numero?: string; // Number of the establishment
   telefone: string;
   cidade: string; // Ex: "Passos - MG" or "Franca - SP"
   cep?: string; // Postal code
