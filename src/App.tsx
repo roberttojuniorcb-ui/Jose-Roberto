@@ -84,7 +84,6 @@ import {
   compilarAPIResponse, 
   BAÚ_CAPACIDADE_MAXIMA 
 } from './utils/logisticsEngine';
-import MapaDaCidade from './components/MapaDaCidade';
 import TorqueLogLogoIcon from './components/TorqueLogLogoIcon';
 
 const MONTHS_PT = [
@@ -9034,8 +9033,8 @@ export default function App() {
             </div>
           </div>
 
-          {/* Column A (lg:col-span-4) - Dispatch form */}
-          <div className="lg:col-span-4 bg-white rounded-xl shadow-sm border border-slate-200 p-5 flex flex-col justify-between" id="portal-cliente-form-solicitacao">
+          {/* Column A (lg:col-span-6) - Dispatch form */}
+          <div className="lg:col-span-6 bg-white rounded-xl shadow-sm border border-slate-200 p-5 flex flex-col justify-between" id="portal-cliente-form-solicitacao">
             <div>
               <div className="border-b border-slate-100 pb-3 mb-4">
                 <h2 className="text-sm font-black text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
@@ -9732,8 +9731,8 @@ export default function App() {
             </div>
           </div>
 
-          {/* Column B (lg:col-span-4) - Registered Motoboys to track them */}
-          <div className="lg:col-span-4 bg-white rounded-xl shadow-sm border border-slate-200 p-5 flex flex-col justify-between" id="portal-cliente-motoboys">
+          {/* Column B (lg:col-span-6) - Registered Motoboys */}
+          <div className="lg:col-span-6 bg-white rounded-xl shadow-sm border border-slate-200 p-5 flex flex-col justify-between" id="portal-cliente-motoboys">
             <div>
               <div className="border-b border-slate-100 pb-3 mb-4">
                 <h2 className="text-sm font-black text-slate-900 uppercase tracking-wider flex items-center gap-2 font-mono">
@@ -9750,7 +9749,6 @@ export default function App() {
                   </div>
                 ) : (
                   filteredMotoboysForClient.map((mb, idx) => {
-                    const isTracked = selectedMotoboyIdForTracking === mb.id;
                     const activeDelivery = ordens.find(o => o.status === 'Moto a Caminho' && o.motoboyId === mb.id);
                     const isDeliveringForSelf = activeDelivery && activeDelivery.clienteId === activeClienteUser?.id;
 
@@ -9765,9 +9763,7 @@ export default function App() {
                     return (
                       <div 
                         key={mb.id} 
-                        className={`p-3 bg-slate-50 border rounded-xl flex items-center justify-between gap-2 transition duration-200 ${
-                          isTracked ? 'border-orange-400 bg-orange-50/20 shadow-xs' : 'border-slate-150 hover:bg-slate-100/50'
-                        }`}
+                        className="p-3 bg-slate-50 border border-slate-150 rounded-xl flex items-center justify-between gap-2 transition duration-200 hover:bg-slate-100/50"
                       >
                         <div className="space-y-0.5">
                           <span className="text-xs font-bold text-slate-900 block font-mono leading-none">{mb.nome}</span>
@@ -9797,23 +9793,8 @@ export default function App() {
             </div>
 
             <div className="mt-4 p-2.5 bg-emerald-50 border border-emerald-150 rounded-xl text-[10px] font-mono text-emerald-850 leading-relaxed">
-              ⭐ <strong>Acompanhamento:</strong> Motoboys que estiverem listados como <strong>Sua Entrega</strong> estão trazendo sua mercadoria! Clique no botão para visualizá-los se movendo.
+              ⭐ <strong>Acompanhamento:</strong> Motoboys que estiverem listados como <strong>Sua Entrega</strong> estão trazendo sua mercadoria! Use o botão "Rastrear" para abrir a rota exata no Google Maps.
             </div>
-          </div>
-
-          {/* Column C (lg:col-span-4) - Interactive City Map representation for Customer */}
-          <div className="lg:col-span-4 h-full">
-            <MapaDaCidade 
-              clientes={clientes}
-              ordens={ordens}
-              motoboys={filteredMotoboysForClient}
-              selectedMotoboyIdForTracking={selectedMotoboyIdForTracking}
-              setSelectedMotoboyIdForTracking={setSelectedMotoboyIdForTracking}
-              activeSessionRole={effectiveRole}
-              activeClienteUser={activeClienteUser}
-              selectedQuadrant={activeClienteUser?.quadrante} // highlights their own quadrant segment
-              animationTick={animationTick}
-            />
           </div>
 
           {/* Row 3 (lg:col-span-12) - CUSTOMER'S OWN CLIENTS BASE DATABASE / SUB-CLIENTS */}
@@ -9951,12 +9932,18 @@ export default function App() {
                             👉 O condutor parceiro aceitou o frete e está se dirigindo ao <strong>Setor {o.quadrante}</strong> para fazer a entrega final no cliente/oficina destinatária: <strong className="text-slate-900">{o.destinatarioNome}</strong>.
                           </div>
                           <div className="pl-3.5 pt-0.5">
-                            <button 
-                              onClick={() => setSelectedMotoboyIdForTracking(o.motoboyId || null)}
-                              className="bg-orange-500 hover:bg-orange-600 text-white font-mono text-[9px] font-black px-3 py-1 rounded transition uppercase tracking-wider cursor-pointer shadow-sm ml-0"
-                            >
-                              Rastrear Moto no Mapa 🧭
-                            </button>
+                            {(() => {
+                              const mbObj = motoboys.find(m => m.id === o.motoboyId);
+                              return mbObj ? (
+                                <button 
+                                  onClick={() => handleRastrearMotoboyNoGoogleMaps(mbObj)}
+                                  className="bg-orange-600 hover:bg-orange-700 text-white font-mono text-[9px] font-black px-3 py-1 rounded transition uppercase tracking-wider cursor-pointer shadow-sm ml-0 flex items-center gap-1"
+                                >
+                                  <Navigation className="w-2.5 h-2.5" />
+                                  Rastrear no Google Maps 🗺️
+                                </button>
+                              ) : null;
+                            })()}
                           </div>
                         </div>
                       ) : (
