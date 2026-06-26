@@ -1308,6 +1308,7 @@ export default function App() {
             clienteId: o.clienteId,
             clienteNome: o.clienteNome,
             quadrante: o.quadrante as Quadrante,
+            cidade: o.cidade || undefined,
             itensDescricao: o.itensDescricao,
             itensAnalistas: o.itensAnalistas || [],
             enderecoEntrega: o.enderecoEntrega || undefined,
@@ -1322,6 +1323,11 @@ export default function App() {
             grupoRotaId: o.grupoRotaId || undefined,
             motivoDesmembramento: o.motivoDesmembramento || undefined,
             travaCubagemStatus: o.travaCubagemStatus || 'Liberado - Cabe no Baú',
+            tempoRestanteSweep: o.tempoRestanteSweep !== undefined ? Number(o.tempoRestanteSweep) : undefined,
+            tipoEntrega: o.tipoEntrega || undefined,
+            distanciaKm: o.distanciaKm !== undefined ? Number(o.distanciaKm) : undefined,
+            tipoEntregadorPedido: o.tipoEntregadorPedido || undefined,
+            faturaParceiraPaga: o.faturaParceiraPaga !== undefined ? !!o.faturaParceiraPaga : undefined,
             criadoEm: o.criadoEm
           });
         });
@@ -2344,6 +2350,7 @@ export default function App() {
       clienteId: targetCliente.id,
       clienteNome: targetCliente.nome,
       quadrante: targetCliente.quadrante,
+      cidade: targetCliente.cidade || 'Passos - MG',
       itensDescricao: finalItemMsg,
       itensAnalistas: layoutAnalise.itens,
       retornoPeca,
@@ -2354,7 +2361,11 @@ export default function App() {
       status: finalStatus,
       travaCubagemStatus: layoutAnalise.status,
       motivoDesmembramento: isLocked ? motivoDesm : undefined,
-      tempoRestanteSweep: 15
+      tempoRestanteSweep: 15,
+      tipoEntrega: 'local',
+      distanciaKm: obterEstimativaTempoPercurso(targetCliente.quadrante).distanciaKm,
+      tipoEntregadorPedido: 'freelancer',
+      faturaParceiraPaga: false
     };
 
     // If grouped route occurred, let's update matched orders to grouped status as well
@@ -9219,7 +9230,7 @@ export default function App() {
                   clienteId: activeClienteUser.id,
                   clienteNome: activeClienteUser.nome,
                   quadrante: finalQuadrante,
-                  cidade: isInter ? pedidoCidadeDestino : 'Santa Cruz das Palmeiras - SP',
+                  cidade: isInter ? pedidoCidadeDestino : (activeClienteUser.cidade || 'Passos - MG'),
                   itensDescricao: clientItemTexto.trim() || 'Objeto de Envio',
                   itensAnalistas: [], // Empty since we do not need items/cubage logic
                   enderecoEntrega: finalEndereco,

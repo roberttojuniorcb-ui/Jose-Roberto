@@ -117,7 +117,7 @@ async function startServer() {
 
     // 1. Try modern Routes API v2 (new recommended standard)
     try {
-      const routesUrl = "https://routes.googleapis.com/v2:computeRoutes";
+      const routesUrl = "https://routes.googleapis.com/directions/v2:computeRoutes";
       const routesPayload = {
         origin: { address: oStr },
         destination: { address: dStr },
