@@ -73,6 +73,121 @@ async function startServer() {
     }
   });
 
+  // Proxy endpoint to calculate routes/distance via Google Maps API
+  app.get("/api/maps/distance", async (req, res) => {
+    const { origin, destination } = req.query;
+
+    if (!origin || !destination) {
+      return res.status(400).json({ status: "error", error: "Origin and destination query parameters are required." });
+    }
+
+    const apiKey = process.env.GOOGLE_MAPS_PLATFORM_KEY || process.env.VITE_GOOGLE_MAPS_PLATFORM_KEY || '';
+    if (!apiKey) {
+      return res.status(400).json({ status: "error", error: "Google Maps API key not configured on server." });
+    }
+
+    // 1. Try modern Routes API v2 (new recommended standard)
+    try {
+      const routesUrl = "https://routes.googleapis.com/v2:computeRoutes";
+      const routesPayload = {
+        origin: { address: origin as string },
+        destination: { address: destination as string },
+        travelMode: "DRIVE"
+      };
+
+      const routesResponse = await fetch(routesUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Goog-Api-Key": apiKey,
+          "X-Goog-FieldMask": "routes.duration,routes.distanceMeters"
+        },
+        body: JSON.stringify(routesPayload)
+      });
+
+      if (routesResponse.ok) {
+        const data: any = await routesResponse.json();
+        if (data && data.routes && data.routes[0]) {
+          const route = data.routes[0];
+          const distanceMeters = route.distanceMeters || 0;
+          const durationSeconds = route.duration ? parseInt(route.duration) : 0;
+          const km = distanceMeters / 1000;
+          
+          console.log(`[Routes API] Calculated distance from "${origin}" to "${destination}": ${km} km`);
+          return res.json({
+            status: "success",
+            distanceKm: km,
+            durationMin: Math.round(durationSeconds / 60)
+          });
+        }
+      } else {
+        const errText = await routesResponse.text();
+        console.warn(`[Routes API Fail] Status: ${routesResponse.status}, Error: ${errText}`);
+      }
+    } catch (e: any) {
+      console.error("[Routes API Exception]", e);
+    }
+
+    // 2. Fallback to standard Directions API (very commonly enabled on maps keys)
+    try {
+      console.log("[Directions API Fallback] Querying legacy Directions API...");
+      const directionsUrl = `https://maps.googleapis.com/maps/api/directions/json?origin=${encodeURIComponent(origin as string)}&destination=${encodeURIComponent(destination as string)}&key=${apiKey}`;
+      const directionsResponse = await fetch(directionsUrl);
+      if (directionsResponse.ok) {
+        const data: any = await directionsResponse.json();
+        if (data && data.status === "OK" && data.routes && data.routes[0] && data.routes[0].legs && data.routes[0].legs[0]) {
+          const leg = data.routes[0].legs[0];
+          const distanceMeters = leg.distance ? leg.distance.value : 0;
+          const durationSeconds = leg.duration ? leg.duration.value : 0;
+          const km = distanceMeters / 1000;
+
+          console.log(`[Directions API] Calculated distance from "${origin}" to "${destination}": ${km} km`);
+          return res.json({
+            status: "success",
+            distanceKm: km,
+            durationMin: Math.round(durationSeconds / 60)
+          });
+        } else {
+          console.warn(`[Directions API Non-OK Status] ${data.status || 'No Status'}`);
+        }
+      }
+    } catch (e: any) {
+      console.error("[Directions API Exception]", e);
+    }
+
+    // 3. Fallback to Distance Matrix API
+    try {
+      console.log("[Distance Matrix API Fallback] Querying Distance Matrix API...");
+      const matrixUrl = `https://maps.googleapis.com/maps/api/distancematrix/json?origins=${encodeURIComponent(origin as string)}&destinations=${encodeURIComponent(destination as string)}&key=${apiKey}`;
+      const matrixResponse = await fetch(matrixUrl);
+      if (matrixResponse.ok) {
+        const data: any = await matrixResponse.json();
+        if (data && data.status === "OK" && data.rows && data.rows[0] && data.rows[0].elements && data.rows[0].elements[0]) {
+          const element = data.rows[0].elements[0];
+          if (element.status === "OK" && element.distance) {
+            const distanceMeters = element.distance.value;
+            const durationSeconds = element.duration ? element.duration.value : 0;
+            const km = distanceMeters / 1000;
+
+            console.log(`[Distance Matrix API] Calculated distance: ${km} km`);
+            return res.json({
+              status: "success",
+              distanceKm: km,
+              durationMin: Math.round(durationSeconds / 60)
+            });
+          }
+        }
+      }
+    } catch (e: any) {
+      console.error("[Distance Matrix Exception]", e);
+    }
+
+    return res.status(502).json({
+      status: "error",
+      error: "All Google Maps API routes failed or key does not have them activated."
+    });
+  });
+
   // Vite middleware integrado para desenvolvimento/produção
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({

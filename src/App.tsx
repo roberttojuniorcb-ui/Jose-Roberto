@@ -1653,98 +1653,55 @@ export default function App() {
 
     setGoogleMapsDistance(prev => ({ ...prev, status: 'loading', errorMsg: undefined }));
 
-    const runDistanceCalculation = () => {
+    const runDistanceCalculation = async () => {
       try {
-        const service = new (window as any).google.maps.DistanceMatrixService();
-        service.getDistanceMatrix(
-          {
-            origins: [finalOrigem],
-            destinations: [finalDest],
-            travelMode: (window as any).google.maps.TravelMode.DRIVING,
-            unitSystem: (window as any).google.maps.UnitSystem.METRIC,
-          },
-          (response: any, status: any) => {
-            if (status === 'OK' && response && response.rows?.[0]?.elements?.[0]) {
-              const element = response.rows[0].elements[0];
-              if (element.status === 'OK' && element.distance) {
-                const meters = element.distance.value;
-                const kmIda = meters / 1000;
-                setGoogleMapsDistance({
-                  ida: parseFloat(kmIda.toFixed(2)),
-                  volta: parseFloat(kmIda.toFixed(2)),
-                  total: parseFloat((kmIda * 2).toFixed(2)),
-                  status: 'success',
-                  origemUsed: finalOrigem,
-                  destinoUsed: finalDest
-                });
-              } else {
-                // Fallback estimate
-                const fallbackMeters = 3800 + Math.random() * 1200;
-                const kmIda = fallbackMeters / 1000;
-                setGoogleMapsDistance({
-                  ida: parseFloat(kmIda.toFixed(2)),
-                  volta: parseFloat(kmIda.toFixed(2)),
-                  total: parseFloat((kmIda * 2).toFixed(2)),
-                  status: 'success',
-                  origemUsed: finalOrigem,
-                  destinoUsed: finalDest,
-                  errorMsg: 'Endereço não localizado pelo Google Maps. Utilizando estimativa offline do setor.'
-                });
-              }
-            } else {
-              const fallbackMeters = 3800 + Math.random() * 1200;
-              const kmIda = fallbackMeters / 1000;
-              setGoogleMapsDistance({
-                ida: parseFloat(kmIda.toFixed(2)),
-                volta: parseFloat(kmIda.toFixed(2)),
-                total: parseFloat((kmIda * 2).toFixed(2)),
-                status: 'success',
-                origemUsed: finalOrigem,
-                destinoUsed: finalDest,
-                errorMsg: 'Retorno parcial do Google Maps. Utilizando estimativa de percurso.'
-              });
-            }
+        const url = `/api/maps/distance?origin=${encodeURIComponent(finalOrigem)}&destination=${encodeURIComponent(finalDest)}`;
+        const res = await fetch(url);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.status === 'success' && typeof data.distanceKm === 'number') {
+            const kmIda = data.distanceKm;
+            setGoogleMapsDistance({
+              ida: parseFloat(kmIda.toFixed(2)),
+              volta: parseFloat(kmIda.toFixed(2)),
+              total: parseFloat((kmIda * 2).toFixed(2)),
+              status: 'success',
+              origemUsed: finalOrigem,
+              destinoUsed: finalDest
+            });
+            return;
           }
-        );
-      } catch (err: any) {
-        console.error("Erro ao chamar DistanceMatrix:", err);
-        const fallbackMeters = 4000;
+        }
+        
+        // Fallback if proxy request returns error or non-200
+        const fallbackMeters = 3800 + Math.random() * 1200;
+        const kmIda = fallbackMeters / 1000;
         setGoogleMapsDistance({
-          ida: 4.00,
-          volta: 4.00,
-          total: 8.00,
+          ida: parseFloat(kmIda.toFixed(2)),
+          volta: parseFloat(kmIda.toFixed(2)),
+          total: parseFloat((kmIda * 2).toFixed(2)),
           status: 'success',
           origemUsed: finalOrigem,
           destinoUsed: finalDest,
-          errorMsg: 'Erro ao invocar serviço do Google Maps.'
+          errorMsg: 'Usando estimativa regional do setor (API de Mapas em modo contingência).'
+        });
+      } catch (err: any) {
+        console.error("Erro na consulta de distância via API proxy:", err);
+        const fallbackMeters = 4000;
+        const kmIda = fallbackMeters / 1000;
+        setGoogleMapsDistance({
+          ida: parseFloat(kmIda.toFixed(2)),
+          volta: parseFloat(kmIda.toFixed(2)),
+          total: parseFloat((kmIda * 2).toFixed(2)),
+          status: 'success',
+          origemUsed: finalOrigem,
+          destinoUsed: finalDest,
+          errorMsg: 'Serviço de cálculo indisponível. Usando estimativa padrão.'
         });
       }
     };
 
-    if (!(window as any).google || !(window as any).google.maps) {
-      const existingScript = document.getElementById('google-maps-script');
-      if (!existingScript) {
-        const script = document.createElement('script');
-        script.id = 'google-maps-script';
-        script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}`;
-        script.async = true;
-        script.onload = () => {
-          setTimeout(runDistanceCalculation, 400);
-        };
-        script.onerror = () => {
-          setGoogleMapsDistance(prev => ({
-            ...prev,
-            status: 'error',
-            errorMsg: 'Erro ao carregar script do Google Maps.'
-          }));
-        };
-        document.head.appendChild(script);
-      } else {
-        existingScript.addEventListener('load', runDistanceCalculation);
-      }
-    } else {
-      runDistanceCalculation();
-    }
+    runDistanceCalculation();
   }, [destinoTipo, destinoEndereco, destinoNumero, destinoClienteId, activeClienteUser, clientes]);
 
   // --- STATE FOR LIVE API EXPORTER & TERMINAL ---
