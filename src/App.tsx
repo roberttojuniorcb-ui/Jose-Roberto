@@ -5251,7 +5251,7 @@ export default function App() {
               <button
                 type="button"
                 onClick={() => handleAbrirRelatorio('Empresa')}
-                className="bg-indigo-650 hover:bg-indigo-750 text-white text-xs font-black font-mono py-2 px-4 rounded-xl flex items-center gap-2 shadow-sm transition-all cursor-pointer hover:scale-[1.02] border border-indigo-700"
+                className="bg-[#0e0e0e] hover:bg-[#1c1c1c] text-white text-xs font-black font-mono py-2 px-4 rounded-xl flex items-center gap-2 shadow-sm transition-all cursor-pointer hover:scale-[1.02] border border-[#0e0e0e]"
               >
                 🧾 FECHAMENTO DE ENTREGAS (S/M/NF) 📊
               </button>
