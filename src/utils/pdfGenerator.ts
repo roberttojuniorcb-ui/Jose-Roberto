@@ -369,15 +369,6 @@ export function exportFechamentoPDF({
   doc.text("Assinatura Eletrônica do Responsável", 27, finalY + 19);
   doc.text(role === 'Empresa' ? "Selo de Segurança de Conciliação" : "Assinatura do Parceiro Titular", 135, finalY + 19);
 
-  // 10. Security audit line
-  doc.setFillColor(248, 250, 252);
-  doc.rect(15, finalY + 24, pageWidth - 30, 8, "F");
-  doc.setFont("helvetica", "italic");
-  doc.setFontSize(6);
-  doc.setTextColor(brandGray[0], brandGray[1], brandGray[2]);
-  const securityHash = Array.from({length: 32}, () => Math.floor(Math.random()*16).toString(16)).join('').toUpperCase();
-  doc.text(`Cripto-Auditoria Blockchain Token de Autenticidade: SHA-256 / ${securityHash}`, 18, finalY + 29);
-
   // 11. Save PDF
   const filename = `Fechamento_${role}_${targetProfileName.replace(/\s+/g, "_")}_${new Date().toISOString().slice(0, 10)}.pdf`;
   doc.save(filename);
