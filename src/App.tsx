@@ -84,6 +84,7 @@ import {
   compilarAPIResponse, 
   BAÚ_CAPACIDADE_MAXIMA 
 } from './utils/logisticsEngine';
+import { exportFechamentoPDF } from './utils/pdfGenerator';
 import TorqueLogLogoIcon from './components/TorqueLogLogoIcon';
 
 const MONTHS_PT = [
@@ -10785,11 +10786,19 @@ export default function App() {
                     <button
                       type="button"
                       onClick={() => {
-                        window.print();
+                        exportFechamentoPDF({
+                          role: 'Cliente',
+                          periodText: `${MONTHS_PT[calendarViewMonth]} / ${calendarViewYear}`,
+                          activeCliente: closingDist,
+                          activeMotoboy: null,
+                          ordens: closingOrdersList,
+                          allClientes: clientes,
+                          allMotoboys: motoboys
+                        });
                       }}
                       className="bg-slate-800 hover:bg-slate-700 active:scale-95 text-white font-bold py-2 rounded-lg shadow font-mono text-center flex items-center justify-center gap-1.5 cursor-pointer text-xs transition-colors"
                     >
-                      🖨️ Gravar em PDF
+                      📄 Exportar PDF Formatado
                     </button>
                   </div>
                 </div>
@@ -10940,11 +10949,28 @@ export default function App() {
                     <button
                       type="button"
                       onClick={() => {
-                        window.print();
+                        let periodText = '';
+                        if (reportPeriod === 'Semana') {
+                          periodText = 'Últimos 7 dias (Semana Atual)';
+                        } else if (reportPeriod === 'Mes') {
+                          periodText = 'Este Mês';
+                        } else {
+                          periodText = `${reportFilterStartDate.split('-').reverse().join('/')} até ${reportFilterEndDate.split('-').reverse().join('/')}`;
+                        }
+
+                        exportFechamentoPDF({
+                          role: reportRole,
+                          periodText,
+                          activeCliente: activeClienteUser,
+                          activeMotoboy: activeMotoboyUser,
+                          ordens: getFilteredReportOrders(),
+                          allClientes: clientes,
+                          allMotoboys: motoboys
+                        });
                       }}
                       className="bg-slate-900 hover:bg-slate-800 active:scale-95 text-white text-[11px] font-bold font-mono py-1.5 px-3 rounded-lg flex items-center gap-1.5 shadow transition-all cursor-pointer hover:scale-102 active:scale-98"
                     >
-                      🖨️ Salvar como PDF / Imprimir
+                      📄 Exportar Relatório em PDF Formatado
                     </button>
                   </div>
                 </div>
