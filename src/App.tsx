@@ -1617,7 +1617,9 @@ export default function App() {
 
   // Calculate real driving round-trip distances using live Google Maps
   useEffect(() => {
-    const apiKey = process.env.GOOGLE_MAPS_PLATFORM_KEY || '';
+    const apiKey = process.env.GOOGLE_MAPS_PLATFORM_KEY || 
+                   (import.meta as any).env?.VITE_GOOGLE_MAPS_PLATFORM_KEY || 
+                   process.env.VITE_GOOGLE_MAPS_PLATFORM_KEY || '';
     if (!apiKey) {
       setGoogleMapsDistance(prev => ({
         ...prev,
@@ -3771,7 +3773,7 @@ export default function App() {
     });
   };
 
-  const handleAbrirGoogleMaps = (o: OrdemServico) => {
+  const handleAbrirGoogleMaps = (o: OrdemServico, navigateMode: boolean = false) => {
     const cli = clientes.find(c => c.id === o.clienteId || c.nome.toLowerCase() === o.clienteNome.toLowerCase());
     const deCidade = cli?.cidade || o.cidade || 'Passos, MG';
     const origemCep = cli?.cep ? `, CEP ${cli.cep}` : '';
@@ -3782,7 +3784,10 @@ export default function App() {
     const destCidade = destCli?.cidade || deCidade;
     const destino = `${o.enderecoEntrega || ''}${destCep}, ${destCidade}`;
     
-    const url = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(origem)}&destination=${encodeURIComponent(destino)}`;
+    let url = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(origem)}&destination=${encodeURIComponent(destino)}&travelmode=driving`;
+    if (navigateMode) {
+      url += `&dir_action=navigate`;
+    }
     window.open(url, '_blank', 'noopener,noreferrer');
   };
 
@@ -6965,8 +6970,13 @@ export default function App() {
                         </div>
 
                         {/* Middle details description */}
-                        <div className="mt-2 text-xs text-slate-600 bg-slate-50/60 p-2.5 rounded-lg border border-slate-105 font-mono leading-relaxed">
-                          <strong>Itens Catalogados:</strong> {o.itensDescricao}
+                        <div className="mt-2 text-xs text-slate-600 bg-slate-50/60 p-2.5 rounded-lg border border-slate-105 font-mono leading-relaxed space-y-1">
+                          <div><strong>Itens Catalogados:</strong> {o.itensDescricao}</div>
+                          <div className="text-[11px] text-emerald-700 font-bold flex items-center gap-1">
+                            <span>🗺️ {o.distanciaKm ? `Distância Exata: ${o.distanciaKm.toFixed(2)} km (Google Maps)` : `Distância Est.: ${obterEstimativaTempoPercurso(o.quadrante).distanciaKm} km`}</span>
+                            <span className="text-slate-300">|</span>
+                            <span>⏱️ Rota Est.: ~{o.distanciaKm ? Math.round(o.distanciaKm * 1.5) : obterEstimativaTempoPercurso(o.quadrante).tempoMin} min</span>
+                          </div>
                         </div>
 
                         {/* Fees audit block */}
@@ -8806,9 +8816,21 @@ export default function App() {
                           </p>
                           <p>🎯 <strong>Ponto de Destino:</strong> <span className="text-orange-600 font-extrabold">{o.destinatarioNome || 'Oficina / Destinatário Final'}</span> • {o.enderecoEntrega || `Setor ${o.quadrante}`}</p>
                           
-                          <div className="p-1 px-2 border border-orange-200 bg-orange-50/40 rounded text-[10px] text-orange-700 w-fit flex items-center gap-1.5 mt-1">
-                            <span>🗺️ <strong>Logística de Percurso:</strong> Origem ➔ Destino • Rota Est.: ~{obterEstimativaTempoPercurso(o.quadrante).tempoMin} min • Distância: {obterEstimativaTempoPercurso(o.quadrante).distanciaKm} km</span>
-                          </div>
+                          {o.distanciaKm ? (
+                            <div className="p-1.5 px-3 border border-emerald-300 bg-emerald-50 text-emerald-800 rounded-lg text-[10px] sm:text-[11px] w-fit flex items-center gap-2 mt-2 font-mono font-bold shadow-sm animate-fade-in">
+                              <span className="flex h-2 w-2 relative shrink-0">
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                              </span>
+                              <span>
+                                🗺️ <strong>Logística Exata:</strong> Coleta ➔ Entrega • Est.: ~{Math.round(o.distanciaKm * 1.5)} min • Distância: <span className="underline font-black text-emerald-700">{o.distanciaKm.toFixed(2)} km (Google Maps 🗺️)</span>
+                              </span>
+                            </div>
+                          ) : (
+                            <div className="p-1 px-2 border border-orange-200 bg-orange-50/40 rounded text-[10px] text-orange-700 w-fit flex items-center gap-1.5 mt-1">
+                              <span>🗺️ <strong>Logística de Percurso:</strong> Origem ➔ Destino • Rota Est.: ~{obterEstimativaTempoPercurso(o.quadrante).tempoMin} min • Distância: {obterEstimativaTempoPercurso(o.quadrante).distanciaKm} km</span>
+                            </div>
+                          )}
                         </div>
                         
                         {o.retornoPeca && (
@@ -8833,11 +8855,19 @@ export default function App() {
                           <div className="flex flex-col gap-1.5 w-full">
                             <button
                               type="button"
-                              onClick={() => handleAbrirGoogleMaps(o)}
+                              onClick={() => handleAbrirGoogleMaps(o, false)}
                               className="bg-slate-900 hover:bg-slate-850 active:scale-95 text-white font-mono font-bold text-xs px-3 py-2 rounded-lg transition shadow cursor-pointer flex items-center gap-1.5 justify-center w-full grow font-black"
                             >
                               <Navigation className="w-3.5 h-3.5" />
                               Ver Rota (Google Maps) 🗺️
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleAbrirGoogleMaps(o, true)}
+                              className="bg-orange-600 hover:bg-orange-700 active:scale-95 text-white font-mono font-bold text-xs px-3 py-2 rounded-lg transition shadow cursor-pointer flex items-center gap-1.5 justify-center w-full grow font-black"
+                            >
+                              <Navigation className="w-3.5 h-3.5 animate-pulse" />
+                              Iniciar Trajeto (GPS Navegação) 🚀
                             </button>
                             <button
                               type="button"
@@ -9939,9 +9969,19 @@ export default function App() {
                         <div>🎯 <strong>Oficina de Entrega (Destino):</strong> {o.destinatarioNome || 'Oficina Credenciada'}</div>
                         <div>📍 <strong>Endereço de Destino:</strong> {o.enderecoEntrega}</div>
                         <div>🧭 <strong>Região / Quadrante Atribuído:</strong> Setor {o.quadrante}</div>
-                        <div className="text-[10px] text-orange-650 bg-orange-50 border border-orange-100 rounded px-1.5 py-0.5 mt-1.5 font-bold flex items-center gap-1 w-fit">
-                          <span>⏱️ Rota Est.: ~{obterEstimativaTempoPercurso(o.quadrante).tempoMin} min • 🛣️ Distância Coleta-Entrega: {obterEstimativaTempoPercurso(o.quadrante).distanciaKm} km</span>
-                        </div>
+                        {o.distanciaKm ? (
+                          <div className="text-[10px] text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-1.5 py-0.5 mt-1.5 font-bold flex items-center gap-1.5 w-fit">
+                            <span className="flex h-1.5 w-1.5 relative">
+                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                              <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
+                            </span>
+                            <span>⏱️ Rota Est.: ~{Math.round(o.distanciaKm * 1.5)} min • 🛣️ Distância Coleta-Entrega: <strong className="font-mono text-emerald-800">{o.distanciaKm.toFixed(2)} km (Exata via Google Maps 🗺️)</strong></span>
+                          </div>
+                        ) : (
+                          <div className="text-[10px] text-orange-650 bg-orange-50 border border-orange-100 rounded px-1.5 py-0.5 mt-1.5 font-bold flex items-center gap-1 w-fit">
+                            <span>⏱️ Rota Est.: ~{obterEstimativaTempoPercurso(o.quadrante).tempoMin} min • 🛣️ Distância Coleta-Entrega: {obterEstimativaTempoPercurso(o.quadrante).distanciaKm} km</span>
+                          </div>
+                        )}
                       </div>
 
                       {o.motoboyNome ? (
@@ -10579,7 +10619,7 @@ export default function App() {
                   type="button"
                   onClick={() => {
                     handleAtualizarStatusOrdem(orderToAcceptPrompt.id, 'Moto a Caminho');
-                    handleAbrirGoogleMaps(orderToAcceptPrompt);
+                    handleAbrirGoogleMaps(orderToAcceptPrompt, true);
                     if (rememberPreference) {
                       localStorage.setItem('torque_log_maps_pref', 'always_open');
                       setMapsPreference('always_open');
@@ -10588,8 +10628,25 @@ export default function App() {
                   }}
                   className="w-full bg-orange-600 hover:bg-orange-700 active:scale-98 text-white font-black text-xs py-3 rounded-xl transition duration-155 flex items-center justify-center gap-2 shadow-md shadow-orange-500/10 cursor-pointer text-center"
                 >
-                  <Navigation className="w-4 h-4 text-white" />
-                  Sim, Aceitar e Abrir Rota 🗺️
+                  <Navigation className="w-4 h-4 text-white animate-pulse" />
+                  Sim, Aceitar e Iniciar Trajeto GPS 🚀
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleAtualizarStatusOrdem(orderToAcceptPrompt.id, 'Moto a Caminho');
+                    handleAbrirGoogleMaps(orderToAcceptPrompt, false);
+                    if (rememberPreference) {
+                      localStorage.setItem('torque_log_maps_pref', 'always_open');
+                      setMapsPreference('always_open');
+                    }
+                    setOrderToAcceptPrompt(null);
+                  }}
+                  className="w-full bg-slate-900 hover:bg-slate-800 active:scale-98 text-white font-bold text-xs py-2.5 rounded-xl transition cursor-pointer text-center flex items-center justify-center gap-2"
+                >
+                  <Navigation className="w-3.5 h-3.5 text-white" />
+                  Sim, Aceitar e Apenas Ver Rota 🗺️
                 </button>
                 
                 <button
@@ -10602,7 +10659,7 @@ export default function App() {
                     }
                     setOrderToAcceptPrompt(null);
                   }}
-                  className="w-full bg-slate-900 hover:bg-slate-800 active:scale-98 text-white font-bold text-xs py-2.5 rounded-xl transition cursor-pointer text-center"
+                  className="w-full bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs py-2.5 rounded-xl transition cursor-pointer text-center"
                 >
                   Não, aceitar sem abrir mapa (Já sei o caminho) 👍
                 </button>

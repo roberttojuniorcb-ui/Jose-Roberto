@@ -71,6 +71,11 @@ export const syncOrdensToSupabase = async (ordens: OrdemServico[]): Promise<void
       grupo_rota_id: o.grupoRotaId || null,
       motivo_desmembramento: o.motivoDesmembramento || null,
       trava_cubagem_status: o.travaCubagemStatus || 'Liberado - Cabe no Baú',
+      distancia_km: o.distanciaKm !== undefined ? Number(o.distanciaKm) : null,
+      tipo_entrega: o.tipoEntrega || 'local',
+      tipo_entregador_pedido: o.tipoEntregadorPedido || 'freelancer',
+      fatura_parceira_paga: !!o.faturaParceiraPaga,
+      cidade: o.cidade || null,
       criado_em: o.criadoEm || new Date().toISOString()
     }));
 

@@ -208,6 +208,11 @@ export async function syncSingleOrdemToFirebase(o: any) {
       grupoRotaId: o.grupoRotaId || null,
       motivoDesmembramento: o.motivoDesmembramento || null,
       travaCubagemStatus: o.travaCubagemStatus || 'Liberado - Cabe no Baú',
+      distanciaKm: o.distanciaKm !== undefined ? Number(o.distanciaKm) : null,
+      tipoEntrega: o.tipoEntrega || 'local',
+      tipoEntregadorPedido: o.tipoEntregadorPedido || 'freelancer',
+      faturaParceiraPaga: !!o.faturaParceiraPaga,
+      cidade: o.cidade || null,
       criadoEm: o.criadoEm
     };
     await setDoc(docRef, payload, { merge: true });
@@ -340,6 +345,11 @@ export async function syncOrdensToFirebase(ordens: any[]) {
         grupoRotaId: o.grupoRotaId || null,
         motivoDesmembramento: o.motivoDesmembramento || null,
         travaCubagemStatus: o.travaCubagemStatus || 'Liberado - Cabe no Baú',
+        distanciaKm: o.distanciaKm !== undefined ? Number(o.distanciaKm) : null,
+        tipoEntrega: o.tipoEntrega || 'local',
+        tipoEntregadorPedido: o.tipoEntregadorPedido || 'freelancer',
+        faturaParceiraPaga: !!o.faturaParceiraPaga,
+        cidade: o.cidade || null,
         criadoEm: o.criadoEm
       };
       batch.set(docRef, payload, { merge: true });
