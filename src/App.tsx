@@ -9778,8 +9778,86 @@ export default function App() {
             </div>
           </div>
 
-          {/* Column B (lg:col-span-6) - Registered Motoboys */}
-          <div className="lg:col-span-6 bg-white rounded-xl shadow-sm border border-slate-200 p-5 flex flex-col justify-between" id="portal-cliente-motoboys">
+          {/* Column B (lg:col-span-6) - CUSTOMER'S OWN CLIENTS BASE DATABASE / SUB-CLIENTS */}
+          <div className="lg:col-span-6 bg-white rounded-xl shadow-sm border border-slate-200 p-5 flex flex-col justify-between" id="carteira-clientes-distribuidora">
+            <div>
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-slate-100 pb-3 mb-4">
+                <div>
+                  <h2 className="text-sm font-black text-slate-900 uppercase tracking-wider flex items-center gap-1.5 font-mono">
+                    <Briefcase className="w-4 h-4 text-orange-500" />
+                    Sua Carteira de Clientes
+                  </h2>
+                  <p className="text-xs text-slate-450 font-mono">Consulte, selecione para envio ou pré-registre novas oficinas parceiras em sua base persistente.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setClientNewClientNome('');
+                    setClientNewClientEndereco('');
+                    setClientNewClientQuadrante('A');
+                    setIsClientAddingNewClient(true);
+                  }}
+                  className="bg-orange-500 text-white font-mono text-xs font-bold py-1.5 px-3 rounded-lg hover:bg-orange-600 flex items-center gap-1 cursor-pointer transition shadow-xs self-stretch sm:self-auto text-center justify-center shrink-0"
+                >
+                  <Plus className="w-3.5 h-3.5 text-white" />
+                  Novo
+                </button>
+              </div>
+
+              {clientes.filter(c => c.criadoPorClienteId === activeClienteUser?.id).length === 0 ? (
+                <div className="text-center py-10 border border-dashed border-slate-200 rounded-xl space-y-2 bg-slate-50/50">
+                  <p className="text-xs text-slate-500 font-mono">Nenhum cliente/oficina destinatária cadastrada na sua base de dados ainda.</p>
+                  <p className="text-[10px] text-slate-450 font-mono">Use o botão acima ou o cadastro rápido no formulário de despacho para começar.</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[350px] overflow-y-auto pr-1">
+                  {clientes.filter(c => c.criadoPorClienteId === activeClienteUser?.id).map(c => (
+                    <div key={c.id} className="p-3 bg-slate-50 border border-slate-150 rounded-lg flex flex-col justify-between hover:border-orange-200 hover:bg-slate-50/60 transition duration-155">
+                      <div className="space-y-1">
+                        <div className="flex justify-between items-start gap-1">
+                          <span className="text-xs font-bold text-slate-900 font-mono truncate max-w-[120px] block">{c.nome}</span>
+                          <span className="text-[9px] font-mono bg-orange-100 text-orange-800 font-bold px-1.5 py-0.2 rounded shrink-0">
+                            Setor {c.quadrante}
+                          </span>
+                        </div>
+                        <span className="text-[9.5px] text-slate-400 font-mono block">Código: {c.id}</span>
+                        <p className="text-[10.5px] text-slate-650 font-mono leading-relaxed line-clamp-2">📍 {c.endereco}</p>
+                      </div>
+
+                      <div className="border-t border-slate-100 mt-3 pt-2.5 flex items-center justify-between gap-2">
+                        <span className="text-[9px] font-mono text-emerald-600 bg-emerald-50 px-1 py-0.5 rounded border border-emerald-100">
+                          ✓ Sincronizado
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setDestinoTipo('cliente');
+                            setDestinoClienteId(c.id);
+                            setDestinoQuadrante(c.quadrante);
+                            
+                            setSupabaseSuccessMsg(`🎯 "${c.nome}" selecionado com sucesso! Preencha a descrição de itens.`);
+                            setTimeout(() => setSupabaseSuccessMsg(''), 4500);
+
+                            // Scroll back smoothly to form focus
+                            const dispatchFormSec = document.getElementById("portal-cliente-form-solicitacao");
+                            if (dispatchFormSec) {
+                              dispatchFormSec.scrollIntoView({ behavior: 'smooth' });
+                            }
+                          }}
+                          className="bg-white hover:bg-orange-500 hover:text-white text-orange-600 border border-orange-200 hover:border-orange-500 text-[10px] font-bold font-mono py-1 px-2.5 rounded-md transition cursor-pointer shrink-0"
+                        >
+                          🚚 Selecionar
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Row 3 (lg:col-span-12) - Registered Motoboys */}
+          <div className="lg:col-span-12 bg-white rounded-xl shadow-sm border border-slate-200 p-5" id="portal-cliente-motoboys">
             <div>
               <div className="border-b border-slate-100 pb-3 mb-4">
                 <h2 className="text-sm font-black text-slate-900 uppercase tracking-wider flex items-center gap-2 font-mono">
@@ -9789,9 +9867,9 @@ export default function App() {
                 <p className="text-xs text-slate-450 font-mono">Clique no botão para seguir a rota de cada prestador em tempo real</p>
               </div>
 
-              <div className="space-y-3 max-h-[290px] overflow-y-auto pr-1">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 max-h-[350px] overflow-y-auto pr-1">
                 {filteredMotoboysForClient.length === 0 ? (
-                  <div className="p-8 text-center text-slate-400 italic font-mono text-xs border border-dashed border-slate-200 rounded-xl bg-slate-50">
+                  <div className="p-8 text-center text-slate-400 italic font-mono text-xs border border-dashed border-slate-200 rounded-xl bg-slate-50 col-span-full">
                     Nenhum entregador exclusivo cadastrado para a sua região ({activeClienteUser?.cidade || 'Sem Cidade'}).
                   </div>
                 ) : (
@@ -9842,82 +9920,6 @@ export default function App() {
             <div className="mt-4 p-2.5 bg-emerald-50 border border-emerald-150 rounded-xl text-[10px] font-mono text-emerald-850 leading-relaxed">
               ⭐ <strong>Acompanhamento:</strong> Motoboys que estiverem listados como <strong>Sua Entrega</strong> estão trazendo sua mercadoria! Use o botão "Rastrear" para abrir a rota exata no Google Maps.
             </div>
-          </div>
-
-          {/* Row 3 (lg:col-span-12) - CUSTOMER'S OWN CLIENTS BASE DATABASE / SUB-CLIENTS */}
-          <div className="lg:col-span-12 bg-white rounded-xl shadow-sm border border-slate-200 p-5" id="carteira-clientes-distribuidora">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-slate-100 pb-3 mb-4">
-              <div>
-                <h2 className="text-sm font-black text-slate-900 uppercase tracking-wider flex items-center gap-1.5 font-mono">
-                  <Briefcase className="w-4 h-4 text-orange-500" />
-                  Sua Carteira Privada de Clientes (Destinatários Cadastrados)
-                </h2>
-                <p className="text-xs text-slate-450 font-mono">Consulte, selecione para envio ou pré-registre novas oficinas parceiras em sua base persistente.</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setClientNewClientNome('');
-                  setClientNewClientEndereco('');
-                  setClientNewClientQuadrante('A');
-                  setIsClientAddingNewClient(true);
-                }}
-                className="bg-orange-500 text-white font-mono text-xs font-bold py-1.5 px-3 rounded-lg hover:bg-orange-600 flex items-center gap-1 cursor-pointer transition shadow-xs self-stretch sm:self-auto text-center justify-center"
-              >
-                <Plus className="w-3.5 h-3.5 text-white" />
-                Cadastrar Novo Cliente B2B (Oficina)
-              </button>
-            </div>
-
-            {clientes.filter(c => c.criadoPorClienteId === activeClienteUser?.id).length === 0 ? (
-              <div className="text-center py-10 border border-dashed border-slate-200 rounded-xl space-y-2 bg-slate-50/50">
-                <p className="text-xs text-slate-500 font-mono">Nenhum cliente/oficina destinatária cadastrada na sua base de dados ainda.</p>
-                <p className="text-[10px] text-slate-450 font-mono">Use o botão acima ou o cadastro rápido no formulário de despacho para começar.</p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                {clientes.filter(c => c.criadoPorClienteId === activeClienteUser?.id).map(c => (
-                  <div key={c.id} className="p-3 bg-slate-50 border border-slate-150 rounded-lg flex flex-col justify-between hover:border-orange-200 hover:bg-slate-50/60 transition duration-155">
-                    <div className="space-y-1">
-                      <div className="flex justify-between items-start gap-1">
-                        <span className="text-xs font-bold text-slate-900 font-mono truncate max-w-[180px] block">{c.nome}</span>
-                        <span className="text-[9px] font-mono bg-orange-100 text-orange-800 font-bold px-1.5 py-0.2 rounded shrink-0">
-                          Setor {c.quadrante}
-                        </span>
-                      </div>
-                      <span className="text-[9.5px] text-slate-400 font-mono block">Código: {c.id}</span>
-                      <p className="text-[10.5px] text-slate-650 font-mono leading-relaxed line-clamp-2">📍 {c.endereco}</p>
-                    </div>
-
-                    <div className="border-t border-slate-100 mt-3 pt-2.5 flex items-center justify-between gap-2">
-                      <span className="text-[9px] font-mono text-emerald-600 bg-emerald-50 px-1 py-0.5 rounded border border-emerald-100">
-                        ✓ Banco Sincronizado
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setDestinoTipo('cliente');
-                          setDestinoClienteId(c.id);
-                          setDestinoQuadrante(c.quadrante);
-                          
-                          setSupabaseSuccessMsg(`🎯 "${c.nome}" selecionado com sucesso! Preencha a descrição de itens.`);
-                          setTimeout(() => setSupabaseSuccessMsg(''), 4500);
-
-                          // Scroll back smoothly to form focus
-                          const dispatchFormSec = document.getElementById("portal-cliente-form-solicitacao");
-                          if (dispatchFormSec) {
-                            dispatchFormSec.scrollIntoView({ behavior: 'smooth' });
-                          }
-                        }}
-                        className="bg-white hover:bg-orange-500 hover:text-white text-orange-600 border border-orange-200 hover:border-orange-500 text-[10px] font-bold font-mono py-1 px-2.5 rounded-md transition cursor-pointer"
-                      >
-                        🚚 Selecionar p/ Entrega
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
           </div>
 
           {/* Row 2 (lg:col-span-12) - Real-time Order tracking list */}
