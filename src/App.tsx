@@ -530,7 +530,7 @@ export default function App() {
   }, [livroCaixaCombustivelTorquelog]);
 
   // --- STATES FOR EXCLUSION CONFIRMATION ---
-  const [deleteConfirmType, setDeleteConfirmType] = useState<'cliente' | 'motoboy' | 'multiple-clientes' | 'ordem' | 'representante' | 'desvincular-cliente' | null>(null);
+  const [deleteConfirmType, setDeleteConfirmType] = useState<'cliente' | 'motoboy' | 'multiple-clientes' | 'ordem' | 'devolver-ordem' | 'representante' | 'desvincular-cliente' | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [deleteConfirmName, setDeleteConfirmName] = useState<string>('');
   const [selectedClientIds, setSelectedClientIds] = useState<string[]>([]);
@@ -2776,6 +2776,15 @@ export default function App() {
     setDeleteConfirmName(`Ordem de Serviço ${ordemId} (${targetO.destinatarioNome || targetO.enderecoEntrega || 'Sem Oficina/Destino'})`);
   };
 
+  // Devolver/release accepted delivery order back to available list - Open confirmation modal
+  const handleDevolverOrdem = (ordemId: string) => {
+    const targetO = ordens.find(o => o.id === ordemId);
+    if (!targetO) return;
+    setDeleteConfirmType('devolver-ordem');
+    setDeleteConfirmId(ordemId);
+    setDeleteConfirmName(`Devolver a corrida ${ordemId} de ${targetO.clienteNome} para a fila`);
+  };
+
   // --- REPRESENTANTES MANAGEMENT EVENT HANDLERS ---
   const handleCriarRepresentante = (e: React.FormEvent) => {
     e.preventDefault();
@@ -3006,6 +3015,19 @@ export default function App() {
         }
 
         setSupabaseSuccessMsg(`❌ Entrega "${ordemId}" cancelada com sucesso!`);
+        setTimeout(() => setSupabaseSuccessMsg(''), 4000);
+      }
+    } else if (deleteConfirmType === 'devolver-ordem') {
+      const ordemId = deleteConfirmId;
+      const targetO = ordens.find(o => o.id === ordemId);
+      if (targetO) {
+        setOrdens(prev => prev.map(o => o.id === ordemId ? {
+          ...o,
+          status: 'Buscando Parceiro',
+          motoboyId: undefined,
+          motoboyNome: undefined
+        } : o));
+        setSupabaseSuccessMsg(`✅ Corrida devolvida para a fila com sucesso!`);
         setTimeout(() => setSupabaseSuccessMsg(''), 4000);
       }
     } else if (deleteConfirmType === 'representante') {
@@ -4556,16 +4578,21 @@ export default function App() {
         <div className="max-w-7xl mx-auto flex flex-col lg:flex-row justify-between items-center gap-4">
           
           <div className="flex flex-wrap items-center justify-between lg:justify-start w-full lg:w-auto gap-4">
-            <div className="flex items-center gap-4">
-              <div className="bg-slate-950 p-2.5 rounded-xl shadow-xl flex items-center justify-center border-2 border-orange-500 scale-105 hover:scale-110 transition duration-300" id="brand-logo">
-                <TorqueLogLogoIcon size={84} className="text-orange-500" variant="esportivo" />
+            <div className="flex items-center gap-2.5 sm:gap-4">
+              <div className="bg-slate-950 p-1.5 sm:p-2.5 rounded-xl shadow-xl flex items-center justify-center border-2 border-orange-500 transition duration-300 shrink-0" id="brand-logo">
+                <div className="block sm:hidden">
+                  <TorqueLogLogoIcon size={44} className="text-orange-500" variant="esportivo" />
+                </div>
+                <div className="hidden sm:block">
+                  <TorqueLogLogoIcon size={84} className="text-orange-500" variant="esportivo" />
+                </div>
               </div>
               <div>
-                <div className="flex items-baseline gap-2 flex-wrap">
-                  <span className="text-5xl font-black tracking-tighter font-mono text-orange-400 drop-shadow-md select-none uppercase">TorqueLog</span>
-                  <span className="text-[10px] bg-amber-500 text-slate-950 font-black px-2 py-0.5 rounded shadow-sm border border-amber-400 animate-pulse">LOGÍSTICA B2B EXPRESS</span>
+                <div className="flex items-baseline gap-1.5 sm:gap-2 flex-wrap">
+                  <span className="text-2xl sm:text-3xl md:text-5xl font-black tracking-tighter font-mono text-orange-400 drop-shadow-md select-none uppercase">TorqueLog</span>
+                  <span className="text-[8px] sm:text-[10px] bg-amber-500 text-slate-950 font-black px-1.5 sm:px-2 py-0.5 rounded shadow-sm border border-amber-400 animate-pulse font-sans uppercase tracking-wider">LOGÍSTICA B2B EXPRESS</span>
                 </div>
-                <p className="text-[10.5px] text-orange-100 font-mono tracking-widest font-extrabold uppercase mt-1">PLATAFORMA INTEGRADA DE DISTRIBUIÇÃO DE MERCADORIAS</p>
+                <p className="text-[8.5px] sm:text-[10.5px] text-orange-100 font-mono tracking-wider sm:tracking-widest font-extrabold uppercase mt-1">PLATAFORMA INTEGRADA DE DISTRIBUIÇÃO DE MERCADORIAS</p>
               </div>
             </div>
  
@@ -8816,7 +8843,7 @@ export default function App() {
 
                       </div>
 
-                      <div className="flex sm:flex-col items-stretch sm:items-end gap-2 shrink-0 w-full sm:w-auto border-t sm:border-t-0 pt-2 sm:pt-0 mt-1 sm:mt-0">
+                      <div className="flex flex-col items-stretch sm:items-end gap-2 shrink-0 w-full sm:w-auto border-t sm:border-t-0 pt-2 sm:pt-0 mt-1 sm:mt-0">
                         {o.status !== 'Moto a Caminho' ? (
                           <button
                             onClick={() => handleAceitarOuPerguntarOrdem(o)}
@@ -8853,13 +8880,15 @@ export default function App() {
                             </button>
                           </div>
                         )}
-                        <button
-                          type="button"
-                          onClick={() => handleCancelarOrdem(o.id)}
-                          className="bg-red-50 hover:bg-red-100 text-red-600 border border-red-100 font-mono text-[10px] font-bold py-1.5 px-2.5 rounded-lg active:scale-95 transition cursor-pointer w-full sm:w-auto text-center justify-center flex items-center gap-1"
-                        >
-                          ✕ Cancelar Entrega
-                        </button>
+                        {o.motoboyId && (
+                          <button
+                            type="button"
+                            onClick={() => handleDevolverOrdem(o.id)}
+                            className="bg-red-50 hover:bg-red-100 text-red-600 border border-red-100 font-mono text-[10px] font-bold py-1.5 px-2.5 rounded-lg active:scale-95 transition cursor-pointer w-full sm:w-auto text-center justify-center flex items-center gap-1"
+                          >
+                            ✕ Devolver Corrida
+                          </button>
+                        )}
                       </div>
                     </div>
                   ))
@@ -12758,13 +12787,15 @@ export default function App() {
                 <Trash2 className="w-6 h-6" />
               </div>
               <h3 className="text-sm font-bold text-slate-100 uppercase font-mono tracking-tight mb-2">
-                {deleteConfirmType === 'desvincular-cliente' ? 'Desvincular Indicação 💔' : deleteConfirmType === 'ordem' ? 'Cancelar Entrega ⚠️' : 'Confirmar Exclusão ⚠️'}
+                {deleteConfirmType === 'desvincular-cliente' ? 'Desvincular Indicação 💔' : deleteConfirmType === 'ordem' ? 'Cancelar Entrega ⚠️' : deleteConfirmType === 'devolver-ordem' ? 'Devolver Corrida 🏍️' : 'Confirmar Exclusão ⚠️'}
               </h3>
               <p className="text-xs text-slate-400 mb-6 font-sans text-center">
                 {deleteConfirmType === 'desvincular-cliente' ? (
                   <span>Deseja realmente desvincular as indicações e repasses futuros do parceiro:</span>
                 ) : deleteConfirmType === 'ordem' ? (
                   <span>Tem certeza de que deseja cancelar a entrega de código:</span>
+                ) : deleteConfirmType === 'devolver-ordem' ? (
+                  <span>Tem certeza que deseja devolver esta corrida para a fila de disponíveis? Outros motoboys poderão aceitá-la:</span>
                 ) : (
                   <span>Tem certeza que deseja excluir permanentemente o cadastro de:</span>
                 )}

@@ -89,7 +89,51 @@ async function startServer() {
     return { distanceKm, durationMin };
   };
 
-  // Proxy endpoint to calculate routes/distance via Google Maps API
+  // Helper to geocode an address using OpenStreetMap Nominatim
+  const geocodeAddressOSM = async (address: string): Promise<{ lon: number, lat: number } | null> => {
+    try {
+      const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(address)}&format=json&limit=1`;
+      const response = await fetch(url, {
+        headers: {
+          "User-Agent": "TorqueLogApp/1.0 (roberttojuniorcb@gmail.com)"
+        }
+      });
+      if (response.ok) {
+        const data: any = await response.json();
+        if (data && data[0]) {
+          return {
+            lon: parseFloat(data[0].lon),
+            lat: parseFloat(data[0].lat)
+          };
+        }
+      }
+    } catch (e: any) {
+      console.log(`[OSM Geocoding Info] Unable to geocode "${address}" via OSM:`, e.message || e);
+    }
+    return null;
+  };
+
+  // Helper to calculate routing via OpenStreetMap OSRM
+  const getOSRMRoute = async (originCoords: { lon: number, lat: number }, destCoords: { lon: number, lat: number }): Promise<{ distanceKm: number, durationMin: number } | null> => {
+    try {
+      const url = `https://router.project-osrm.org/route/v1/driving/${originCoords.lon},${originCoords.lat};${destCoords.lon},${destCoords.lat}?overview=false`;
+      const response = await fetch(url);
+      if (response.ok) {
+        const data: any = await response.json();
+        if (data && data.routes && data.routes[0]) {
+          const route = data.routes[0];
+          const distanceKm = route.distance / 1000;
+          const durationMin = Math.round(route.duration / 60);
+          return { distanceKm, durationMin };
+        }
+      }
+    } catch (e: any) {
+      console.log(`[OSM Routing Info] Unable to get route via OSRM:`, e.message || e);
+    }
+    return null;
+  };
+
+  // Proxy endpoint to calculate routes/distance via Google Maps API or OpenStreetMap (OSM)
   app.get("/api/maps/distance", async (req, res) => {
     const { origin, destination } = req.query;
 
@@ -103,15 +147,34 @@ async function startServer() {
     const apiKey = process.env.GOOGLE_MAPS_PLATFORM_KEY || process.env.VITE_GOOGLE_MAPS_PLATFORM_KEY || '';
     const isPlaceholder = !apiKey || apiKey.includes("YOUR_") || apiKey.length < 15;
 
+    // If Google API key is NOT valid, we try OpenStreetMap (OSM) FIRST
     if (isPlaceholder) {
+      console.log(`[Maps Proxy] Google API key not set or placeholder. Trying OpenStreetMap (OSM) alternative...`);
+      const originCoords = await geocodeAddressOSM(oStr);
+      const destCoords = await geocodeAddressOSM(dStr);
+
+      if (originCoords && destCoords) {
+        const route = await getOSRMRoute(originCoords, destCoords);
+        if (route) {
+          console.log(`[OSM System] Calculated distance from "${oStr}" to "${dStr}": ${route.distanceKm.toFixed(2)} km`);
+          return res.json({
+            status: "success",
+            distanceKm: route.distanceKm,
+            durationMin: route.durationMin,
+            systemUsed: "OpenStreetMap (OSM / OSRM)",
+            message: "Calculated successfully using OpenStreetMap."
+          });
+        }
+      }
+
       const fallback = getDeterministicDistance(oStr, dStr);
-      console.log(`[Maps Proxy] API key not set or placeholder. Returning deterministic fallback: ${fallback.distanceKm} km`);
+      console.log(`[Maps Proxy Fallback] OSM routing failed or unavailable. Returning deterministic fallback: ${fallback.distanceKm} km`);
       return res.json({
         status: "success",
         distanceKm: fallback.distanceKm,
         durationMin: fallback.durationMin,
         isFallback: true,
-        message: "Key not configured. Using deterministic fallback."
+        message: "Key not configured & OSM unavailable. Using deterministic fallback."
       });
     }
 
@@ -146,7 +209,8 @@ async function startServer() {
           return res.json({
             status: "success",
             distanceKm: km,
-            durationMin: Math.round(durationSeconds / 60)
+            durationMin: Math.round(durationSeconds / 60),
+            systemUsed: "Google Routes API v2"
           });
         }
       } else {
@@ -173,7 +237,8 @@ async function startServer() {
           return res.json({
             status: "success",
             distanceKm: km,
-            durationMin: Math.round(durationSeconds / 60)
+            durationMin: Math.round(durationSeconds / 60),
+            systemUsed: "Google Directions API"
           });
         } else {
           console.log(`[Directions API Info] Status: ${data.status || 'No Status'}`);
@@ -200,7 +265,8 @@ async function startServer() {
             return res.json({
               status: "success",
               distanceKm: km,
-              durationMin: Math.round(durationSeconds / 60)
+              durationMin: Math.round(durationSeconds / 60),
+              systemUsed: "Google Distance Matrix API"
             });
           }
         }
@@ -209,9 +275,28 @@ async function startServer() {
       console.log("[Distance Matrix Info] Skipping Distance Matrix attempt due to exception:", e.message || e);
     }
 
-    // 4. Default to elegant deterministic fallback if everything else failed (avoids 502/404 crashes)
+    // 4. Try OpenStreetMap (OSM) as a robust fallback if all Google APIs failed
+    console.log(`[Maps Proxy] All Google APIs failed. Trying OpenStreetMap (OSM) alternative...`);
+    const originCoords = await geocodeAddressOSM(oStr);
+    const destCoords = await geocodeAddressOSM(dStr);
+
+    if (originCoords && destCoords) {
+      const route = await getOSRMRoute(originCoords, destCoords);
+      if (route) {
+        console.log(`[OSM System] Calculated distance from "${oStr}" to "${dStr}": ${route.distanceKm.toFixed(2)} km`);
+        return res.json({
+          status: "success",
+          distanceKm: route.distanceKm,
+          durationMin: route.durationMin,
+          systemUsed: "OpenStreetMap (OSM / OSRM)",
+          message: "Calculated successfully using OpenStreetMap."
+        });
+      }
+    }
+
+    // 5. Default to elegant deterministic fallback if everything else failed
     const fallback = getDeterministicDistance(oStr, dStr);
-    console.log(`[Maps Proxy Fallback] All Google API endpoints failed. Returning deterministic fallback: ${fallback.distanceKm} km`);
+    console.log(`[Maps Proxy Fallback] All Google and OSM API endpoints failed. Returning deterministic fallback: ${fallback.distanceKm} km`);
     return res.json({
       status: "success",
       distanceKm: fallback.distanceKm,
