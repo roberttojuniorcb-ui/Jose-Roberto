@@ -9514,10 +9514,10 @@ export default function App() {
                       : obterEstimativaTempoPercurso(finalQuadrante).distanciaKm);
                 const cobrado = isInter 
                   ? (10.00 + (Number(pedidoDistanciaKm) * 2.50) + (Number(pedidoDistanciaKm) * 1.20))
-                  : 9.00; // Taxa fixa R$ 9.00
+                  : (activeClienteUser?.valorCobradoCliente ?? 9.00); // Taxa fixa acordada no cadastro
                 const repasse = isInter
                   ? (Number(pedidoDistanciaKm) * 2) // R$ 1.00 por KM total
-                  : (tipoEntregadorPedido === 'exclusivo' ? 4.50 : 6.00);
+                  : (activeClienteUser?.valorPagoMotoboy ?? (tipoEntregadorPedido === 'exclusivo' ? 4.50 : 6.00));
 
                 const novaOrdem: OrdemServico = {
                   id: novaOrdemId,
@@ -9940,62 +9940,6 @@ export default function App() {
                   )}
                 </div>
 
-                {/* LIVE GOOGLE MAPS ROUTE TELEMETRY - REQUISITO 3 */}
-                {!pedidoIntermunicipal && (destinoEndereco.trim() || destinoClienteId) && (
-                  <div className="bg-slate-900 text-slate-100 rounded-xl border border-slate-800 p-4 font-mono space-y-2.5 shadow-md shadow-orange-500/5 animate-fade-in">
-                    <div className="flex items-center justify-between">
-                      <span className="flex items-center gap-1.5 bg-emerald-500/15 text-emerald-400 border border-emerald-500/25 px-2 py-0.5 rounded text-[9px] uppercase font-black tracking-widest">
-                        <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-ping" />
-                        Google Maps Conectado
-                      </span>
-                      <span className="text-[8px] text-slate-450 uppercase">Roteamento em tempo real</span>
-                    </div>
-
-                    {googleMapsDistance.status === 'loading' ? (
-                      <div className="flex items-center justify-center py-2 gap-2 text-xs text-orange-400">
-                        <span className="animate-spin text-sm">🔄</span>
-                        <span>Traçando rotas rodoviárias de ida e volta...</span>
-                      </div>
-                    ) : (
-                      <div className="space-y-2">
-                        <div className="grid grid-cols-3 gap-2.5 text-center">
-                          <div className="bg-slate-950 p-2 rounded-lg border border-slate-850">
-                            <span className="block text-[8px] text-slate-400 uppercase font-black">Distância Ida</span>
-                            <span className="text-sm font-black font-mono text-slate-100">
-                              {googleMapsDistance.status === 'success' ? `${googleMapsDistance.ida} KM` : '---'}
-                            </span>
-                          </div>
-                          <div className="bg-slate-950 p-2 rounded-lg border border-slate-850">
-                            <span className="block text-[8px] text-slate-400 uppercase font-black">Distância Volta</span>
-                            <span className="text-sm font-black font-mono text-slate-100">
-                              {googleMapsDistance.status === 'success' ? `${googleMapsDistance.volta} KM` : '---'}
-                            </span>
-                          </div>
-                          <div className="bg-slate-950 p-2 rounded-lg border border-slate-850 bg-gradient-to-br from-slate-950 to-orange-950/20 border-orange-550/15">
-                            <span className="block text-[8px] text-orange-400 uppercase font-black">Rodagem Total</span>
-                            <span className="text-sm font-black font-mono text-orange-400">
-                              {googleMapsDistance.status === 'success' ? `${googleMapsDistance.total} KM` : '---'}
-                            </span>
-                          </div>
-                        </div>
-
-                        {googleMapsDistance.origemUsed && googleMapsDistance.destinoUsed && (
-                          <div className="text-[9px] text-slate-400 space-y-0.5 pt-1 border-t border-slate-850/80 leading-normal">
-                            <div className="truncate"><strong className="text-slate-300 font-bold">Origem:</strong> {googleMapsDistance.origemUsed}</div>
-                            <div className="truncate"><strong className="text-slate-300 font-bold">Destino:</strong> {googleMapsDistance.destinoUsed}</div>
-                          </div>
-                        )}
-
-                        {googleMapsDistance.errorMsg && (
-                          <div className="text-[9.5px] bg-amber-500/10 text-amber-300 p-2 rounded border border-amber-500/20 leading-normal">
-                            ⚠️ {googleMapsDistance.errorMsg}
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                )}
-
                 <div>
                   <label className="block text-xs font-bold text-slate-700 uppercase mb-2 font-mono">Preço do Despacho (Sua Fatura B2B)</label>
                   {pedidoIntermunicipal ? (
@@ -10014,7 +9958,7 @@ export default function App() {
                   ) : (
                     <div className="p-2.5 bg-slate-50 rounded-lg border border-slate-150 flex justify-between text-[11px] font-mono">
                       <span>💵 Taxa Fixa Urbana (Local):</span>
-                      <span className="font-extrabold text-slate-900">R$ 9.00 por envio</span>
+                      <span className="font-extrabold text-slate-900">R$ {(activeClienteUser?.valorCobradoCliente ?? 9.00).toFixed(2)} por envio</span>
                     </div>
                   )}
                 </div>
