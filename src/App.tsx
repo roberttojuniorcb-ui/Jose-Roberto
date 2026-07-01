@@ -1843,8 +1843,8 @@ export default function App() {
     let totalPago = 0;
     
     ordens.forEach(o => {
-      const cobradoVal = (o.valorCobradoCliente || 10.00) + (o.retornoPeca ? (o.taxaReversa || 15) : 0);
-      const pagoVal = (o.valorPagoMotoboy || 4.00) + (o.retornoPeca ? (o.taxaReversa || 15) : 0);
+      const cobradoVal = (o.valorCobradoCliente || 10.00) + (0);
+      const pagoVal = (o.valorPagoMotoboy || 4.00) + (0);
       totalCobrado += cobradoVal;
       totalPago += pagoVal;
     });
@@ -1949,7 +1949,7 @@ export default function App() {
 
         const isOToday = orderDateString === cleanToday;
         const isOThisMonth = orderMonth === cleanMonth && orderYear === cleanYear;
-        const fee = (o.valorCobradoCliente || 10.00) + (o.retornoPeca ? (o.taxaReversa || 15) : 0);
+        const fee = (o.valorCobradoCliente || 10.00) + (0);
 
         if (isOThisMonth && o.status === 'Entregue') {
           mesCount++;
@@ -2016,7 +2016,7 @@ export default function App() {
 
         const isOToday = orderDateString === cleanToday;
         const isOThisMonth = orderMonth === cleanMonth && orderYear === cleanYear;
-        const fee = (o.valorCobradoCliente || 10.00) + (o.retornoPeca ? (o.taxaReversa || 15) : 0);
+        const fee = (o.valorCobradoCliente || 10.00) + (0);
 
         if (o.status === 'Entregue') {
           if (isOThisMonth) {
@@ -2102,9 +2102,9 @@ export default function App() {
     let count = 0;
     selectedDayOrders.forEach(o => {
       if (o.status === 'Entregue') {
-        const fee = (o.valorCobradoCliente || 10.00) + (o.retornoPeca ? (o.taxaReversa || 15) : 0);
+        const fee = (o.valorCobradoCliente || 10.00) + (0);
         billing += fee;
-        const rep = (o.valorPagoMotoboy || 4.00) + (o.retornoPeca ? (o.taxaReversa || 15) : 0);
+        const rep = (o.valorPagoMotoboy || 4.00) + (0);
         repasse += rep;
         count++;
       }
@@ -2140,13 +2140,13 @@ export default function App() {
       let monthlyBilling = 0;
       let monthlyRepasse = 0;
       completedOrdersThisMonth.forEach(o => {
-        monthlyBilling += (o.valorCobradoCliente || 10.00) + (o.retornoPeca ? (o.taxaReversa || 15) : 0);
-        monthlyRepasse += (o.valorPagoMotoboy || 4.00) + (o.retornoPeca ? (o.taxaReversa || 15) : 0);
+        monthlyBilling += (o.valorCobradoCliente || 10.00) + (0);
+        monthlyRepasse += (o.valorPagoMotoboy || 4.00) + (0);
       });
 
       let dailyBilling = 0;
       completedOrdersThisDay.forEach(o => {
-        dailyBilling += (o.valorCobradoCliente || 10.00) + (o.retornoPeca ? (o.taxaReversa || 15) : 0);
+        dailyBilling += (o.valorCobradoCliente || 10.00) + (0);
       });
 
       const monthlyMargin = monthlyBilling - monthlyRepasse;
@@ -3758,10 +3758,10 @@ export default function App() {
     selectedDayOrders.forEach((o, index) => {
       const isDelivered = o.status === 'Entregue';
       const statusLabel = isDelivered ? '✓ ENTREGUE' : `• STATUS: ${o.status.toUpperCase()}`;
-      const value = (o.valorCobradoCliente || 10.00) + (o.retornoPeca ? (o.taxaReversa || 15) : 0);
+      const value = (o.valorCobradoCliente || 10.00) + (0);
       report += `${index + 1}. [${o.id}] - ${o.clienteNome}\n`;
       report += `   - Itens: ${o.itensDescricao}\n`;
-      report += `   - Valor B2B: R$ ${value.toFixed(2)} | Repasse: R$ ${((o.valorPagoMotoboy || 4.00) + (o.retornoPeca ? (o.taxaReversa || 15) : 0)).toFixed(2)}\n`;
+      report += `   - Valor B2B: R$ ${value.toFixed(2)} | Repasse: R$ ${((o.valorPagoMotoboy || 4.00) + (0)).toFixed(2)}\n`;
       report += `   - ${statusLabel}\n\n`;
     });
     
@@ -5948,7 +5948,7 @@ export default function App() {
               </div>
 
               {/* REVERSE LOGISTICS OPTION */}
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-slate-50 border border-slate-200 p-3 rounded-lg">
+              <div className="bg-slate-50 border border-slate-200 p-3 rounded-lg">
                 <div className="flex items-start gap-2.5">
                   <input
                     type="checkbox"
@@ -5966,21 +5966,6 @@ export default function App() {
                     </span>
                   </div>
                 </div>
-
-                {retornoPeca && (
-                  <div className="flex items-center gap-1.5 self-end sm:self-auto font-mono text-xs text-slate-700 bg-white border border-slate-200 px-2 py-1 rounded">
-                    <Coins className="w-3.5 h-3.5 text-orange-500" />
-                    <span>Taxa Reversa: </span>
-                    <input
-                      type="number"
-                      step="0.5"
-                      min="5"
-                      value={taxaReversaParam}
-                      onChange={(e) => setTaxaReversaParam(parseFloat(e.target.value) || 15)}
-                      className="w-16 bg-slate-50 py-0.5 px-1 border border-slate-200 rounded text-center text-xs font-bold font-mono focus:ring-1 focus:ring-orange-500 text-slate-800"
-                    />
-                  </div>
-                )}
               </div>
 
               {/* ACTION BTN SUBMIT */}
@@ -6759,7 +6744,7 @@ export default function App() {
                         <div className="text-right shrink-0">
                           <span className="text-[10px] text-slate-400 block font-mono">Repasse ao Motoboy</span>
                           <span className="text-sm font-extrabold text-orange-600 font-mono">
-                            R$ {((o.valorPagoMotoboy || 4.00) + (o.retornoPeca ? (o.taxaReversa || 15) : 0)).toFixed(2)}
+                            R$ {(o.valorPagoMotoboy || 4.00).toFixed(2)}
                           </span>
                           <span className="text-[8px] text-slate-400 block font-mono">(Fixo da distribuidora)</span>
                         </div>
@@ -6772,7 +6757,7 @@ export default function App() {
                         </div>
                         {o.retornoPeca && (
                           <div className="text-orange-600 font-bold flex items-center gap-1">
-                            <span>🔄 Rota reversa inclusa para Distribuidora (+ R$ {o.taxaReversa?.toFixed(2)})</span>
+                            <span>🔄 Rota reversa inclusa para Distribuidora</span>
                           </div>
                         )}
                         {o.motivoDesmembramento && (
@@ -7220,8 +7205,8 @@ export default function App() {
                     const isDelivered = o.status === 'Entregue';
                     const hasReverse = o.retornoPeca === true;
                     
-                    const fee = (o.valorCobradoCliente || 10.00) + (o.retornoPeca ? (o.taxaReversa || 15) : 0);
-                    const rep = (o.valorPagoMotoboy || 4.00) + (o.retornoPeca ? (o.taxaReversa || 15) : 0);
+                    const fee = (o.valorCobradoCliente || 10.00) + (0);
+                    const rep = (o.valorPagoMotoboy || 4.00) + (0);
                     const net = fee - rep;
 
                     // Compute clean status pills colors
@@ -7833,10 +7818,10 @@ export default function App() {
                 Área de Tarifação
               </span>
               <h2 className="text-xl font-extrabold font-sans tracking-tight">
-                ⚙️ Configuração de Taxas, Tarifas e Repasses
+                ⚙️ Configuração de Taxas e Tarifas
               </h2>
               <p className="text-xs text-slate-300 mt-1 font-mono">
-                Ajuste os valores operacionais padrão para representantes comerciais, revendas e lógica reversa em tempo real.
+                Ajuste os valores operacionais padrão para representantes comerciais e revendas em tempo real.
               </p>
             </div>
             
@@ -7894,44 +7879,7 @@ export default function App() {
               </div>
             </div>
 
-            {/* Configuração da Taxa Reversa */}
-            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 w-full">
-              <div className="flex items-center gap-2 mb-4 pb-2 border-b border-slate-100">
-                <Activity className="w-5 h-5 text-indigo-600" />
-                <h3 className="text-sm font-bold text-slate-900 uppercase font-mono tracking-tight">Taxa Reversa Padrão</h3>
-              </div>
 
-              <div className="space-y-4 font-mono text-xs">
-                <p className="text-slate-600 leading-relaxed">
-                  Defina o valor cobrado por faturamento de logística reversa (retorno de peças) padrão.
-                </p>
-
-                <div className="bg-slate-50 border border-slate-150 rounded-xl p-4 flex items-center justify-between gap-4">
-                  <div>
-                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wide mb-1">
-                      Valor Unitário (R$)
-                    </label>
-                    <span className="text-[9px] text-slate-400 block mb-2 leading-none">Ajuste o valor no campo ao lado</span>
-                    <strong className="text-2xl font-black text-slate-900 tracking-tight">
-                      R$ {taxaReversaParam.toFixed(2)}
-                    </strong>
-                  </div>
-                  <div className="w-32">
-                    <input
-                      type="number"
-                      step="0.5"
-                      min="0.00"
-                      value={taxaReversaParam}
-                      onChange={(e) => {
-                        const val = parseFloat(e.target.value);
-                        setTaxaReversaParam(isNaN(val) ? 0 : val);
-                      }}
-                      className="w-full bg-white text-slate-900 border border-slate-300 font-bold p-2.5 rounded-lg text-center font-mono text-xs focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none"
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
           </div>
 
           {/* Right Column: Dynamic Realtime Impact Preview */}
@@ -9092,7 +9040,7 @@ export default function App() {
                           
                           {/* Dynamic payout rates on each run card */}
                           <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 border border-emerald-200/60 px-2 py-0.5 rounded text-[10px] font-bold font-mono">
-                            💰 Ganho: R$ {((obterValorRepasseOperacional(o)) + (o.retornoPeca ? (o.taxaReversa || 15.00) : 0)).toFixed(2)}
+                            💰 Ganho: R$ {((obterValorRepasseOperacional(o)) + (0)).toFixed(2)}
                             {isExclusiveNow && activeMotoboyUser?.empresaExclusiva && (o.clienteNome.toLowerCase() === activeMotoboyUser.empresaExclusiva.toLowerCase() || o.clienteId === activeMotoboyUser.empresaExclusiva) ? (
                               <span className="text-[8px] text-emerald-600/90 font-normal font-sans ml-0.5">(Fixo Exclusividade)</span>
                             ) : (
@@ -9220,7 +9168,7 @@ export default function App() {
                       </div>
                       <div className="text-right shrink-0">
                         <span className="text-emerald-700 font-bold font-mono">
-                          + R$ {((o.valorPagoMotoboy || 4.00) + (o.retornoPeca ? (o.taxaReversa || 15) : 0)).toFixed(2)}
+                          + R$ {((o.valorPagoMotoboy || 4.00) + (0)).toFixed(2)}
                         </span>
                       </div>
                     </div>
@@ -10395,7 +10343,7 @@ export default function App() {
                     <div className="flex justify-between items-center py-1 bg-amber-50 px-2 rounded border border-amber-100">
                       <span className="font-bold text-amber-800 font-mono">🏍️ VALOR DO FRETE (REPASSE ACORDADO):</span>
                       <span className="font-extrabold text-amber-955 text-xs font-mono">
-                        R$ {((activeSignOrder.valorPagoMotoboy || 4.00) + (activeSignOrder.retornoPeca ? (activeSignOrder.taxaReversa || 15) : 0)).toFixed(2)}
+                        R$ {((activeSignOrder.valorPagoMotoboy || 4.00) + (0)).toFixed(2)}
                       </span>
                     </div>
                   ) : effectiveRole === 'Cliente' ? (
@@ -10403,7 +10351,7 @@ export default function App() {
                     <div className="flex justify-between items-center py-1 bg-emerald-50 px-2 rounded border border-emerald-100">
                       <span className="font-bold text-emerald-800 font-mono">💵 VALOR DO ENVIO (FABRIL B2B):</span>
                       <span className="font-extrabold text-emerald-955 text-xs font-mono">
-                        R$ {((activeSignOrder.valorCobradoCliente || 10.00) + (activeSignOrder.retornoPeca ? (activeSignOrder.taxaReversa || 15) : 0)).toFixed(2)}
+                        R$ {((activeSignOrder.valorCobradoCliente || 10.00) + (0)).toFixed(2)}
                       </span>
                     </div>
                   ) : (
@@ -10411,11 +10359,11 @@ export default function App() {
                     <>
                       <div className="flex justify-between">
                         <span>💵 Cobrança Cliente B2B:</span>
-                        <span className="font-bold text-slate-800">R$ {((activeSignOrder.valorCobradoCliente || 10.00) + (activeSignOrder.retornoPeca ? (activeSignOrder.taxaReversa || 15) : 0)).toFixed(2)}</span>
+                        <span className="font-bold text-slate-800">R$ {((activeSignOrder.valorCobradoCliente || 10.00) + (0)).toFixed(2)}</span>
                       </div>
                       <div className="flex justify-between">
                         <span>🏍️ Repasse ao Motoboy:</span>
-                        <span className="font-bold text-rose-600">R$ {((activeSignOrder.valorPagoMotoboy || 4.00) + (activeSignOrder.retornoPeca ? (activeSignOrder.taxaReversa || 15) : 0)).toFixed(2)}</span>
+                        <span className="font-bold text-rose-600">R$ {((activeSignOrder.valorPagoMotoboy || 4.00) + (0)).toFixed(2)}</span>
                       </div>
                       <div className="flex justify-between font-bold text-emerald-600 border-t border-dashed border-slate-200 mt-1 pt-1">
                         <span>⚡ Lucro Líquido TorqueLog:</span>
@@ -10993,7 +10941,7 @@ export default function App() {
             text += `----------------------------------------------------\n`;
             text += `RELAÇÃO DETALHADA DE ORDENS DE SERVIÇO (OS):\n`;
             closingOrdersList.forEach((ord, index) => {
-              const val = (ord.valorCobradoCliente || 10.00) + (ord.retornoPeca ? (ord.taxaReversa || 15) : 0);
+              const val = (ord.valorCobradoCliente || 10.00) + (0);
               text += `${index + 1}. OS ID: ${ord.id} | Data: ${new Date(ord.criadoEm).toLocaleDateString()} | Oficina: ${ord.destinatarioNome || 'Prefeitura / Balcão'} | Valor: R$ ${val.toFixed(2)}${ord.retornoPeca ? ' (Reversa inclusa)' : ''}\n`;
             });
             text += `----------------------------------------------------\n`;
@@ -11057,7 +11005,7 @@ export default function App() {
                       </div>
                     ) : (
                       closingOrdersList.map((ord, idx) => {
-                        const val = (ord.valorCobradoCliente || 10.00) + (ord.retornoPeca ? (ord.taxaReversa || 15) : 0);
+                        const val = (ord.valorCobradoCliente || 10.00) + (0);
                         return (
                           <div key={ord.id} className="p-2 flex justify-between items-center bg-white hover:bg-slate-50 transition-colors">
                             <div className="space-y-0.5">
@@ -11102,7 +11050,7 @@ export default function App() {
                         text += `----------------------------------------------------\n`;
                         text += `RELAÇÃO DETALHADA DE ORDENS DE SERVIÇO (OS):\n`;
                         closingOrdersList.slice(0, 40).forEach((ord, index) => {
-                          const val = (ord.valorCobradoCliente || 10.00) + (ord.retornoPeca ? (ord.taxaReversa || 15) : 0);
+                          const val = (ord.valorCobradoCliente || 10.00) + (0);
                           text += `${index + 1}. OS ID: ${ord.id} | Data: ${new Date(ord.criadoEm).toLocaleDateString()} | Oficina: ${ord.destinatarioNome || 'Prefeitura / Balcão'} | Valor: R$ ${val.toFixed(2)}${ord.retornoPeca ? ' (Reversa inclusa)' : ''}\n`;
                         });
                         if (closingOrdersList.length > 40) {
@@ -11223,8 +11171,8 @@ export default function App() {
                         let billed = 0;
                         let owed = 0;
                         list.forEach(o => {
-                          billed += (o.valorCobradoCliente || 10.00) + (o.retornoPeca ? (o.taxaReversa || 15.00) : 0);
-                          owed += (o.valorPagoMotoboy || 4.00) + (o.retornoPeca ? (o.taxaReversa || 15.00) : 0);
+                          billed += (o.valorCobradoCliente || 10.00) + (0);
+                          owed += (o.valorPagoMotoboy || 4.00) + (0);
                         });
                         const count = list.length;
                         const profit = billed - owed;
@@ -11253,8 +11201,8 @@ export default function App() {
 
                         let orderBreakdown = list.slice(0, 40).map(o => {
                           const val = reportRole === 'Cliente' 
-                            ? ((o.valorCobradoCliente || 10.00) + (o.retornoPeca ? (o.taxaReversa || 15.00) : 0))
-                            : ((o.valorPagoMotoboy || 4.00) + (o.retornoPeca ? (o.taxaReversa || 15.00) : 0));
+                            ? ((o.valorCobradoCliente || 10.00) + (0))
+                            : ((o.valorPagoMotoboy || 4.00) + (0));
                           return `✅ OS #${o.id} | ${new Date(o.criadoEm).toLocaleDateString('pt-BR')} | ${o.clienteNome.slice(0, 15)} | R$ ${val.toFixed(2)}`;
                         }).join('\n');
 
@@ -11387,8 +11335,8 @@ export default function App() {
                 let totalOwedToMotoboys = 0;
 
                 filteredOrders.forEach(o => {
-                  totalBilledToClients += (o.valorCobradoCliente || 10.00) + (o.retornoPeca ? (o.taxaReversa || 15.00) : 0);
-                  totalOwedToMotoboys += (o.valorPagoMotoboy || 4.00) + (o.retornoPeca ? (o.taxaReversa || 15.00) : 0);
+                  totalBilledToClients += (o.valorCobradoCliente || 10.00) + (0);
+                  totalOwedToMotoboys += (o.valorPagoMotoboy || 4.00) + (0);
                 });
 
                 const totalProfit = totalBilledToClients - totalOwedToMotoboys;
@@ -11485,8 +11433,8 @@ export default function App() {
                               </tr>
                             ) : (
                               filteredOrders.map(o => {
-                                const b2bVal = (o.valorCobradoCliente || 10.00) + (o.retornoPeca ? (o.taxaReversa || 15.00) : 0);
-                                const mbVal = (o.valorPagoMotoboy || 4.00) + (o.retornoPeca ? (o.taxaReversa || 15.00) : 0);
+                                const b2bVal = (o.valorCobradoCliente || 10.00) + (0);
+                                const mbVal = (o.valorPagoMotoboy || 4.00) + (0);
                                 return (
                                   <tr key={o.id} className="hover:bg-slate-50">
                                     <td className="p-3 font-bold text-slate-900">{o.id}</td>

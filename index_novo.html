@@ -4,6 +4,25 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>TorqueLog - Inteligência Logística para Autopeças</title>
+  <script>
+    (function() {
+      try {
+        var _fetch = window.fetch;
+        Object.defineProperty(window, 'fetch', {
+          get: function() {
+            return _fetch;
+          },
+          set: function(newFetch) {
+            _fetch = newFetch;
+          },
+          configurable: true,
+          enumerable: true
+        });
+      } catch (e) {
+        console.warn("Could not patch window.fetch:", e);
+      }
+    })();
+  </script>
   
   <!-- Font Families -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
