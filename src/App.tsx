@@ -643,6 +643,8 @@ export default function App() {
     return safeGetLocalStorage('torque_log_maps_pref', 'always_ask') as 'always_ask' | 'always_open' | 'always_skip_maps';
   });
   const [rememberPreference, setRememberPreference] = useState<boolean>(false);
+  const [showLandingPage, setShowLandingPage] = useState<boolean>(true);
+  const [showDriverProposalModal, setShowDriverProposalModal] = useState<boolean>(false);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -3984,26 +3986,318 @@ export default function App() {
   return (
     <>
       {!activeSessionRole ? (
-        <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-between p-4 sm:p-6 md:p-8 font-sans selection:bg-orange-500 selection:text-white relative overflow-hidden" id="login-screen">
-        
-        {/* Abstract background ambient aura */}
-        <div className="absolute top-[-20%] left-[-10%] w-[500px] h-[500px] rounded-full bg-orange-600/10 blur-[130px] pointer-events-none" />
-        {/* Top header branding */}
-        <header className="max-w-4xl w-full mx-auto flex flex-col md:flex-row justify-between items-center gap-4 py-6 border-b border-slate-900">
-          <div className="flex items-center gap-4">
-            <div className="bg-slate-950/90 p-3 rounded-xl border-2 border-orange-500 flex items-center justify-center shadow-xl shadow-orange-500/10 shrink-0 scale-105 transition-all duration-300 hover:scale-110">
-              <TorqueLogLogoIcon size={80} className="text-orange-500" variant="esportivo" />
-            </div>
-            <div>
-              <div className="flex items-center gap-3 select-none" translate="no">
-                <span className="text-[46px] font-black tracking-tighter font-mono text-orange-400 drop-shadow-md notranslate">TorqueLog</span>
-                <span className="text-[10px] bg-slate-900 border border-orange-500/30 text-orange-400 px-2.5 py-0.5 rounded font-black font-mono animate-pulse">B2B PORTAL</span>
+        showLandingPage ? (
+          <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-between p-4 sm:p-6 md:p-8 font-sans selection:bg-orange-500 selection:text-white relative overflow-hidden" id="landing-page-conversion">
+            {/* Background effects */}
+            <div className="absolute top-[-20%] left-[-10%] w-[600px] h-[600px] rounded-full bg-orange-600/10 blur-[130px] pointer-events-none" />
+            <div className="absolute bottom-[-20%] right-[-10%] w-[600px] h-[600px] rounded-full bg-amber-500/10 blur-[130px] pointer-events-none" />
+
+            {/* Header */}
+            <header className="max-w-6xl w-full mx-auto flex flex-col md:flex-row justify-between items-center gap-4 py-6 border-b border-slate-900 z-10 relative">
+              <div className="flex items-center gap-4">
+                <div className="bg-slate-950/90 p-3 rounded-xl border-2 border-orange-500 flex items-center justify-center shadow-xl shadow-orange-500/10 shrink-0">
+                  <TorqueLogLogoIcon size={64} className="text-orange-500" variant="esportivo" />
+                </div>
+                <div>
+                  <div className="flex items-baseline gap-2 select-none" translate="no">
+                    <span className="text-3xl sm:text-4xl font-black tracking-tighter font-mono text-orange-400 drop-shadow-md">TorqueLog</span>
+                    <span className="text-[9px] bg-slate-900 border border-orange-500/30 text-orange-400 px-2.5 py-0.5 rounded font-black font-mono animate-pulse">B2B EXPRESS</span>
+                  </div>
+                  <p className="text-[10px] text-slate-400 font-mono tracking-wider uppercase mt-1">PLATAFORMA INTEGRADA DE DISTRIBUIÇÃO DE MERCADORIAS</p>
+                </div>
               </div>
-              <p className="text-[10.5px] text-slate-400 font-mono tracking-wider uppercase mt-1">PLATAFORMA INTEGRADA DE DISTRIBUIÇÃO DE MERCADORIAS</p>
-            </div>
+              <button
+                type="button"
+                onClick={() => setShowLandingPage(false)}
+                className="bg-slate-900 hover:bg-slate-800 text-orange-400 hover:text-orange-300 border border-slate-800 hover:border-orange-500/50 font-mono font-bold text-xs py-2 px-4 rounded-xl transition duration-150 flex items-center gap-2 shadow-md cursor-pointer z-20 shrink-0 uppercase tracking-wide"
+              >
+                🔑 Portal de Login B2B →
+              </button>
+            </header>
+
+            {/* Main Content */}
+            <main className="max-w-6xl w-full mx-auto my-auto py-8 sm:py-12 grid grid-cols-1 md:grid-cols-2 gap-8 z-10 relative">
+              
+              {/* Option A: For Drivers */}
+              <div className="bg-slate-900/60 backdrop-blur-md rounded-2xl border border-slate-800 shadow-2xl p-6 sm:p-8 flex flex-col justify-between relative overflow-hidden group hover:border-orange-500/30 transition duration-300">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-orange-500/5 rounded-full blur-2xl pointer-events-none group-hover:bg-orange-500/10 transition-all duration-300"></div>
+                <div>
+                  <div className="flex items-center gap-3 mb-6">
+                    <div className="w-12 h-12 rounded-xl bg-orange-500/10 flex items-center justify-center border border-orange-500/20 text-orange-400 text-2xl shadow-sm">
+                      🏍️
+                    </div>
+                    <span className="text-xs font-bold font-mono tracking-widest text-orange-400 uppercase bg-orange-500/10 px-2.5 py-1 rounded">Para Entregadores</span>
+                  </div>
+                  
+                  <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight leading-snug mb-4 font-sans">
+                    Quer ser dono do seu próprio negócio e ganhar mais?
+                  </h2>
+                  
+                  <p className="text-sm text-slate-350 font-mono leading-relaxed">
+                    Deixe de ser CLT tradicional e comece a faturar muito mais como <strong className="text-orange-400">empreendedor parceiro MEI</strong> da TorqueLog! 
+                    <br /><br />
+                    Você poderá continuar prestando serviços de transporte e coletas para a mesma loja que já atende hoje em sua região, mas agora faturando mais, tendo total liberdade de horários, menos impostos retidos e total autonomia profissional. O aplicativo TorqueLog roteiriza todas as suas entregas de forma inteligente para que você ganhe tempo e dinheiro.
+                  </p>
+                </div>
+                
+                <div className="mt-8 border-t border-slate-800/60 pt-6 flex flex-col sm:flex-row gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowDriverProposalModal(true)}
+                    className="flex-1 bg-orange-500 hover:bg-orange-600 hover:scale-[1.01] active:scale-[0.99] text-white font-mono font-black text-xs py-3.5 px-4 rounded-xl transition duration-150 flex items-center justify-center gap-2 shadow-lg shadow-orange-500/15 cursor-pointer text-center uppercase tracking-wider"
+                  >
+                    🚀 Conhecer Proposta e Ganhos
+                  </button>
+                  <a
+                    href="https://api.whatsapp.com/send?phone=5519984427748&text=Olá!%20Quero%20me%20tornar%20um%20entregador%20TorqueLog%20e%20saber%20mais%20sobre%20como%20trabalhar%20como%20MEI."
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex-1 bg-slate-900 hover:bg-slate-800 border border-slate-750 hover:border-orange-500/50 text-slate-300 hover:text-white font-mono font-bold text-xs py-3.5 px-4 rounded-xl transition duration-150 flex items-center justify-center gap-2 cursor-pointer text-center uppercase tracking-wide"
+                  >
+                    <svg className="w-4 h-4 fill-current shrink-0 text-emerald-500" viewBox="0 0 24 24" referrerPolicy="no-referrer">
+                      <path d="M12.031 6.172c-2.02 0-3.659 1.635-3.659 3.659 0 .614.152 1.209.444 1.74l-.472 1.72 1.764-.46a3.618 3.618 0 0 0 1.923.541c2.019 0 3.66-1.636 3.66-3.66 0-2.022-1.64-3.66-3.66-3.66zm1.905 5.155c-.078.22-.44.426-.644.453-.203.027-.457.042-.741-.051a2.822 2.822 0 0 1-1.127-.723 3.123 3.123 0 0 1-.774-1.22c-.156-.37-.024-.572.073-.674.098-.102.219-.254.329-.381.11-.127.147-.212.22-.352.073-.14.037-.263-.018-.37-.056-.107-.491-1.185-.674-1.62-.178-.426-.358-.369-.492-.375-.123-.005-.264-.006-.405-.006a.78.78 0 0 0-.563.262c-.195.214-.741.724-.741 1.763 0 1.04.757 2.046.862 2.188.106.14 1.491 2.278 3.611 3.193.504.218.898.348 1.206.446.505.161.966.138 1.33.084.406-.06.126-.412.247-.412a1.008 1.008 0 0 0 .7.493c.241.05.485.074.726.074.458 0 .895-.083 1.298-.246zM12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm.019 21.72c-1.83 0-3.623-.483-5.203-1.397l-.373-.222-3.867 1.013 1.03-3.768-.243-.387A9.673 9.673 0 0 1 2.28 12c0-5.352 4.36-9.712 9.72-9.712 5.353 0 9.712 4.36 9.712 9.712 0 5.353-4.36 9.72-9.712 9.72z" />
+                    </svg>
+                    Falar no WhatsApp
+                  </a>
+                </div>
+              </div>
+
+              {/* Option B: For Partner Companies */}
+              <div className="bg-slate-900/60 backdrop-blur-md rounded-2xl border border-slate-800 shadow-2xl p-6 sm:p-8 flex flex-col justify-between relative overflow-hidden group hover:border-emerald-500/30 transition duration-300">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 rounded-full blur-2xl pointer-events-none group-hover:bg-emerald-500/10 transition-all duration-300"></div>
+                <div>
+                  <div className="flex items-center gap-3 mb-6">
+                    <div className="w-12 h-12 rounded-xl bg-emerald-500/10 flex items-center justify-center border border-emerald-500/20 text-emerald-400 text-2xl shadow-sm">
+                      🏢
+                    </div>
+                    <span className="text-xs font-bold font-mono tracking-widest text-emerald-400 uppercase bg-emerald-500/10 px-2.5 py-1 rounded">Para Lojas de Autopeças</span>
+                  </div>
+                  
+                  <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight leading-snug mb-4 font-sans">
+                    Reduza seus custos de entrega em até 40%.
+                  </h2>
+                  
+                  <p className="text-sm text-slate-350 font-mono leading-relaxed">
+                    Nós ajudamos a sua loja de autopeças a transformar a sua equipe atual de entregadores CLT internos em dinâmicos e focados prestadores de serviço terceirizados <strong className="text-emerald-400">MEI legalizados</strong> através da nossa robusta plataforma de despacho.
+                    <br /><br />
+                    Isso significa o fim de frotas paradas, redução total de passivos trabalhistas, economia direta e otimização total de cada metro cúbico transportado. Com o TorqueLog, você acompanha tudo no mapa com segurança jurídica completa (ACT Compliance).
+                  </p>
+                </div>
+                
+                <div className="mt-8 border-t border-slate-800/60 pt-6 flex flex-col sm:flex-row gap-3">
+                  <a
+                    href="https://api.whatsapp.com/send?phone=5519984427748&text=Olá!%20Gostaria%20de%20conhecer%20a%20proposta%20de%20redução%20de%20custos%20da%20TorqueLog%20e%20me%20tornar%20um%20parceiro."
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex-1 bg-emerald-600 hover:bg-emerald-500 hover:scale-[1.01] active:scale-[0.99] text-white font-mono font-black text-xs py-3.5 px-4 rounded-xl transition duration-150 flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/10 cursor-pointer text-center uppercase tracking-wider"
+                  >
+                    <svg className="w-4.5 h-4.5 fill-current shrink-0" viewBox="0 0 24 24" referrerPolicy="no-referrer">
+                      <path d="M12.031 6.172c-2.02 0-3.659 1.635-3.659 3.659 0 .614.152 1.209.444 1.74l-.472 1.72 1.764-.46a3.618 3.618 0 0 0 1.923.541c2.019 0 3.66-1.636 3.66-3.66 0-2.022-1.64-3.66-3.66-3.66zm1.905 5.155c-.078.22-.44.426-.644.453-.203.027-.457.042-.741-.051a2.822 2.822 0 0 1-1.127-.723 3.123 3.123 0 0 1-.774-1.22c-.156-.37-.024-.572.073-.674.098-.102.219-.254.329-.381.11-.127.147-.212.22-.352.073-.14.037-.263-.018-.37-.056-.107-.491-1.185-.674-1.62-.178-.426-.358-.369-.492-.375-.123-.005-.264-.006-.405-.006a.78.78 0 0 0-.563.262c-.195.214-.741.724-.741 1.763 0 1.04.757 2.046.862 2.188.106.14 1.491 2.278 3.611 3.193.504.218.898.348 1.206.446.505.161.966.138 1.33.084.406-.06.126-.412.247-.412a1.008 1.008 0 0 0 .7.493c.241.05.485.074.726.074.458 0 .895-.083 1.298-.246zM12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm.019 21.72c-1.83 0-3.623-.483-5.203-1.397l-.373-.222-3.867 1.013 1.03-3.768-.243-.387A9.673 9.673 0 0 1 2.28 12c0-5.352 4.36-9.712 9.72-9.712 5.353 0 9.712 4.36 9.712 9.712 0 5.353-4.36 9.72-9.712 9.72z" />
+                    </svg>
+                    Quero me tornar um parceiro
+                  </a>
+                  <a
+                    href="/proposta_comercial.html"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex-1 bg-slate-900 hover:bg-slate-800 border border-slate-750 hover:border-emerald-500 text-slate-300 hover:text-white font-mono font-black text-xs py-3.5 px-4 rounded-xl transition duration-150 flex items-center justify-center gap-1 cursor-pointer text-center uppercase tracking-wider"
+                  >
+                    Conhecer a Proposta
+                  </a>
+                </div>
+              </div>
+
+            </main>
+
+            {/* Modal de Proposta Comercial para Entregadores (MEI) */}
+            {showDriverProposalModal && (
+              <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md overflow-y-auto" id="driver-proposal-modal">
+                <div className="bg-slate-900 border border-orange-500/30 rounded-2xl max-w-2xl w-full p-6 sm:p-8 relative shadow-2xl shadow-orange-500/5 my-8 max-h-[90vh] overflow-y-auto flex flex-col justify-between">
+                  
+                  {/* Botão Fechar */}
+                  <button 
+                    onClick={() => setShowDriverProposalModal(false)}
+                    className="absolute top-4 right-4 text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 p-2 rounded-full cursor-pointer transition duration-150 font-sans text-xs flex items-center justify-center w-8 h-8"
+                    title="Fechar"
+                  >
+                    ✕
+                  </button>
+
+                  <div>
+                    {/* Cabeçalho */}
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="w-10 h-10 rounded-xl bg-orange-500/10 flex items-center justify-center border border-orange-500/20 text-orange-400 text-xl shadow-sm">
+                        🏍️
+                      </div>
+                      <span className="text-xs font-bold font-mono tracking-widest text-orange-400 uppercase bg-orange-500/10 px-2.5 py-1 rounded">PROPOSTA DE GANHOS MEI</span>
+                    </div>
+
+                    <h3 className="text-2xl font-black text-white tracking-tight leading-tight mb-4 font-sans">
+                      🚀 Deixe de ser funcionário e seja dono do seu próprio trajeto!
+                    </h3>
+
+                    <div className="space-y-4 text-sm text-slate-300 font-sans leading-relaxed">
+                      <p>
+                        Você já conhece a correria do dia a dia no balcão e no trânsito. Sabe que o mercado de autopeças exige agilidade e confiança. Mas me responda com sinceridade: <strong>se você faz 10 ou 50 entregas no dia, o seu salário no fim do mês muda?</strong>
+                      </p>
+                      <p>
+                        Na CLT, o seu ganho tem um teto. Com a <strong>TorqueLog</strong>, o seu esforço dita o seu salário.
+                      </p>
+                      <p>
+                        Estamos transformando a logística de autopeças e queremos que você seja nosso parceiro. Ao fazer a transição de um entregador CLT para um prestador de serviços MEI, você assume o controle dos seus ganhos, paga muito menos impostos e pode continuar prestando serviço para a mesma loja que você já conhece — só que agora, <strong className="text-orange-400">ganhando por produção</strong>.
+                      </p>
+
+                      <div className="border-t border-slate-800/80 pt-5 mt-6">
+                        <h4 className="text-md font-bold text-orange-400 flex items-center gap-2 mb-2 font-mono">
+                          💰 Vamos aos Números: Quanto você pode ganhar?
+                        </h4>
+                        <p className="text-slate-400 mb-4">
+                          Na TorqueLog, a matemática é simples e transparente: quanto mais você acelera, mais você fatura. Atualmente, o valor repassado por entrega de autopeças é de <strong className="text-white">R$ 4,50</strong>. O volume de saídas em uma loja de peças é alto, e uma média realista para um entregador focado é de <strong>30 entregas por dia</strong>.
+                        </p>
+
+                        {/* Tabela de Ganhos */}
+                        <div className="overflow-x-auto rounded-xl border border-slate-800 bg-slate-950/60 mb-4">
+                          <table className="w-full text-left border-collapse text-xs font-mono">
+                            <thead>
+                              <tr className="bg-slate-900 border-b border-slate-800 text-slate-400 uppercase tracking-wider">
+                                <th className="p-3">Descrição da Produtividade</th>
+                                <th className="p-3">Cálculo</th>
+                                <th className="p-3 text-right">Seu Faturamento</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-850">
+                              <tr>
+                                <td className="p-3 font-semibold text-slate-300">Por Entrega</td>
+                                <td className="p-3 text-slate-400">Valor Fixo Base</td>
+                                <td className="p-3 text-right text-orange-400 font-bold">R$ 4,50</td>
+                              </tr>
+                              <tr>
+                                <td className="p-3 font-semibold text-slate-300">Por Dia</td>
+                                <td className="p-3 text-slate-400">30 entregas x R$ 4,50</td>
+                                <td className="p-3 text-right text-orange-400 font-bold">R$ 135,00</td>
+                              </tr>
+                              <tr>
+                                <td className="p-3 font-semibold text-slate-300">Por Semana (6 dias úteis)</td>
+                                <td className="p-3 text-slate-400">R$ 135,00 x 6 dias</td>
+                                <td className="p-3 text-right text-orange-400 font-bold">R$ 810,00</td>
+                              </tr>
+                              <tr className="bg-orange-500/5">
+                                <td className="p-3 font-black text-white">Por Mês (26 dias trabalhados)</td>
+                                <td className="p-3 text-slate-300">R$ 135,00 x 26 dias</td>
+                                <td className="p-3 text-right text-orange-400 font-black text-sm">R$ 3.510,00</td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </div>
+
+                        <p className="text-xs text-orange-400/95 italic leading-normal mb-5">
+                          💡 <strong>E o melhor:</strong> dias de pico significam mais dinheiro. Se a oficina parceira pedir muitas peças e você fechar 45 entregas em um dia movimentado, você volta para casa com mais de <strong>R$ 200,00</strong> naquele único dia!
+                        </p>
+                      </div>
+
+                      <div className="border-t border-slate-800/80 pt-5">
+                        <h4 className="text-md font-bold text-emerald-400 flex items-center gap-2 mb-3 font-mono">
+                          🛠️ Por que migrar para MEI com a TorqueLog é a melhor escolha?
+                        </h4>
+                        <ul className="space-y-3 text-slate-300">
+                          <li className="flex gap-2">
+                            <span className="text-emerald-500 font-bold shrink-0">✓</span>
+                            <span><strong>Continue na sua "área":</strong> Você não precisa buscar clientes novos no escuro. Você pode continuar atendendo a loja de autopeças onde já trabalha, mas agora com um contrato de parceria através da nossa plataforma.</span>
+                          </li>
+                          <li className="flex gap-2">
+                            <span className="text-emerald-500 font-bold shrink-0">✓</span>
+                            <span><strong>Seja seu próprio chefe:</strong> Sem subordinação de horários engessados. Você é um empresário (Microempreendedor Individual) prestando um serviço essencial.</span>
+                          </li>
+                          <li className="flex gap-2">
+                            <span className="text-emerald-500 font-bold shrink-0">✓</span>
+                            <span><strong>Impostos reduzidos:</strong> Como MEI, você paga apenas uma taxa fixa mensal bem baixa (o DAS, em torno de R$ 75,00), muito diferente dos altos descontos de INSS e IRPF que corroem o salário na carteira assinada.</span>
+                          </li>
+                          <li className="flex gap-2">
+                            <span className="text-emerald-500 font-bold shrink-0">✓</span>
+                            <span><strong>Proteção garantida:</strong> O pagamento do seu DAS mensal como MEI garante os seus direitos previdenciários, como auxílio-doença, aposentadoria e pensão. Você trabalha legalizado e protegido.</span>
+                          </li>
+                          <li className="flex gap-2">
+                            <span className="text-emerald-500 font-bold shrink-0">✓</span>
+                            <span><strong>Escalabilidade:</strong> A TorqueLog conecta você a uma rede logística. Se a sua loja parceira estiver com baixo movimento, você pode pegar corridas de outras empresas da rede.</span>
+                          </li>
+                        </ul>
+                      </div>
+
+                      <div className="border-t border-slate-800/80 pt-5 mt-4">
+                        <h4 className="text-md font-bold text-white flex items-center gap-2 mb-2 font-sans">
+                          🚦 Está pronto para dar a partida no seu próprio negócio?
+                        </h4>
+                        <p className="text-slate-400">
+                          Não limite mais o seu potencial. Formalize-se de forma rápida, simples e comece a ver o resultado real de cada quilômetro rodado. A equipe da TorqueLog te orienta em todo o processo de abertura do seu MEI (que é gratuito e feito pela internet).
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-8 border-t border-slate-800/60 pt-6 flex flex-col sm:flex-row gap-3">
+                    <a
+                      href="https://api.whatsapp.com/send?phone=5519984427748&text=Olá!%20Quero%2520me%2520tornar%2520um%2520entregador%2520TorqueLog%2520e%2520saber%2520mais%2520sobre%2520como%2520trabalhar%2520como%2520MEI."
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex-1 bg-orange-500 hover:bg-orange-600 hover:scale-[1.01] active:scale-[0.99] text-white font-mono font-black text-xs py-4 px-5 rounded-xl transition duration-150 flex items-center justify-center gap-2 shadow-lg shadow-orange-500/15 cursor-pointer text-center uppercase tracking-wider"
+                    >
+                      <svg className="w-5 h-5 fill-current shrink-0 animate-pulse" viewBox="0 0 24 24" referrerPolicy="no-referrer">
+                        <path d="M12.031 6.172c-2.02 0-3.659 1.635-3.659 3.659 0 .614.152 1.209.444 1.74l-.472 1.72 1.764-.46a3.618 3.618 0 0 0 1.923.541c2.019 0 3.66-1.636 3.66-3.66 0-2.022-1.64-3.66-3.66-3.66zm1.905 5.155c-.078.22-.44.426-.644.453-.203.027-.457.042-.741-.051a2.822 2.822 0 0 1-1.127-.723 3.123 3.123 0 0 1-.774-1.22c-.156-.37-.024-.572.073-.674.098-.102.219-.254.329-.381.11-.127.147-.212.22-.352.073-.14.037-.263-.018-.37-.056-.107-.491-1.185-.674-1.62-.178-.426-.358-.369-.492-.375-.123-.005-.264-.006-.405-.006a.78.78 0 0 0-.563.262c-.195.214-.741.724-.741 1.763 0 1.04.757 2.046.862 2.188.106.14 1.491 2.278 3.611 3.193.504.218.898.348 1.206.446.505.161.966.138 1.33.084.406-.06.126-.412.247-.412a1.008 1.008 0 0 0 .7.493c.241.05.485.074.726.074.458 0 .895-.083 1.298-.246zM12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm.019 21.72c-1.83 0-3.623-.483-5.203-1.397l-.373-.222-3.867 1.013 1.03-3.768-.243-.387A9.673 9.673 0 0 1 2.28 12c0-5.352 4.36-9.712 9.72-9.712 5.353 0 9.712 4.36 9.712 9.712 0 5.353-4.36 9.72-9.712 9.72z" />
+                      </svg>
+                      Quero me tornar um parceiro TorqueLog e aumentar meus ganhos!
+                    </a>
+                    <button
+                      onClick={() => setShowDriverProposalModal(false)}
+                      className="bg-slate-800 hover:bg-slate-750 border border-slate-700 text-slate-300 hover:text-white font-mono font-bold text-xs py-3.5 px-5 rounded-xl cursor-pointer transition duration-150 uppercase tracking-wide"
+                    >
+                      Voltar
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Footer */}
+            <footer className="text-center text-[10px] text-slate-600 font-mono tracking-wider max-w-4xl w-full mx-auto py-6 border-t border-slate-900 z-10 relative">
+              <p>TORQUELOG LOGÍSTICA B2B • MODELO TRABALHISTA COMPLIANCE MEI ZERO RISCO ACT</p>
+              <p className="mt-1 opacity-60">Distribuição automatizada de mercadorias com inteligência e controle de rotas em tempo real.</p>
+              <p className="mt-3 text-orange-400 font-bold select-all flex items-center justify-center gap-1">
+                <span>Contato suporte técnico corporativo:</span>
+                <a href="mailto:administracao@torquelog.com.br" className="underline hover:text-orange-300">administracao@torquelog.com.br</a>
+              </p>
+            </footer>
           </div>
-          <span className="text-xs font-mono text-slate-500 tracking-widest hidden lg:inline">ROTEIRIZAÇÃO AUTOMOTIVA INTELIGENTE</span>
-        </header>
+        ) : (
+          <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-between p-4 sm:p-6 md:p-8 font-sans selection:bg-orange-500 selection:text-white relative overflow-hidden" id="login-screen">
+          
+          {/* Abstract background ambient aura */}
+          <div className="absolute top-[-20%] left-[-10%] w-[500px] h-[500px] rounded-full bg-orange-600/10 blur-[130px] pointer-events-none" />
+          {/* Top header branding */}
+          <header className="max-w-4xl w-full mx-auto flex flex-col md:flex-row justify-between items-center gap-4 py-6 border-b border-slate-900">
+            <div className="flex items-center gap-4">
+              <div className="bg-slate-950/90 p-3 rounded-xl border-2 border-orange-500 flex items-center justify-center shadow-xl shadow-orange-500/10 shrink-0 scale-105 transition-all duration-300 hover:scale-110">
+                <TorqueLogLogoIcon size={80} className="text-orange-500" variant="esportivo" />
+              </div>
+              <div>
+                <div className="flex items-center gap-3 select-none" translate="no">
+                  <span className="text-[46px] font-black tracking-tighter font-mono text-orange-400 drop-shadow-md notranslate">TorqueLog</span>
+                  <span className="text-[10px] bg-slate-900 border border-orange-500/30 text-orange-400 px-2.5 py-0.5 rounded font-black font-mono animate-pulse">B2B PORTAL</span>
+                </div>
+                <p className="text-[10.5px] text-slate-400 font-mono tracking-wider uppercase mt-1">PLATAFORMA INTEGRADA DE DISTRIBUIÇÃO DE MERCADORIAS</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setShowLandingPage(true)}
+                className="bg-slate-900 hover:bg-slate-850 text-slate-450 hover:text-slate-300 border border-slate-800 text-[10.5px] font-mono font-bold py-2 px-3.5 rounded-xl cursor-pointer transition-all flex items-center gap-1 shrink-0 uppercase tracking-wide"
+              >
+                ← Voltar
+              </button>
+              <span className="text-xs font-mono text-slate-500 tracking-widest hidden lg:inline">ROTEIRIZAÇÃO AUTOMOTIVA INTELIGENTE</span>
+            </div>
+          </header>
+
 
         {/* Main interactive auth card */}
         <main className="max-w-md w-full mx-auto bg-slate-900/80 backdrop-blur-md rounded-2xl border border-slate-800 shadow-2xl p-6 sm:p-8 my-auto relative z-10">
@@ -4524,7 +4818,8 @@ export default function App() {
           </p>
         </footer>
       </div>
-    ) : (
+    )
+  ) : (
       <div className="min-h-screen bg-slate-50 text-slate-800 font-sans flex flex-col selection:bg-orange-500 selection:text-white" id="torquelog-app">
       
       {firebaseQuotaExceeded && (

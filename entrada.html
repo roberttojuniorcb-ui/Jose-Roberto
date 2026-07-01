@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TorqueLog - Inteligência Logística para Autopeças</title>
+  
+  <!-- Font Families -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;700;800&display=swap" rel="stylesheet">
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+          colors: {
+            slate: {
+              750: '#1e293b',
+              850: '#0f172a',
+              950: '#020617',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+    }
+    .font-mono {
+      font-family: 'JetBrains Mono', monospace;
+    }
+    @keyframes pulse-slow {
+      0%, 100% { opacity: 1; }
+      50% { opacity: .5; }
+    }
+    .animate-pulse-slow {
+      animation: pulse-slow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    }
+    @keyframes spin-slow {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+    .animate-spin-slow {
+      animation: spin-slow 20s linear infinite;
+    }
+    @keyframes bounce-slow {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-4px); }
+    }
+    .animate-bounce-slow {
+      animation: bounce-slow 2s ease-in-out infinite;
+    }
+  </style>
+</head>
+<body class="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-between p-4 sm:p-6 md:p-8 selection:bg-orange-500 selection:text-white relative overflow-x-hidden">
+
+  <!-- Ambient glowing blobs -->
+  <div class="absolute top-[-20%] left-[-10%] w-[500px] h-[500px] rounded-full bg-orange-600/10 blur-[130px] pointer-events-none"></div>
+  <div class="absolute bottom-[-20%] right-[-10%] w-[500px] h-[500px] rounded-full bg-amber-500/10 blur-[130px] pointer-events-none"></div>
+
+  <!-- Header -->
+  <header class="max-w-6xl w-full mx-auto flex flex-col md:flex-row justify-between items-center gap-6 py-6 border-b border-slate-900 z-10 relative">
+    <div class="flex items-center gap-4">
+      <!-- TorqueLog Logo -->
+      <div class="bg-slate-950/90 p-3 rounded-xl border-2 border-orange-500 flex items-center justify-center shadow-xl shadow-orange-500/10 shrink-0">
+        <svg viewBox="0 0 100 100" width="64" height="64" class="select-none shrink-0 text-orange-500 fill-current">
+          <!-- Slowly Rotating Outer Gear -->
+          <g class="origin-[46px_50px] animate-spin-slow">
+            <circle cx="46" cy="50" r="32" stroke="currentColor" stroke-width="4.5" fill="none" class="opacity-95" />
+            <circle cx="46" cy="50" r="25" stroke="currentColor" stroke-width="1.5" stroke-dasharray="4 4" fill="none" class="opacity-70" />
+            <!-- Teeth -->
+            <rect x="43" y="13" width="6" height="9" rx="1.5" fill="currentColor" transform="rotate(0 46 50)" />
+            <rect x="43" y="13" width="6" height="9" rx="1.5" fill="currentColor" transform="rotate(30 46 50)" />
+            <rect x="43" y="13" width="6" height="9" rx="1.5" fill="currentColor" transform="rotate(60 46 50)" />
+            <rect x="43" y="13" width="6" height="9" rx="1.5" fill="currentColor" transform="rotate(90 46 50)" />
+            <rect x="43" y="13" width="6" height="9" rx="1.5" fill="currentColor" transform="rotate(120 46 50)" />
+            <rect x="43" y="13" width="6" height="9" rx="1.5" fill="currentColor" transform="rotate(150 46 50)" />
+            <rect x="43" y="13" width="6" height="9" rx="1.5" fill="currentColor" transform="rotate(180 46 50)" />
+            <rect x="43" y="13" width="6" height="9" rx="1.5" fill="currentColor" transform="rotate(210 46 50)" />
+            <rect x="43" y="13" width="6" height="9" rx="1.5" fill="currentColor" transform="rotate(240 46 50)" />
+            <rect x="43" y="13" width="6" height="9" rx="1.5" fill="currentColor" transform="rotate(270 46 50)" />
+            <rect x="43" y="13" width="6" height="9" rx="1.5" fill="currentColor" transform="rotate(300 46 50)" />
+            <rect x="43" y="13" width="6" height="9" rx="1.5" fill="currentColor" transform="rotate(330 46 50)" />
+          </g>
+          <!-- Sweeping Arrow -->
+          <path d="M 46 90 A 40 40 0 0 0 86 50 L 92 50 L 81.5 28 L 71 50 L 77 50 A 31 31 0 0 1 46 81 L 46 90 Z" fill="currentColor" class="text-orange-500 drop-shadow-[0_3px_6px_rgba(249,115,22,0.45)]" />
+          <!-- Motorcycle Silhouette with leaning rider -->
+          <g class="origin-[46px_50px] animate-bounce-slow">
+            <!-- Trail lines -->
+            <g class="opacity-95 text-orange-400">
+              <line x1="4" y1="44" x2="19" y2="44" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" />
+              <line x1="1" y1="50" x2="16" y2="50" stroke="currentColor" stroke-width="4.0" stroke-linecap="round" />
+              <line x1="3" y1="56" x2="15" y2="56" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" />
+            </g>
+            <path d="M 18 56 C 18 50, 22 47, 28 47 C 30 47, 32 48, 34 51 L 42 43 C 41 41, 40 39, 40 37 C 40 32, 44 28, 49 28 C 51 28, 53 29, 54 30 L 63 24 C 65 23, 67 24, 68 27 L 70 31 C 72 32, 73 33, 74 35 L 78 42 C 80 45, 79 49, 76 51 C 74 53, 71 54, 68 54 L 18 54 Z" fill="currentColor" class="text-white" />
+            <!-- Inner Wheel Highlights -->
+            <circle cx="28" cy="52" r="8" fill="#020617" />
+            <circle cx="28" cy="52" r="5.5" fill="none" stroke="currentColor" stroke-width="2.5" class="text-white" />
+            <circle cx="65" cy="52" r="8" fill="#020617" />
+            <circle cx="65" cy="52" r="5.5" fill="none" stroke="currentColor" stroke-width="2.5" class="text-white" />
+          </g>
+        </svg>
+      </div>
+      <div>
+        <div class="flex items-baseline gap-2 select-none">
+          <span class="text-3xl sm:text-4xl font-black tracking-tighter font-mono text-orange-400 drop-shadow-md">TorqueLog</span>
+          <span class="text-[9px] bg-slate-900 border border-orange-500/30 text-orange-400 px-2.5 py-0.5 rounded font-black font-mono animate-pulse-slow">B2B EXPRESS</span>
+        </div>
+        <p class="text-[10px] text-slate-400 font-mono tracking-wider uppercase mt-1">PLATAFORMA INTEGRADA DE DISTRIBUIÇÃO DE MERCADORIAS</p>
+      </div>
+    </div>
+    <!-- Direct Portal Redirection -->
+    <a href="/" class="bg-slate-900 hover:bg-slate-800 text-orange-400 hover:text-orange-300 border border-slate-800 hover:border-orange-500/50 font-mono font-bold text-xs py-2.5 px-4 rounded-xl transition duration-150 flex items-center gap-2 shadow-md shrink-0 uppercase tracking-wide">
+      🔑 Acessar Portal B2B →
+    </a>
+  </header>
+
+  <div class="max-w-4xl w-full mx-auto text-center mt-8 sm:mt-12 z-10 relative">
+    <h1 class="text-3xl sm:text-5xl font-black text-white tracking-tight leading-none font-sans">
+      Acelere a sua Logística de Autopeças
+    </h1>
+    <p class="text-slate-400 font-mono text-xs sm:text-sm max-w-2xl mx-auto mt-4 leading-relaxed">
+      Escolha a opção ideal para o seu perfil e descubra como a nossa plataforma gera mais valor para o seu dia a dia.
+    </p>
+  </div>
+
+  <!-- Main Content Cards -->
+  <main class="max-w-6xl w-full mx-auto my-auto py-8 sm:py-12 grid grid-cols-1 md:grid-cols-2 gap-8 z-10 relative">
+    
+    <!-- Option A: For Drivers -->
+    <div class="bg-slate-900/60 backdrop-blur-md rounded-2xl border border-slate-800 shadow-2xl p-6 sm:p-8 flex flex-col justify-between relative overflow-hidden group hover:border-orange-500/30 transition duration-300">
+      <div class="absolute top-0 right-0 w-32 h-32 bg-orange-500/5 rounded-full blur-2xl pointer-events-none group-hover:bg-orange-500/10 transition-all duration-300"></div>
+      <div>
+        <div class="flex items-center gap-3 mb-6">
+          <div class="w-12 h-12 rounded-xl bg-orange-500/10 flex items-center justify-center border border-orange-500/20 text-orange-400 text-2xl shadow-sm">
+            🏍️
+          </div>
+          <span class="text-xs font-bold font-mono tracking-widest text-orange-400 uppercase bg-orange-500/10 px-2.5 py-1 rounded">Para Entregadores</span>
+        </div>
+        
+        <h2 class="text-xl sm:text-2xl font-black text-white tracking-tight leading-snug mb-4">
+          Quer ser dono do seu próprio negócio e ganhar mais?
+        </h2>
+        
+        <div class="text-sm text-slate-300 font-sans space-y-4 leading-relaxed">
+          <p>
+            Se você já atua como entregador CLT em uma loja de autopeças, você pode continuar realizando as entregas para a mesma empresa, mas agora como um parceiro <strong class="text-orange-400 font-bold">MEI</strong> através da TorqueLog.
+          </p>
+          <p>
+            Trabalhando por produção, você reduz drasticamente os impostos retidos na carteira assinada e aumenta diretamente a sua renda líquida diária.
+          </p>
+          
+          <!-- Box Financeiro -->
+          <div class="bg-orange-500/5 border-l-4 border-orange-500 rounded-r-xl p-4 mt-6">
+            <h4 class="text-xs font-bold text-orange-400 font-mono uppercase tracking-wider mb-2">
+              📈 Projeção de Ganhos (R$ 4,50 por entrega)
+            </h4>
+            <p class="text-xs text-slate-400 mb-3">
+              Com um fluxo constante de saídas no balcão de peças, confira a estimativa baseada em <strong>30 entregas por dia</strong>:
+            </p>
+            
+            <div class="overflow-x-auto rounded-lg border border-slate-800 bg-slate-950/60 mb-3">
+              <table class="w-full text-left border-collapse text-[11px] font-mono">
+                <thead>
+                  <tr class="bg-slate-900 border-b border-slate-800 text-slate-400">
+                    <th class="p-2">Período</th>
+                    <th class="p-2 text-center">Entregas</th>
+                    <th class="p-2 text-right">Faturamento</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-900">
+                  <tr>
+                    <td class="p-2 text-slate-300 font-semibold">Por Dia</td>
+                    <td class="p-2 text-center text-slate-400">30</td>
+                    <td class="p-2 text-right text-orange-400 font-bold">R$ 135,00</td>
+                  </tr>
+                  <tr>
+                    <td class="p-2 text-slate-300 font-semibold">Por Semana (6 dias)</td>
+                    <td class="p-2 text-center text-slate-400">180</td>
+                    <td class="p-2 text-right text-orange-400 font-bold">R$ 810,00</td>
+                  </tr>
+                  <tr class="bg-orange-500/5">
+                    <td class="p-2 text-white font-bold">Por Mês (26 dias)</td>
+                    <td class="p-2 text-center text-slate-300">780</td>
+                    <td class="p-2 text-right text-orange-400 font-black">R$ 3.510,00</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            
+            <p class="text-[10px] text-slate-400 leading-normal">
+              *<strong>Comparação:</strong> Um salário CLT bruto de R$ 3.000,00 rende cerca de R$ 2.650,00 líquidos. Como MEI na TorqueLog, fazendo 30 entregas/dia, sobram <strong class="text-emerald-400 font-bold">R$ 3.435,00 líquidos</strong> no seu bolso (já descontada a taxa fixa do DAS).
+            </p>
+          </div>
+        </div>
+      </div>
+      
+      <div class="mt-8 border-t border-slate-800/60 pt-6">
+        <a href="https://api.whatsapp.com/send?phone=5519984427748&text=Olá!%20Quero%20me%20tornar%20um%20entregador%20TorqueLog%20e%20saber%20mais%20sobre%20como%20trabalhar%20como%20MEI." target="_blank" rel="noopener noreferrer" class="w-full bg-orange-500 hover:bg-orange-600 hover:scale-[1.01] active:scale-[0.99] text-white font-mono font-black text-xs py-3.5 px-4 rounded-xl transition duration-150 flex items-center justify-center gap-2 shadow-lg shadow-orange-500/15 cursor-pointer text-center uppercase tracking-wider">
+          <svg class="w-4.5 h-4.5 fill-current shrink-0 animate-pulse-slow" viewBox="0 0 24 24">
+            <path d="M12.031 6.172c-2.02 0-3.659 1.635-3.659 3.659 0 .614.152 1.209.444 1.74l-.472 1.72 1.764-.46a3.618 3.618 0 0 0 1.923.541c2.019 0 3.66-1.636 3.66-3.66 0-2.022-1.64-3.66-3.66-3.66zm1.905 5.155c-.078.22-.44.426-.644.453-.203.027-.457.042-.741-.051a2.822 2.822 0 0 1-1.127-.723 3.123 3.123 0 0 1-.774-1.22c-.156-.37-.024-.572.073-.674.098-.102.219-.254.329-.381.11-.127.147-.212.22-.352.073-.14.037-.263-.018-.37-.056-.107-.491-1.185-.674-1.62-.178-.426-.358-.369-.492-.375-.123-.005-.264-.006-.405-.006a.78.78 0 0 0-.563.262c-.195.214-.741.724-.741 1.763 0 1.04.757 2.046.862 2.188.106.14 1.491 2.278 3.611 3.193.504.218.898.348 1.206.446.505.161.966.138 1.33.084.406-.06.126-.412.247-.412a1.008 1.008 0 0 0 .7.493c.241.05.485.074.726.074.458 0 .895-.083 1.298-.246zM12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm.019 21.72c-1.83 0-3.623-.483-5.203-1.397l-.373-.222-3.867 1.013 1.03-3.768-.243-.387A9.673 9.673 0 0 1 2.28 12c0-5.352 4.36-9.712 9.72-9.712 5.353 0 9.712 4.36 9.712 9.712 0 5.353-4.36 9.72-9.712 9.72z" />
+          </svg>
+          Quero ser um entregador TorqueLog
+        </a>
+      </div>
+    </div>
+
+    <!-- Option B: For Partner Companies -->
+    <div class="bg-slate-900/60 backdrop-blur-md rounded-2xl border border-slate-800 shadow-2xl p-6 sm:p-8 flex flex-col justify-between relative overflow-hidden group hover:border-emerald-500/30 transition duration-300">
+      <div class="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 rounded-full blur-2xl pointer-events-none group-hover:bg-emerald-500/10 transition-all duration-300"></div>
+      <div>
+        <div class="flex items-center gap-3 mb-6">
+          <div class="w-12 h-12 rounded-xl bg-emerald-500/10 flex items-center justify-center border border-emerald-500/20 text-emerald-400 text-2xl shadow-sm">
+            🏢
+          </div>
+          <span class="text-xs font-bold font-mono tracking-widest text-emerald-400 uppercase bg-emerald-500/10 px-2.5 py-1 rounded">Para Empresas</span>
+        </div>
+        
+        <h2 class="text-xl sm:text-2xl font-black text-white tracking-tight leading-snug mb-4">
+          Reduza seus custos de entrega em até 40%
+        </h2>
+        
+        <div class="text-sm text-slate-350 font-sans space-y-4 leading-relaxed">
+          <p>
+            Gerenciar uma frota própria de motoboys sob o regime CLT gera um custo fixo pesado, além de altos riscos e passivos trabalhistas para a sua loja de autopeças.
+          </p>
+          <p>
+            A TorqueLog ajuda a sua empresa a realizar a transição jurídica e operacional da sua equipe atual de entregadores para o modelo de prestação de serviços <strong class="text-emerald-400 font-bold">MEI</strong> utilizando a nossa plataforma.
+          </p>
+          
+          <!-- Box Financeiro -->
+          <div class="bg-emerald-500/5 border-l-4 border-emerald-500 rounded-r-xl p-4 mt-6">
+            <h4 class="text-xs font-bold text-emerald-400 font-mono uppercase tracking-wider mb-2">
+              📉 O Impacto Financeiro na Operação
+            </h4>
+            <p class="text-xs text-slate-400 mb-3">
+              Sua empresa passa a pagar estritamente pela produção (demanda real do balcão), eliminando custos invisíveis:
+            </p>
+            
+            <div class="overflow-x-auto rounded-lg border border-slate-800 bg-slate-950/60 mb-3">
+              <table class="w-full text-left border-collapse text-[11px] font-mono">
+                <thead>
+                  <tr class="bg-slate-900 border-b border-slate-800 text-slate-400">
+                    <th class="p-2">Custo por Entregador</th>
+                    <th class="p-2">Modelo CLT</th>
+                    <th class="p-2 text-right">Modelo TorqueLog</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-900">
+                  <tr>
+                    <td class="p-2 text-slate-300 font-semibold">Custo Base / Repasse</td>
+                    <td class="p-2 text-slate-400">R$ 3.000,00</td>
+                    <td class="p-2 text-right text-slate-300">R$ 3.000,00</td>
+                  </tr>
+                  <tr>
+                    <td class="p-2 text-slate-300 font-semibold">Encargos (FGTS, 13º, Férias, INSS)</td>
+                    <td class="p-2 text-slate-400">+ R$ 1.200,00 (Aprox. 40%)</td>
+                    <td class="p-2 text-right text-emerald-400 font-bold">R$ 0,00</td>
+                  </tr>
+                  <tr class="bg-emerald-500/5">
+                    <td class="p-2 text-white font-bold">Custo Total Mensal</td>
+                    <td class="p-2 text-slate-300 font-bold">R$ 4.200,00</td>
+                    <td class="p-2 text-right text-emerald-400 font-black">R$ 3.000,00</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            
+            <p class="text-[10px] text-slate-400 leading-normal">
+              Sua empresa ganha flexibilidade logística completa, paga apenas pelo que entrega e reduz o custo real por saída de autopeças de forma imediata.
+            </p>
+          </div>
+        </div>
+      </div>
+      
+      <div class="mt-8 border-t border-slate-800/60 pt-6 flex flex-col sm:flex-row gap-3">
+        <a href="https://api.whatsapp.com/send?phone=5519984427748&text=Olá!%20Gostaria%20de%20conhecer%20a%20proposta%20de%20redução%20de%20custos%20da%20TorqueLog%20e%20me%20tornar%20um%20parceiro." target="_blank" rel="noopener noreferrer" class="flex-1 bg-emerald-600 hover:bg-emerald-500 hover:scale-[1.01] active:scale-[0.99] text-white font-mono font-black text-xs py-3.5 px-4 rounded-xl transition duration-150 flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/10 cursor-pointer text-center uppercase tracking-wider">
+          <svg class="w-4.5 h-4.5 fill-current shrink-0" viewBox="0 0 24 24">
+            <path d="M12.031 6.172c-2.02 0-3.659 1.635-3.659 3.659 0 .614.152 1.209.444 1.74l-.472 1.72 1.764-.46a3.618 3.618 0 0 0 1.923.541c2.019 0 3.66-1.636 3.66-3.66 0-2.022-1.64-3.66-3.66-3.66zm1.905 5.155c-.078.22-.44.426-.644.453-.203.027-.457.042-.741-.051a2.822 2.822 0 0 1-1.127-.723 3.123 3.123 0 0 1-.774-1.22c-.156-.37-.024-.572.073-.674.098-.102.219-.254.329-.381.11-.127.147-.212.22-.352.073-.14.037-.263-.018-.37-.056-.107-.491-1.185-.674-1.62-.178-.426-.358-.369-.492-.375-.123-.005-.264-.006-.405-.006a.78.78 0 0 0-.563.262c-.195.214-.741.724-.741 1.763 0 1.04.757 2.046.862 2.188.106.14 1.491 2.278 3.611 3.193.504.218.898.348 1.206.446.505.161.966.138 1.33.084.406-.06.126-.412.247-.412a1.008 1.008 0 0 0 .7.493c.241.05.485.074.726.074.458 0 .895-.083 1.298-.246zM12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm.019 21.72c-1.83 0-3.623-.483-5.203-1.397l-.373-.222-3.867 1.013 1.03-3.768-.243-.387A9.673 9.673 0 0 1 2.28 12c0-5.352 4.36-9.712 9.72-9.712 5.353 0 9.712 4.36 9.712 9.712 0 5.353-4.36 9.72-9.712 9.72z" />
+          </svg>
+          Quero ser um parceiro
+        </a>
+        <a href="/proposta_comercial.html" target="_blank" rel="noopener noreferrer" class="flex-1 bg-slate-900 hover:bg-slate-800 border border-slate-750 hover:border-emerald-500 text-slate-300 hover:text-white font-mono font-black text-xs py-3.5 px-4 rounded-xl transition duration-150 flex items-center justify-center gap-1 cursor-pointer text-center uppercase tracking-wider">
+          Conhecer a Proposta Completa
+        </a>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="text-center text-[10px] text-slate-600 font-mono tracking-wider max-w-4xl w-full mx-auto py-6 border-t border-slate-900 z-10 relative">
+    <p>TORQUELOG LOGÍSTICA B2B • MODELO TRABALHISTA COMPLIANCE MEI ZERO RISCO ACT</p>
+    <p class="mt-1 opacity-60">Distribuição automatizada de mercadorias com inteligência e controle de rotas em tempo real.</p>
+    <p class="mt-3 text-orange-400 font-bold select-all flex items-center justify-center gap-1">
+      <span>Contato suporte técnico corporativo:</span>
+      <a href="mailto:administracao@torquelog.com.br" class="underline hover:text-orange-300">administracao@torquelog.com.br</a>
+    </p>
+  </footer>
+
+</body>
+</html>
