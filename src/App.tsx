@@ -4646,6 +4646,16 @@ export default function App() {
                       <Lock className="w-4 h-4 text-white" />
                       AUTENTICAR PORTAL
                     </button>
+
+                    {/* Download Android App Button */}
+                    <a
+                      href="/downloads/app-debug.apk"
+                      download="TorqueLog-Entregador.apk"
+                      className="w-full bg-slate-900 hover:bg-slate-850 active:transform active:scale-95 text-orange-500 hover:text-orange-400 font-mono font-bold text-xs py-3 rounded-xl transition duration-150 flex items-center justify-center gap-2 border border-slate-800 hover:border-orange-500/30 shadow-md cursor-pointer mt-2 text-center"
+                    >
+                      <Smartphone className="w-4 h-4 text-orange-500 shrink-0" />
+                      BAIXAR APLICATIVO ANDROID (.APK)
+                    </a>
                     
                     <div className="bg-slate-950/90 border border-orange-500/30 p-3.5 rounded-xl text-xs leading-relaxed space-y-2.5">
                       <div className="flex items-center gap-2">
@@ -4744,13 +4754,25 @@ export default function App() {
 
                 {/* Login button */}
                 {loginRole !== 'Cliente' && (
-                  <button
-                    type="submit"
-                    className="w-full bg-orange-500 hover:bg-orange-600 active:transform active:scale-95 text-white font-mono font-bold text-sm py-3 rounded-xl transition duration-150 flex items-center justify-center gap-2 shadow-lg shadow-orange-500/10 cursor-pointer"
-                  >
-                    <Lock className="w-4 h-4 text-white" />
-                    AUTENTICAR PORTAL
-                  </button>
+                  <div className="space-y-2">
+                    <button
+                      type="submit"
+                      className="w-full bg-orange-500 hover:bg-orange-600 active:transform active:scale-95 text-white font-mono font-bold text-sm py-3 rounded-xl transition duration-150 flex items-center justify-center gap-2 shadow-lg shadow-orange-500/10 cursor-pointer"
+                    >
+                      <Lock className="w-4 h-4 text-white" />
+                      AUTENTICAR PORTAL
+                    </button>
+
+                    {/* Download Android App Button */}
+                    <a
+                      href="/downloads/app-debug.apk"
+                      download="TorqueLog-Entregador.apk"
+                      className="w-full bg-slate-900 hover:bg-slate-850 active:transform active:scale-95 text-orange-500 hover:text-orange-400 font-mono font-bold text-xs py-3 rounded-xl transition duration-150 flex items-center justify-center gap-2 border border-slate-800 hover:border-orange-500/30 shadow-md cursor-pointer text-center"
+                    >
+                      <Smartphone className="w-4 h-4 text-orange-500 shrink-0" />
+                      BAIXAR APLICATIVO ANDROID (.APK)
+                    </a>
+                  </div>
                 )}
               </form>
 
