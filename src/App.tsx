@@ -296,6 +296,7 @@ export default function App() {
   const [newClientSenha, setNewClientSenha] = useState<string>('');
   const [newClientMotoboysAtivos, setNewClientMotoboysAtivos] = useState<number>(1);
   const [newClientRamo, setNewClientRamo] = useState<string>('Autopeças');
+  const [newClientCNPJ, setNewClientCNPJ] = useState<string>('');
 
   // --- STATE FOR QUICK REGISTERING CLIENT/DESTINATARIO (CRUD) ---
   const [isQuickRegisteringDestinatario, setIsQuickRegisteringDestinatario] = useState<boolean>(false);
@@ -324,6 +325,7 @@ export default function App() {
   const [editClientRamo, setEditClientRamo] = useState<string>('Autopeças');
   const [editClientNotaAdmin, setEditClientNotaAdmin] = useState<string>('');
   const [editClientAdminBloqueado, setEditClientAdminBloqueado] = useState<boolean>(false);
+  const [editClientCNPJ, setEditClientCNPJ] = useState<string>('');
 
   // --- SUB-CLIENT MANAGEMENT INSIDE PARTNER EDITOR MODAL ---
   const [subCliEditingId, setSubCliEditingId] = useState<string | null>(null);
@@ -2472,6 +2474,7 @@ export default function App() {
       criadoEm: new Date().toISOString(),
       motoboysAtivos: Number(newClientMotoboysAtivos) || 0,
       ramo: newClientRamo,
+      cnpj: newClientCNPJ || undefined,
       indicadoPorRepId: newClientIndicadoPorRepId || undefined
     };
 
@@ -2566,6 +2569,7 @@ export default function App() {
     setNewClientEmail('');
     setNewClientSenha('');
     setNewClientRamo('Autopeças');
+    setNewClientCNPJ('');
     setNewClientIndicadoPorRepId('');
   };
 
@@ -2597,6 +2601,7 @@ export default function App() {
       senha: editClientSenha || clienteParaEditar.senha,
       motoboysAtivos: Number(editClientMotoboysAtivos) || 0,
       ramo: editClientRamo,
+      cnpj: editClientCNPJ || undefined,
       indicadoPorRepId: editClientIndicadoPorRepId || undefined,
       notaAdmin: editClientNotaAdmin,
       adminBloqueado: editClientAdminBloqueado
@@ -4649,8 +4654,9 @@ export default function App() {
 
                     {/* Download Android App Button */}
                     <a
-                      href="/downloads/app-debug.apk"
-                      download="TorqueLog-Entregador.apk"
+                      href="/api/download-apk"
+                      target="_blank"
+                      rel="noopener noreferrer"
                       className="w-full bg-slate-900 hover:bg-slate-850 active:transform active:scale-95 text-orange-500 hover:text-orange-400 font-mono font-bold text-xs py-3 rounded-xl transition duration-150 flex items-center justify-center gap-2 border border-slate-800 hover:border-orange-500/30 shadow-md cursor-pointer mt-2 text-center"
                     >
                       <Smartphone className="w-4 h-4 text-orange-500 shrink-0" />
@@ -4765,8 +4771,9 @@ export default function App() {
 
                     {/* Download Android App Button */}
                     <a
-                      href="/downloads/app-debug.apk"
-                      download="TorqueLog-Entregador.apk"
+                      href="/api/download-apk"
+                      target="_blank"
+                      rel="noopener noreferrer"
                       className="w-full bg-slate-900 hover:bg-slate-850 active:transform active:scale-95 text-orange-500 hover:text-orange-400 font-mono font-bold text-xs py-3 rounded-xl transition duration-150 flex items-center justify-center gap-2 border border-slate-800 hover:border-orange-500/30 shadow-md cursor-pointer text-center"
                     >
                       <Smartphone className="w-4 h-4 text-orange-500 shrink-0" />
@@ -6299,6 +6306,7 @@ export default function App() {
                             setEditClientValorPagoMotoboy(cli.valorPagoMotoboy);
                             setEditClientMotoboysAtivos(cli.motoboysAtivos || 0);
                             setEditClientRamo(cli.ramo || 'Autopeças');
+                            setEditClientCNPJ(cli.cnpj || '');
                             setEditClientIndicadoPorRepId(cli.indicadoPorRepId || '');
                             setEditClientNotaAdmin(cli.notaAdmin || '');
                             setEditClientAdminBloqueado(!!cli.adminBloqueado);
@@ -11812,6 +11820,19 @@ export default function App() {
 
                 <div>
                   <label className="block text-xs font-bold text-slate-700 uppercase mb-1 font-mono">
+                    CNPJ do Parceiro (Opcional)
+                  </label>
+                  <input
+                    type="text"
+                    value={newClientCNPJ}
+                    onChange={(e) => setNewClientCNPJ(e.target.value)}
+                    placeholder="Ex: 12.345.678/0001-90"
+                    className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded-lg p-2.5 text-xs focus:ring-2 focus:ring-orange-500 focus:border-orange-500 font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1 font-mono">
                     Ramo da Empresa / Estabelecimento *
                   </label>
                   <select
@@ -12096,6 +12117,19 @@ export default function App() {
                     value={editClientNome}
                     onChange={(e) => setEditClientNome(e.target.value)}
                     placeholder="Ex: Oficina Mecânica do Renan"
+                    className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded-lg p-2.5 text-xs focus:ring-2 focus:ring-orange-500 focus:border-orange-500 font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1 font-mono">
+                    CNPJ do Parceiro (Opcional)
+                  </label>
+                  <input
+                    type="text"
+                    value={editClientCNPJ}
+                    onChange={(e) => setEditClientCNPJ(e.target.value)}
+                    placeholder="Ex: 12.345.678/0001-90"
                     className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded-lg p-2.5 text-xs focus:ring-2 focus:ring-orange-500 focus:border-orange-500 font-mono"
                   />
                 </div>

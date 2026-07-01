@@ -30,6 +30,20 @@ async function startServer() {
     res.json({ status: "ok", message: "TorqueLog Node.js Backend operando com sucesso!" });
   });
 
+  // Rota dedicada e segura para download direto do APK no Android com mime-types e headers corretos
+  app.get("/api/download-apk", (req, res) => {
+    const apkPath = path.join(process.cwd(), "public", "downloads", "app-debug.apk");
+    res.setHeader("Content-Type", "application/vnd.android.package-archive");
+    res.download(apkPath, "TorqueLog-Entregador.apk", (err) => {
+      if (err) {
+        console.error("[Download APK] Erro ao baixar APK:", err);
+        if (!res.headersSent) {
+          res.status(404).send("Arquivo APK temporariamente indisponível. Por favor, tente novamente mais tarde.");
+        }
+      }
+    });
+  });
+
   // Rota de envio de email de confirmação usando SMTP real com fallback para simulação em ambiente de desenvolvimento
   app.post("/api/send-email", async (req, res) => {
     const { to, subject, body, html } = req.body;
