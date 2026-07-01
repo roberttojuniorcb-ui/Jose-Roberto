@@ -3817,7 +3817,7 @@ export default function App() {
     }
     if (mapsPreference === 'always_open') {
       handleAtualizarStatusOrdem(o.id, 'Moto a Caminho');
-      handleAbrirGoogleMaps(o);
+      handleAbrirGoogleMaps(o, true);
     } else if (mapsPreference === 'always_skip_maps') {
       handleAtualizarStatusOrdem(o.id, 'Moto a Caminho');
     } else {
@@ -9121,19 +9121,11 @@ export default function App() {
                           <div className="flex flex-col gap-1.5 w-full">
                             <button
                               type="button"
-                              onClick={() => handleAbrirGoogleMaps(o, false)}
-                              className="bg-slate-900 hover:bg-slate-850 active:scale-95 text-white font-mono font-bold text-xs px-3 py-2 rounded-lg transition shadow cursor-pointer flex items-center gap-1.5 justify-center w-full grow font-black"
-                            >
-                              <Navigation className="w-3.5 h-3.5" />
-                              Ver Rota (Google Maps) 🗺️
-                            </button>
-                            <button
-                              type="button"
                               onClick={() => handleAbrirGoogleMaps(o, true)}
                               className="bg-orange-600 hover:bg-orange-700 active:scale-95 text-white font-mono font-bold text-xs px-3 py-2 rounded-lg transition shadow cursor-pointer flex items-center gap-1.5 justify-center w-full grow font-black"
                             >
                               <Navigation className="w-3.5 h-3.5 animate-pulse" />
-                              Iniciar Trajeto (GPS Navegação) 🚀
+                              Iniciar Trajeto (GPS Rota) 🚀
                             </button>
                             <button
                               type="button"
@@ -10887,24 +10879,7 @@ export default function App() {
                   className="w-full bg-orange-600 hover:bg-orange-700 active:scale-98 text-white font-black text-xs py-3 rounded-xl transition duration-155 flex items-center justify-center gap-2 shadow-md shadow-orange-500/10 cursor-pointer text-center"
                 >
                   <Navigation className="w-4 h-4 text-white animate-pulse" />
-                  Sim, Aceitar e Iniciar Trajeto GPS 🚀
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    handleAtualizarStatusOrdem(orderToAcceptPrompt.id, 'Moto a Caminho');
-                    handleAbrirGoogleMaps(orderToAcceptPrompt, false);
-                    if (rememberPreference) {
-                      localStorage.setItem('torque_log_maps_pref', 'always_open');
-                      setMapsPreference('always_open');
-                    }
-                    setOrderToAcceptPrompt(null);
-                  }}
-                  className="w-full bg-slate-900 hover:bg-slate-800 active:scale-98 text-white font-bold text-xs py-2.5 rounded-xl transition cursor-pointer text-center flex items-center justify-center gap-2"
-                >
-                  <Navigation className="w-3.5 h-3.5 text-white" />
-                  Sim, Aceitar e Apenas Ver Rota 🗺️
+                  Sim, Aceitar e Iniciar Trajeto 🚀
                 </button>
                 
                 <button
