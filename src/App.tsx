@@ -439,6 +439,7 @@ export default function App() {
   const [newMotoboyEmpresaExclusiva, setNewMotoboyEmpresaExclusiva] = useState<string>('');
   const [newMotoboyVeiculo, setNewMotoboyVeiculo] = useState<string>('Moto');
   const [newMotoboyTipoMoto, setNewMotoboyTipoMoto] = useState<'alugada' | 'propria'>('propria');
+  const [newMotoboyValorCombustivel, setNewMotoboyValorCombustivel] = useState<number>(0.50);
 
   // --- STATE FOR MOTOBOY EDITING (CRUD) ---
   const [motoboyParaEditar, setMotoboyParaEditar] = useState<Motoboy | null>(null);
@@ -453,6 +454,7 @@ export default function App() {
   const [editMotoboyEmpresaExclusiva, setEditMotoboyEmpresaExclusiva] = useState<string>('');
   const [editMotoboyVeiculo, setEditMotoboyVeiculo] = useState<string>('Moto');
   const [editMotoboyTipoMoto, setEditMotoboyTipoMoto] = useState<'alugada' | 'propria'>('propria');
+  const [editMotoboyValorCombustivel, setEditMotoboyValorCombustivel] = useState<number>(0.50);
 
   // --- REGISTRADOR DE ODÔMETROS ESTADOS ---
   const [isCheckinModalOpen, setCheckinModalOpen] = useState<boolean>(false);
@@ -824,7 +826,7 @@ export default function App() {
   const hasMotoboyChanged = (a: Motoboy, b: Motoboy) => {
     const keys: (keyof Motoboy)[] = [
       'nome', 'telefone', 'cidade', 'senha', 'valorRepasseFixo', 'situacao', 
-      'empresaExclusiva', 'veiculo', 'valorContratoExclusivo', 'valorTaxaFreelancer'
+      'empresaExclusiva', 'veiculo', 'valorCombustivelPorKm', 'valorTaxaFreelancer'
     ];
     return keys.some(k => {
       const valA = a[k] ?? '';
@@ -1261,12 +1263,13 @@ export default function App() {
                 cidade: m.cidade,
                 senha: m.senha,
                 valorRepasseFixo: Number(m.valor_repasse_fixo || m.valorRepasseFixo || 4.00),
-                valorContratoExclusivo: Number(m.valor_contrato_exclusivo || m.valorContratoExclusivo || 150.00),
+                valorContratoExclusivo: Number(m.valor_contrato_exclusivo || m.valorContratoExclusivo || 0.00),
                 valorTaxaFreelancer: Number(m.valor_taxa_freelancer || m.valorTaxaFreelancer || 6.00),
                 situacao: m.situacao || 'Ativo',
                 empresaExclusiva: m.empresa_exclusiva || m.empresaExclusiva || '',
                 veiculo: m.veiculo || 'Moto',
                 tipoMoto: m.tipo_moto || m.tipoMoto || 'propria',
+                valorCombustivelPorKm: Number(m.valor_combustivel_por_km || m.valorCombustivelPorKm || 0.50),
                 criadoEm: m.criado_em || m.criadoEm
               }));
               prevMotoboysRef.current = mappedMoto;
@@ -2850,12 +2853,13 @@ export default function App() {
       cidade: editMotoboyCidade,
       senha: editMotoboySenha || motoboyParaEditar.senha,
       valorRepasseFixo: Number(editMotoboyRepasse) || 4.00,
-      valorContratoExclusivo: Number(editMotoboyContratoExclusivo) || 150.00,
+      valorContratoExclusivo: 0,
       valorTaxaFreelancer: Number(editMotoboyTaxaFreelancer) || 6.00,
       situacao: editMotoboySituacao || 'Ativo',
       empresaExclusiva: editMotoboyEmpresaExclusiva || undefined,
       veiculo: editMotoboyVeiculo,
-      tipoMoto: editMotoboyTipoMoto
+      tipoMoto: editMotoboyTipoMoto,
+      valorCombustivelPorKm: editMotoboyTipoMoto === 'alugada' ? Number(editMotoboyValorCombustivel) : 0.50
     };
 
     setMotoboys(prev => prev.map(m => m.id === motoboyParaEditar.id ? updatedMb : m));
@@ -3675,12 +3679,13 @@ export default function App() {
       cidade: newMotoboyCidade,
       senha: newMotoboySenha || 'passos123',
       valorRepasseFixo: Number(newMotoboyRepasse) || 4.00,
-      valorContratoExclusivo: Number(newMotoboyContratoExclusivo) || 150.00,
+      valorContratoExclusivo: 0,
       valorTaxaFreelancer: Number(newMotoboyTaxaFreelancer) || 6.00,
       criadoEm: new Date().toISOString(),
       empresaExclusiva: newMotoboyEmpresaExclusiva || undefined,
       veiculo: newMotoboyVeiculo,
-      tipoMoto: newMotoboyTipoMoto
+      tipoMoto: newMotoboyTipoMoto,
+      valorCombustivelPorKm: newMotoboyTipoMoto === 'alugada' ? Number(newMotoboyValorCombustivel) : 0.50
     };
 
     setMotoboys(prev => [novoMotoboy, ...prev]);
@@ -3911,7 +3916,7 @@ export default function App() {
     // LÓGICA DE DETECÇÃO E RETENÇÃO DE COMBUSTÍVEL PARA MOTO ALUGADA TORQUELOG:
     if (activeMotoboyUser && activeMotoboyUser.tipoMoto === 'alugada' && updatedO) {
       const orderDistance = updatedO.distanciaKm || 4.2; // fallback
-      const combDeducao = orderDistance * 0.50; // R$ 0.50 por KM
+      const combDeducao = orderDistance * (activeMotoboyUser.valorCombustivelPorKm ?? 0.50); // custom or standard R$ 0.50 por KM
       setLivroCaixaCombustivelTorquelog(prev => prev + combDeducao);
       
       const updatedRiders = motoboys.map(m => {
@@ -6465,20 +6470,7 @@ export default function App() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label className="block text-[9px] font-bold text-slate-755 uppercase mb-0.5 font-mono">Diária Contrato Exclusivo (R$)</label>
-                      <input
-                        type="number"
-                        step="1.00"
-                        min="0"
-                        required
-                        value={newMotoboyContratoExclusivo}
-                        onChange={(e) => setNewMotoboyContratoExclusivo(parseFloat(e.target.value) || 0)}
-                        placeholder="Ex: 150.00"
-                        className="w-full bg-white text-slate-900 border border-slate-250 rounded p-2 text-xs focus:ring-2 focus:ring-orange-550 font-mono font-bold text-orange-650"
-                      />
-                    </div>
+                  <div className="grid grid-cols-1 gap-2">
                     <div>
                       <label className="block text-[9px] font-bold text-slate-755 uppercase mb-0.5 font-mono">Taxa por Corrida Freelancer (R$)</label>
                       <input
@@ -6541,34 +6533,55 @@ export default function App() {
                   </div>
 
                   {newMotoboyVeiculo === 'Moto' && (
-                    <div>
-                      <label className="block text-[9px] font-bold text-slate-705 uppercase mb-1 font-mono">
-                        Vínculo da Motocicleta (Frota)
-                      </label>
-                      <div className="grid grid-cols-2 gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setNewMotoboyTipoMoto('propria')}
-                          className={`py-1.5 px-3 rounded text-[10px] font-mono font-bold border transition ${
-                            newMotoboyTipoMoto === 'propria'
-                              ? 'bg-orange-500 border-orange-500 text-white shadow-sm'
-                              : 'bg-white border-slate-255 text-slate-700 hover:bg-slate-50'
-                          }`}
-                        >
-                          🏍️ Moto Própria
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setNewMotoboyTipoMoto('alugada')}
-                          className={`py-1.5 px-3 rounded text-[10px] font-mono font-bold border transition ${
-                            newMotoboyTipoMoto === 'alugada'
-                              ? 'bg-rose-600 border-rose-600 text-white shadow-sm'
-                              : 'bg-white border-slate-255 text-slate-700 hover:bg-slate-50'
-                          }`}
-                        >
-                          🔑 Moto Alugada (Frota)
-                        </button>
+                    <div className="space-y-2">
+                      <div>
+                        <label className="block text-[9px] font-bold text-slate-705 uppercase mb-1 font-mono">
+                          Vínculo da Motocicleta (Frota)
+                        </label>
+                        <div className="grid grid-cols-2 gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setNewMotoboyTipoMoto('propria')}
+                            className={`py-1.5 px-3 rounded text-[10px] font-mono font-bold border transition ${
+                              newMotoboyTipoMoto === 'propria'
+                                ? 'bg-orange-500 border-orange-500 text-white shadow-sm'
+                                : 'bg-white border-slate-255 text-slate-700 hover:bg-slate-50'
+                            }`}
+                          >
+                            🏍️ Moto Própria
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setNewMotoboyTipoMoto('alugada')}
+                            className={`py-1.5 px-3 rounded text-[10px] font-mono font-bold border transition ${
+                              newMotoboyTipoMoto === 'alugada'
+                                ? 'bg-rose-600 border-rose-600 text-white shadow-sm'
+                                : 'bg-white border-slate-255 text-slate-700 hover:bg-slate-50'
+                            }`}
+                          >
+                            🔑 Moto Alugada (Frota)
+                          </button>
+                        </div>
                       </div>
+
+                      {newMotoboyTipoMoto === 'alugada' && (
+                        <div className="p-2 bg-slate-50 border border-slate-200 rounded-lg space-y-1">
+                          <label className="block text-[9px] font-bold text-slate-705 uppercase font-mono">
+                            Cobrança de Combustível por KM (R$)
+                          </label>
+                          <input
+                            type="number"
+                            step="0.05"
+                            min="0"
+                            max="5"
+                            required
+                            value={newMotoboyValorCombustivel}
+                            onChange={(e) => setNewMotoboyValorCombustivel(parseFloat(e.target.value) || 0)}
+                            className="w-full bg-white text-slate-900 border border-slate-250 rounded p-1 text-xs font-mono font-bold text-rose-600"
+                          />
+                          <p className="text-[8px] text-slate-450 font-mono">Caso queira cobrar menos que o padrão de R$ 0,50 por KM.</p>
+                        </div>
+                      )}
                     </div>
                   )}
 
@@ -6633,12 +6646,13 @@ export default function App() {
                           setEditMotoboyCidade(m.cidade);
                           setEditMotoboySenha(m.senha);
                           setEditMotoboyRepasse(m.valorRepasseFixo);
-                          setEditMotoboyContratoExclusivo(m.valorContratoExclusivo || 150.00);
+                          setEditMotoboyContratoExclusivo(0);
                           setEditMotoboyTaxaFreelancer(m.valorTaxaFreelancer || 6.00);
                           setEditMotoboySituacao(m.situacao || 'Ativo');
                           setEditMotoboyEmpresaExclusiva(m.empresaExclusiva || '');
                           setEditMotoboyVeiculo(m.veiculo || 'Moto');
                           setEditMotoboyTipoMoto(m.tipoMoto || 'propria');
+                          setEditMotoboyValorCombustivel(m.valorCombustivelPorKm || 0.50);
                         }}
                         className="bg-slate-100 hover:bg-slate-200 text-slate-700 p-1.5 rounded transition border border-slate-250 cursor-pointer self-center"
                         title="Editar credenciamento de motoboy"
@@ -7966,7 +7980,7 @@ export default function App() {
                 📅 Conciliação Quinzenal & Liquidação de Frota
               </h2>
               <p className="text-xs text-slate-400 mt-1 font-mono">
-                Gerencie o faturamento corporativo CNPJ com incidência de 6%, retenção de combustível (R$0,50/km) e descontos de aluguel fixo de R$700,00.
+                Gerencie o faturamento corporativo CNPJ com incidência de 6%, retenção parametrizável de combustível e descontos de aluguel fixo de R$700,00.
               </p>
             </div>
 
@@ -8139,7 +8153,7 @@ export default function App() {
 
                   const isAlugada = mb.tipoMoto === 'alugada';
                   const kmRodadoQuinzenal = isAlugada ? (mb.kmSaidaAcumuladaQuinzenal || 0) : 0;
-                  const deducaoCombustivelAmt = isAlugada ? kmRodadoQuinzenal * 0.50 : 0;
+                  const deducaoCombustivelAmt = isAlugada ? kmRodadoQuinzenal * (mb.valorCombustivelPorKm ?? 0.50) : 0;
 
                   const taxaAluguelMoto = isAlugada ? 700.00 : 0;
 
@@ -8472,8 +8486,8 @@ export default function App() {
                             <span className="font-black text-orange-600">{m.kmSaidaAcumuladaQuinzenal || 0} km</span>
                           </div>
                           <div className="flex justify-between">
-                            <span>⛽ Retenção Combustível (R$0,50/km):</span>
-                            <span className="font-bold text-rose-600">R$ {((m.kmSaidaAcumuladaQuinzenal || 0) * 0.50).toFixed(2)}</span>
+                            <span>⛽ Retenção Combustível (R${(m.valorCombustivelPorKm ?? 0.50).toFixed(2)}/km):</span>
+                            <span className="font-bold text-rose-600">R$ {((m.kmSaidaAcumuladaQuinzenal || 0) * (m.valorCombustivelPorKm ?? 0.50)).toFixed(2)}</span>
                           </div>
                         </div>
 
@@ -8505,13 +8519,13 @@ export default function App() {
                           </div>
 
                           <div>
-                            <label className="block text-[8px] font-bold uppercase text-slate-505 mb-0.5">Valor do Contrato Exclusivo (R$)</label>
+                            <label className="block text-[8px] font-bold uppercase text-slate-505 mb-0.5">Combustível por KM (R$)</label>
                             <input 
                               type="number" 
-                              step="5.00"
-                              defaultValue={m.valorContratoExclusivo || 150.00}
-                              id={`excl-rate-${m.id}`}
-                              className="w-full bg-white border border-slate-200 rounded p-1.5 text-[11px] text-slate-900 font-bold text-orange-600"
+                              step="0.05"
+                              defaultValue={m.valorCombustivelPorKm ?? 0.50}
+                              id={`fuel-rate-${m.id}`}
+                              className="w-full bg-white border border-slate-200 rounded p-1.5 text-[11px] text-slate-900 font-bold text-rose-600"
                             />
                           </div>
 
@@ -8520,7 +8534,7 @@ export default function App() {
                             onClick={() => {
                               const fixo = parseFloat((document.getElementById(`fixed-repasse-${m.id}`) as HTMLInputElement)?.value) || 4.00;
                               const free = parseFloat((document.getElementById(`free-rate-${m.id}`) as HTMLInputElement)?.value) || 6.00;
-                              const excl = parseFloat((document.getElementById(`excl-rate-${m.id}`) as HTMLInputElement)?.value) || 150.00;
+                              const fuel = parseFloat((document.getElementById(`fuel-rate-${m.id}`) as HTMLInputElement)?.value) || 0.50;
                               
                               const updated = motoboys.map(item => {
                                 if (item.id === m.id) {
@@ -8528,7 +8542,8 @@ export default function App() {
                                     ...item,
                                     valorRepasseFixo: fixo,
                                     valorTaxaFreelancer: free,
-                                    valorContratoExclusivo: excl
+                                    valorCombustivelPorKm: fuel,
+                                    valorContratoExclusivo: 0
                                   };
                                 }
                                 return item;
@@ -8996,7 +9011,7 @@ export default function App() {
                   </div>
                   <div className="flex justify-between items-center text-emerald-400">
                     <span>🔥 Retenção Combustível (Caixa):</span>
-                    <strong className="font-bold">- R$ {((activeMotoboyUser.kmSaidaAcumuladaQuinzenal || 0) * 0.50).toFixed(2)}</strong>
+                    <strong className="font-bold">- R$ {((activeMotoboyUser.kmSaidaAcumuladaQuinzenal || 0) * (activeMotoboyUser.valorCombustivelPorKm ?? 0.50)).toFixed(2)}</strong>
                   </div>
                   <div className="flex justify-between items-center text-amber-400">
                     <span>📝 Mensalidade/Aluguel Quinzenal Moto:</span>
@@ -9006,13 +9021,13 @@ export default function App() {
                   <div className="border-t border-slate-850 pt-2 flex justify-between items-center text-xs font-black">
                     <span className="text-slate-300">💰 Deduções Acumuladas Provisórias:</span>
                     <span className="text-rose-455 text-rose-400 font-black">
-                      R$ {(((activeMotoboyUser.kmSaidaAcumuladaQuinzenal || 0) * 0.50) + 700.00).toFixed(2)}
+                      R$ {(((activeMotoboyUser.kmSaidaAcumuladaQuinzenal || 0) * (activeMotoboyUser.valorCombustivelPorKm ?? 0.50)) + 700.00).toFixed(2)}
                     </span>
                   </div>
                 </div>
 
                 <div className="p-2 bg-slate-900 border border-slate-800 rounded-lg text-[9px] text-slate-400 leading-normal">
-                  💡 <strong>Regra 15 dias:</strong> O aluguel fixo de R$ 700,00 e o combustível de R$ 0,50/KM são descontados no fechamento da quinzena. KMs das corridas locais baseiam-se na distância do setor (quadrante). Entregas Intermunicipais baseiam-se nos KMs reais computados.
+                  💡 <strong>Regra 15 dias:</strong> O aluguel fixo de R$ 700,00 e o combustível de R$ {(activeMotoboyUser.valorCombustivelPorKm ?? 0.50).toFixed(2)}/KM são descontados no fechamento da quinzena. KMs das corridas locais baseiam-se na distância do setor (quadrante). Entregas Intermunicipais baseiam-se nos KMs reais computados.
                 </div>
               </div>
             </div>
@@ -12814,35 +12829,19 @@ export default function App() {
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 uppercase mb-1 font-mono">
-                      Diária Contrato Exclusivo (R$)
-                    </label>
-                    <input
-                      type="number"
-                      step="1.00"
-                      min="0"
-                      required
-                      value={editMotoboyContratoExclusivo}
-                      onChange={(e) => setEditMotoboyContratoExclusivo(parseFloat(e.target.value) || 0)}
-                      className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded-lg p-2.5 text-xs focus:ring-2 focus:ring-orange-500 font-mono font-bold text-orange-650"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 uppercase mb-1 font-mono">
-                      Taxa Corrida Freelancer (R$)
-                    </label>
-                    <input
-                      type="number"
-                      step="0.50"
-                      min="0"
-                      required
-                      value={editMotoboyTaxaFreelancer}
-                      onChange={(e) => setEditMotoboyTaxaFreelancer(parseFloat(e.target.value) || 0)}
-                      className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded-lg p-2.5 text-xs focus:ring-2 focus:ring-orange-500 font-mono font-bold text-emerald-650"
-                    />
-                  </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1 font-mono">
+                    Taxa Corrida Freelancer (R$)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.50"
+                    min="0"
+                    required
+                    value={editMotoboyTaxaFreelancer}
+                    onChange={(e) => setEditMotoboyTaxaFreelancer(parseFloat(e.target.value) || 0)}
+                    className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded-lg p-2.5 text-xs focus:ring-2 focus:ring-orange-500 font-mono font-bold text-emerald-650"
+                  />
                 </div>
 
                 <div>
@@ -12897,34 +12896,55 @@ export default function App() {
                 </div>
 
                 {editMotoboyVeiculo === 'Moto' && (
-                  <div>
-                    <label className="block text-xs font-bold text-slate-705 uppercase mb-1 font-mono">
-                      Vínculo da Motocicleta (Frota)
-                    </label>
-                    <div className="grid grid-cols-2 gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setEditMotoboyTipoMoto('propria')}
-                        className={`py-1.5 px-3 rounded text-[11px] font-mono font-bold border transition ${
-                          editMotoboyTipoMoto === 'propria'
-                            ? 'bg-orange-500 border-orange-500 text-white shadow-sm'
-                            : 'bg-white border-slate-250 text-slate-700 hover:bg-slate-50'
-                        }`}
-                      >
-                        🏍️ Moto Própria
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setEditMotoboyTipoMoto('alugada')}
-                        className={`py-1.5 px-3 rounded text-[11px] font-mono font-bold border transition ${
-                          editMotoboyTipoMoto === 'alugada'
-                            ? 'bg-rose-600 border-rose-600 text-white shadow-sm'
-                            : 'bg-white border-slate-250 text-slate-700 hover:bg-slate-50'
-                        }`}
-                      >
-                        🔑 Moto Alugada (Frota)
-                      </button>
+                  <div className="space-y-2">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-705 uppercase mb-1 font-mono">
+                        Vínculo da Motocicleta (Frota)
+                      </label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setEditMotoboyTipoMoto('propria')}
+                          className={`py-1.5 px-3 rounded text-[11px] font-mono font-bold border transition ${
+                            editMotoboyTipoMoto === 'propria'
+                              ? 'bg-orange-500 border-orange-500 text-white shadow-sm'
+                              : 'bg-white border-slate-250 text-slate-700 hover:bg-slate-50'
+                          }`}
+                        >
+                          🏍️ Moto Própria
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setEditMotoboyTipoMoto('alugada')}
+                          className={`py-1.5 px-3 rounded text-[11px] font-mono font-bold border transition ${
+                            editMotoboyTipoMoto === 'alugada'
+                              ? 'bg-rose-600 border-rose-600 text-white shadow-sm'
+                              : 'bg-white border-slate-250 text-slate-700 hover:bg-slate-50'
+                          }`}
+                        >
+                          🔑 Moto Alugada (Frota)
+                        </button>
+                      </div>
                     </div>
+
+                    {editMotoboyTipoMoto === 'alugada' && (
+                      <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-lg space-y-1">
+                        <label className="block text-xs font-bold text-slate-705 uppercase font-mono">
+                          Cobrança de Combustível por KM (R$)
+                        </label>
+                        <input
+                          type="number"
+                          step="0.05"
+                          min="0"
+                          max="5"
+                          required
+                          value={editMotoboyValorCombustivel}
+                          onChange={(e) => setEditMotoboyValorCombustivel(parseFloat(e.target.value) || 0)}
+                          className="w-full bg-white text-slate-900 border border-slate-200 rounded-lg p-2 text-xs focus:ring-2 focus:ring-orange-500 font-mono font-bold text-rose-600"
+                        />
+                        <p className="text-[10px] text-slate-450 font-mono">Caso queira cobrar menos que o padrão de R$ 0,50 por KM.</p>
+                      </div>
+                    )}
                   </div>
                 )}
 

@@ -58,6 +58,7 @@ export interface Motoboy {
   kmSaidaAcumuladaQuinzenal?: number; // total work kms within current 15 days
   valorContratoExclusivo?: number; // Valor fixo contratado por dia/mês (diária ou mensalidade contratada)
   valorTaxaFreelancer?: number; // Valor pago por entrega avulsa (freelancer)
+  valorCombustivelPorKm?: number; // Valor cobrado de combustivel por KM (padrão R$ 0.50)
 }
 
 export interface RegistroOdometro {
