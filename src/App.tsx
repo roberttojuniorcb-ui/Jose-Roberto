@@ -1627,18 +1627,6 @@ export default function App() {
 
   // Calculate real driving round-trip distances using live Google Maps
   useEffect(() => {
-    const apiKey = process.env.GOOGLE_MAPS_PLATFORM_KEY || 
-                   (import.meta as any).env?.VITE_GOOGLE_MAPS_PLATFORM_KEY || 
-                   process.env.VITE_GOOGLE_MAPS_PLATFORM_KEY || '';
-    if (!apiKey) {
-      setGoogleMapsDistance(prev => ({
-        ...prev,
-        status: 'idle',
-        errorMsg: 'Chave do Google Maps não configurada nos Segredos do AI Studio.'
-      }));
-      return;
-    }
-
     let finalDest = '';
     if (destinoTipo === 'endereco') {
       if (!destinoEndereco.trim()) {
@@ -1680,7 +1668,7 @@ export default function App() {
                 status: 'success',
                 origemUsed: finalOrigem,
                 destinoUsed: finalDest,
-                errorMsg: data.isFallback ? 'Usando estimativa regional do setor (API de Mapas em modo contingência).' : undefined
+                errorMsg: data.isFallback ? (data.message || 'Usando estimativa regional do setor (API de Mapas em modo contingência).') : undefined
               });
               return;
             }
@@ -3779,8 +3767,9 @@ export default function App() {
   const handleAbrirGoogleMaps = (o: OrdemServico, navigateMode: boolean = false) => {
     const cli = clientes.find(c => c.id === o.clienteId || c.nome.toLowerCase() === o.clienteNome.toLowerCase());
     const deCidade = cli?.cidade || o.cidade || 'Passos, MG';
+    const origemBase = cli?.endereco || activeClienteUser?.endereco || "Av. da Moda, Passos - MG";
     const origemCep = cli?.cep ? `, CEP ${cli.cep}` : '';
-    const origem = `${cli?.endereco || ''}${origemCep}, ${deCidade}`;
+    const origem = `${origemBase}${origemBase.includes(deCidade) ? '' : `${origemCep}, ${deCidade}`}`;
     
     const destCli = clientes.find(c => c.nome.toLowerCase() === o.destinatarioNome?.toLowerCase() || c.id === o.destinatarioNome);
     const destCep = destCli?.cep ? `, CEP ${destCli.cep}` : '';
@@ -3799,8 +3788,9 @@ export default function App() {
     if (activeOrder) {
       const cli = clientes.find(c => c.id === activeOrder.clienteId || c.nome.toLowerCase() === activeOrder.clienteNome.toLowerCase());
       const deCidade = cli?.cidade || mb.cidade || 'Passos, MG';
+      const origemBase = cli?.endereco || activeClienteUser?.endereco || "Av. da Moda, Passos - MG";
       const origemCep = cli?.cep ? `, CEP ${cli.cep}` : '';
-      const origem = `${cli?.endereco || ''}${origemCep}, ${deCidade}`;
+      const origem = `${origemBase}${origemBase.includes(deCidade) ? '' : `${origemCep}, ${deCidade}`}`;
       
       const destCli = clientes.find(c => c.nome.toLowerCase() === activeOrder.destinatarioNome?.toLowerCase() || c.id === activeOrder.destinatarioNome);
       const destCep = destCli?.cep ? `, CEP ${destCli.cep}` : '';
@@ -9566,6 +9556,9 @@ export default function App() {
                 setApiResponseLog(apiPayload);
                 setApiLogTimestamp(new Date().toLocaleTimeString());
                 setApiActionDescription(`Novo despacho solicitado individualmente no portal do cliente: ${novaOrdemId}`);
+
+                // Automatically trigger and start the suggested Google Maps route in navigation mode
+                handleAbrirGoogleMaps(novaOrdem, true);
 
                 // Reset B2B dispatch fields to empty / false defaults for the next entry
                 setDestinoEndereco('');
